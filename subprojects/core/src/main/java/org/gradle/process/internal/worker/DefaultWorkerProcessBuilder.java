@@ -95,7 +95,14 @@ public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
 
     @Override
     public WorkerProcessBuilder applicationClasspath(Iterable<File> files) {
-        GUtil.addToCollection(applicationClasspath, files);
+        for (File file : files) {
+            if (file == null) {
+                throw new IllegalArgumentException("Illegal null value provided in this collection: " + files);
+            }
+            if (file.exists()) {
+                applicationClasspath.add(file);
+            }
+        }
         return this;
     }
 
