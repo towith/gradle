@@ -203,7 +203,6 @@ class ArtifactTransformWithFileInputsIntegrationTest extends AbstractDependencyR
         outputContains("result = [b.jar.green, c.jar.green]")
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can receive a file collection containing transform outputs as parameter"() {
         settingsFile << """
                 include 'a', 'b', 'c', 'd', 'e'
@@ -323,7 +322,6 @@ class ArtifactTransformWithFileInputsIntegrationTest extends AbstractDependencyR
         outputContains("result = [b.jar.green, c.jar.green]")
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can receive a task output file as parameter"() {
         settingsFile << """
                 include 'a', 'b', 'c', 'd', 'e'
@@ -376,7 +374,6 @@ class ArtifactTransformWithFileInputsIntegrationTest extends AbstractDependencyR
         outputContains("processing c.jar using tool-a.jar")
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can receive a task output directory as parameter"() {
         settingsFile << """
                 include 'a', 'b', 'c', 'd', 'e'
