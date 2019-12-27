@@ -26,6 +26,7 @@ import org.gradle.instantexecution.serialization.ReadContext
 import org.gradle.instantexecution.serialization.WriteContext
 import org.gradle.instantexecution.serialization.logNotImplemented
 
+
 object ActionNodeCodec : Codec<ActionNode> {
     override suspend fun WriteContext.encode(value: ActionNode) {
         if (value.action is DefaultConfiguration.ResolveGraphAction) {
