@@ -305,7 +305,6 @@ class ArtifactTransformValuesInjectionIntegrationTest extends AbstractDependency
         ].collect { it.name }
     }
 
-    @ToBeFixedForInstantExecution
     def "transform parameters are validated for input output annotations"() {
         settingsFile << """
             include 'a', 'b'

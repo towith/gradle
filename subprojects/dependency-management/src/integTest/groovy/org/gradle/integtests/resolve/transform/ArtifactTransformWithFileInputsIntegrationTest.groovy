@@ -81,7 +81,6 @@ class ArtifactTransformWithFileInputsIntegrationTest extends AbstractDependencyR
         outputContains("result = [b.jar.green, c.jar.green]")
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can receive a file collection containing external dependencies as parameter"() {
         mavenRepo.module("test", "tool-a", "1.2").publish()
         mavenRepo.module("test", "tool-b", "1.2").publish()
