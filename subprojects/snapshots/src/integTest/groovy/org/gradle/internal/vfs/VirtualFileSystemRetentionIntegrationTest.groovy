@@ -22,6 +22,7 @@ import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import spock.lang.IgnoreIf
 
+import static org.gradle.integtests.fixtures.ToBeFixedForInstantExecution.Skip.FLAKY
 import static org.gradle.internal.service.scopes.VirtualFileSystemServices.VFS_DROP_PROPERTY
 import static org.gradle.internal.service.scopes.VirtualFileSystemServices.VFS_RETENTION_ENABLED_PROPERTY
 
@@ -177,7 +178,7 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
         mainSourceFile.text = sourceFileWithGreeting("Hello World!")
 
         when:
-        run "run"
+        withoutRetention().run "run"
         then:
         outputContains "Hello World!"
         executedAndNotSkipped ":compileJava", ":classes", ":run"
@@ -209,7 +210,7 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
 
         when:
         mainSourceFile.text = sourceFileWithGreeting("Hello VFS!")
-        run "run"
+        withoutRetention().run "run"
         then:
         outputContains "Hello VFS!"
         executedAndNotSkipped ":compileJava", ":classes", ":run"
@@ -227,7 +228,7 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
         outputContains(incubatingMessage)
 
         when:
-        run("assemble")
+        withoutRetention().run("assemble")
         then:
         outputDoesNotContain(incubatingMessage)
     }
@@ -408,6 +409,7 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
         executedAndNotSkipped(":jar")
     }
 
+    @ToBeFixedForInstantExecution(skip = FLAKY, because = "https://github.com/gradle/instant-execution/issues/213")
     def "detects when local state is removed"() {
         buildFile << """
             plugins {
@@ -474,7 +476,12 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
     }
 
     private def withRetention() {
-        executer.withArgument  "-D${VFS_RETENTION_ENABLED_PROPERTY}"
+        executer.withArgument  "-D${VFS_RETENTION_ENABLED_PROPERTY}=true"
+        this
+    }
+
+    private def withoutRetention() {
+        executer.withArgument  "-D${VFS_RETENTION_ENABLED_PROPERTY}=false"
         this
     }
 

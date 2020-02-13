@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 the original author or authors.
+ * Copyright 2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,19 @@
  * limitations under the License.
  */
 
-package org.gradle.plugins.ide.internal.resolver;
+package org.gradle.integtests.tooling;
 
-import java.io.File;
+import org.gradle.tooling.BuildAction;
+import org.gradle.tooling.BuildController;
+import org.gradle.tooling.model.idea.IdeaProject;
+import org.gradle.tooling.model.kotlin.dsl.KotlinDslScriptsModel;
 
-public interface GradleApiSourcesResolver {
-    File resolveLocalGroovySources(String jarName);
+public class KotlinIdeaModelBuildAction implements BuildAction<Object> {
+
+    @Override
+    public Object execute(BuildController controller) {
+        controller.getModel(KotlinDslScriptsModel.class);
+        controller.getModel(IdeaProject.class);
+        return null;
+    }
 }
