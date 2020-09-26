@@ -16,24 +16,20 @@
 
 package org.gradle.api.internal.artifacts
 
-import org.gradle.api.internal.project.ProjectRegistry
 import org.gradle.test.fixtures.AbstractProjectBuilderSpec
 
 class ProjectBackedModuleTest extends AbstractProjectBuilderSpec {
-    ProjectModuleFactory factory = new DefaultProjectModuleFactory(Mock(ProjectRegistry) {
-        getAllProjects() >> []
-    })
 
     def "module exposes project properties"() {
         given:
-        def module = factory.getModule(project)
+        def module = new ProjectBackedModule(project)
 
         expect:
         module.name == project.name
         module.group == project.group.toString()
         module.version == project.version.toString()
         module.status == project.status.toString()
-        module.projectPath == project.path
+        module.projectId == project.mutationState.componentIdentifier
 
         when:
         project.group = "fo${1}o"

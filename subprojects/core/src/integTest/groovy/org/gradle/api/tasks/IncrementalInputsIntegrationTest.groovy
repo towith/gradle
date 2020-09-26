@@ -16,7 +16,7 @@
 
 package org.gradle.api.tasks
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.internal.execution.history.changes.ChangeTypeInternal
 import org.gradle.work.Incremental
 import spock.lang.Issue
@@ -30,7 +30,7 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
             void execute(InputChanges inputChanges) {
                 assert !(inputChanges instanceof ExtensionAware)
 
-                if (project.hasProperty('forceFail')) {
+                if (System.getProperty('forceFail')) {
                     throw new RuntimeException('failed')
                 }
 
@@ -84,7 +84,7 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
     }
 
     @Issue("https://github.com/gradle/gradle/issues/4166")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "task wrongly up-to-date")
     def "file in input dir appears in task inputs for #inputAnnotation"() {
         buildFile << """
             abstract class MyTask extends DefaultTask {
@@ -279,7 +279,7 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
         succeeds("myTask")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "task wrongly up-to-date")
     def "empty providers can be queried for incremental changes"() {
         file("buildSrc").deleteDir()
         buildFile.text = """
@@ -392,6 +392,8 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
     def "provides the file type"() {
         file("buildSrc").deleteDir()
         buildFile.text = """
+            import javax.inject.Inject
+
             abstract class MyCopy extends DefaultTask {
                 @Incremental
                 @PathSensitive(PathSensitivity.RELATIVE)
@@ -401,13 +403,16 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
                 @OutputDirectory
                 abstract DirectoryProperty getOutputDirectory()
 
+                @Inject
+                abstract FileSystemOperations getFs()
+
                 @TaskAction
                 void copy(InputChanges changes) {
                     if (!changes.incremental) {
                         println("Full rebuild - recreating output directory")
                         def outputDir = outputDirectory.get().asFile
-                        project.delete(outputDir)
-                        project.mkdir(outputDir)
+                        fs.delete { delete(outputDir) }
+                        outputDir.mkdirs()
                     }
                     changes.getFileChanges(inputDirectory).each { change ->
                         File outputFile = new File(outputDirectory.get().asFile, change.normalizedPath)
@@ -462,14 +467,14 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
         run("copy")
         then:
         executedAndNotSkipped(":copy")
-        outputDir.assertHasDescendants("modified.txt", "added.txt")
+        outputDir.assertHasDescendants("modified.txt", "added.txt", "subdir")
 
         when:
         inputDir.forceDeleteDir()
         run("copy")
         then:
         executedAndNotSkipped(":copy")
-        outputDir.assertIsEmptyDir()
+        outputDir.assertHasDescendants("subdir")
 
         when:
         inputDir.file("modified.txt").text = "some input"
@@ -483,7 +488,6 @@ class IncrementalInputsIntegrationTest extends AbstractIncrementalTasksIntegrati
         outputDir.assertIsEmptyDir()
     }
 
-    @ToBeFixedForInstantExecution(iterationMatchers = ".*ConfigurableFileTree.*")
     def "outputs are cleaned out on rebuild (output type: #type)"() {
         file("buildSrc").deleteDir()
         buildFile.text = """

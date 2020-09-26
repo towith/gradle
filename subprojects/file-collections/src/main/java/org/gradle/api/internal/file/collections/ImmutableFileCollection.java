@@ -74,6 +74,7 @@ public abstract class ImmutableFileCollection extends AbstractFileCollection {
     private static void nagUser() {
         DeprecationLogger.deprecateInternalApi("ImmutableFileCollection")
             .replaceWith("ProjectLayout.files()")
+            .willBeRemovedInGradle7()
             .withUserManual("lazy_configuration", "property_files_api_reference")
             .nagUser();
     }
@@ -98,13 +99,11 @@ public abstract class ImmutableFileCollection extends AbstractFileCollection {
             return files;
         }
 
-
         @Override
         public String toString() {
             if (files.size() == 1) {
                 return String.format("file '%s'", files.iterator().next().getAbsolutePath());
             }
-
             return super.toString();
         }
     }

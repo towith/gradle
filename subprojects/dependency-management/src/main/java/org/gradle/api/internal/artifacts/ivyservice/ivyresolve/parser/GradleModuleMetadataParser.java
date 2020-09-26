@@ -191,6 +191,7 @@ public class GradleModuleMetadataParser {
         List<ModuleDependency> dependencies = Collections.emptyList();
         List<ModuleDependencyConstraint> dependencyConstraints = Collections.emptyList();
         List<VariantCapability> capabilities = Collections.emptyList();
+        boolean availableExternally = false;
 
         reader.beginObject();
         while (reader.peek() != END_OBJECT) {
@@ -215,8 +216,7 @@ public class GradleModuleMetadataParser {
                     capabilities = consumeCapabilities(reader, true);
                     break;
                 case "available-at":
-                    // For now just collect this as another dependency
-                    // TODO - collect this information and merge the metadata from the other module
+                    availableExternally = true;
                     dependencies = consumeVariantLocation(reader);
                     break;
                 default:
@@ -228,6 +228,15 @@ public class GradleModuleMetadataParser {
         reader.endObject();
 
         MutableComponentVariant variant = metadata.addVariant(variantName, attributes);
+        variant.setAvailableExternally(availableExternally);
+        if (availableExternally) {
+            if (!dependencyConstraints.isEmpty()) {
+                throw new RuntimeException("A variant declared with available-at cannot declare dependency constraints");
+            }
+            if (!files.isEmpty()) {
+                throw new RuntimeException("A variant declared with available-at cannot declare files");
+            }
+        }
         populateVariant(files, dependencies, dependencyConstraints, capabilities, variant);
     }
 
@@ -283,7 +292,7 @@ public class GradleModuleMetadataParser {
     }
 
     private List<ModuleDependency> consumeDependencies(JsonReader reader) throws IOException {
-        List<ModuleDependency> dependencies = new ArrayList<ModuleDependency>();
+        List<ModuleDependency> dependencies = new ArrayList<>();
         reader.beginArray();
         while (reader.peek() != END_ARRAY) {
             String group = null;
@@ -424,7 +433,7 @@ public class GradleModuleMetadataParser {
     }
 
     private List<ModuleDependencyConstraint> consumeDependencyConstraints(JsonReader reader) throws IOException {
-        List<ModuleDependencyConstraint> dependencies = new ArrayList<ModuleDependencyConstraint>();
+        List<ModuleDependencyConstraint> dependencies = new ArrayList<>();
         reader.beginArray();
         while (reader.peek() != END_ARRAY) {
             String group = null;
@@ -504,7 +513,7 @@ public class GradleModuleMetadataParser {
     }
 
     private ImmutableList<ExcludeMetadata> consumeExcludes(JsonReader reader) throws IOException {
-        ImmutableList.Builder<ExcludeMetadata> builder = new ImmutableList.Builder<ExcludeMetadata>();
+        ImmutableList.Builder<ExcludeMetadata> builder = new ImmutableList.Builder<>();
         reader.beginArray();
         while (reader.peek() != END_ARRAY) {
             String group = null;
@@ -535,7 +544,7 @@ public class GradleModuleMetadataParser {
     }
 
     private List<ModuleFile> consumeFiles(JsonReader reader) throws IOException {
-        List<ModuleFile> files = new ArrayList<ModuleFile>();
+        List<ModuleFile> files = new ArrayList<>();
         reader.beginArray();
         while (reader.peek() != END_ARRAY) {
             String fileName = null;

@@ -25,10 +25,10 @@ import org.junit.Rule
 import spock.lang.Specification
 
 import static org.gradle.util.Matchers.isSerializable
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 
 class StartParameterTest extends Specification {
-    @Rule private TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    @Rule private TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     @Rule private SetSystemProperties systemProperties = new SetSystemProperties()
 
     void "new instance has correct state"() {

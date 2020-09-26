@@ -17,7 +17,7 @@
 
 package org.gradle.language.assembler
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.language.AbstractNativeLanguageIntegrationTest
 import org.gradle.nativeplatform.fixtures.RequiresInstalledToolChain
 import org.gradle.nativeplatform.fixtures.ToolChainRequirement
@@ -31,7 +31,6 @@ class AssemblyLanguageIntegrationTest extends AbstractNativeLanguageIntegrationT
 
     HelloWorldApp helloWorldApp = new AssemblerWithCHelloWorldApp(toolChain)
 
-    @ToBeFixedForInstantExecution
     def "build fails when assemble fails"() {
         given:
         buildFile << """
@@ -58,7 +57,7 @@ pushl
         failure.assertThatCause(containsText("Assembler failed while compiling broken.s"))
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can manually define Assembler source sets"() {
         given:
         helloWorldApp.mainSource.writeToDir(file("src/main"))

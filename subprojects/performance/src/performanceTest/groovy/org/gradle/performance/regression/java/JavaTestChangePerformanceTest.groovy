@@ -16,39 +16,28 @@
 
 package org.gradle.performance.regression.java
 
-import org.gradle.performance.AbstractCrossVersionGradleInternalPerformanceTest
-import org.gradle.performance.mutator.ApplyNonAbiChangeToJavaSourceFileMutator
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
+import org.gradle.performance.generator.JavaTestProject
+import org.gradle.profiler.mutations.ApplyNonAbiChangeToJavaSourceFileMutator
 import spock.lang.Unroll
 
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_JAVA_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.MEDIUM_JAVA_MULTI_PROJECT_WITH_TEST_NG
-
-class JavaTestChangePerformanceTest extends AbstractCrossVersionGradleInternalPerformanceTest {
+class JavaTestChangePerformanceTest extends AbstractCrossVersionPerformanceTest {
 
     @Unroll
-    def "test for non-abi change on #testProject"() {
+    def "test for non-abi change"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
-        runner.warmUpRuns = warmUpRuns
-        runner.runs = runs
+        def testProject = JavaTestProject.projectFor(runner.testProject)
+        runner.gradleOpts = runner.projectMemoryOptions
+        runner.warmUpRuns = 2
+        runner.runs = 6
         runner.tasksToRun = ['test']
-        runner.addBuildExperimentListener(new ApplyNonAbiChangeToJavaSourceFileMutator(testProject.config.fileToChangeByScenario['test']))
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.7-20200824220048+0000"]
+        runner.addBuildMutator { new ApplyNonAbiChangeToJavaSourceFileMutator(new File(it.projectDir, testProject.config.fileToChangeByScenario['test'])) }
 
         when:
         def result = runner.run()
 
         then:
         result.assertCurrentVersionHasNotRegressed()
-
-        where:
-        testProject                            | warmUpRuns | runs
-        LARGE_JAVA_MULTI_PROJECT               | 2          | 6
-        MEDIUM_JAVA_MULTI_PROJECT_WITH_TEST_NG | 2          | 6
-        LARGE_MONOLITHIC_JAVA_PROJECT          | 2          | 6
-
-        //monolithicJavaTestNGProject" - testNG requires more test workers, which take too long to start up
     }
 }

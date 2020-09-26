@@ -52,8 +52,9 @@ class ObjectFactoryExtensionsIntegrationTest extends AbstractIntegrationSpec {
         class MyExtensible {}
         
         task createExtension {
+            def objects = project.objects
             doLast {
-                def myExtensible = project.objects.newInstance(MyExtensible)
+                def myExtensible = objects.newInstance(MyExtensible)
                 assert myExtensible instanceof ExtensionAware
                 
                 myExtensible.extensions.create("thing", Thing)

@@ -1,6 +1,8 @@
 package configurations
 
-import common.Os
+import Gradle_Check.configurations.masterReleaseBranchFilter
+import Gradle_Check.configurations.triggerExcludes
+import common.Os.LINUX
 import common.applyDefaultSettings
 import common.buildToolGradleParameters
 import common.gradleWrapper
@@ -27,16 +29,7 @@ class StagePasses(model: CIBuildModel, stage: Stage, prevStage: Stage?, stagePro
     name = stage.stageName.stageName + " (Trigger)"
 
     applyDefaultSettings()
-    artifactRules = "build/build-receipt.properties"
-
-    val triggerExcludes = """
-        -:.idea
-        -:.github
-        -:.teamcity
-        -:.teamcityTest
-        -:subprojects/docs/src/docs/release
-    """.trimIndent()
-    val masterReleaseFilter = model.masterAndReleaseBranches.joinToString(prefix = "+:", separator = "\n+:")
+    artifactRules = "subprojects/base-services/build/generated-resources/build-receipt/org/gradle/build-receipt.properties"
 
     features {
         publishBuildStatusToGithub(model)
@@ -47,7 +40,7 @@ class StagePasses(model: CIBuildModel, stage: Stage, prevStage: Stage?, stagePro
             quietPeriodMode = VcsTrigger.QuietPeriodMode.USE_CUSTOM
             quietPeriod = 90
             triggerRules = triggerExcludes
-            branchFilter = masterReleaseFilter
+            branchFilter = masterReleaseBranchFilter
         }
     } else if (stage.trigger != Trigger.never) {
         triggers.schedule {
@@ -65,12 +58,12 @@ class StagePasses(model: CIBuildModel, stage: Stage, prevStage: Stage?, stagePro
             triggerBuild = always()
             withPendingChangesOnly = true
             param("revisionRule", "lastFinished")
-            param("branchFilter", masterReleaseFilter)
+            param("branchFilter", masterReleaseBranchFilter)
         }
     }
 
     params {
-        param("env.JAVA_HOME", buildJavaHome())
+        param("env.JAVA_HOME", LINUX.buildJavaHome())
     }
 
     val baseBuildType = this
@@ -78,27 +71,19 @@ class StagePasses(model: CIBuildModel, stage: Stage, prevStage: Stage?, stagePro
 
     val defaultGradleParameters = (
         buildToolGradleParameters() +
-            baseBuildType.buildCache.gradleParameters(Os.linux) +
+            baseBuildType.buildCache.gradleParameters(LINUX) +
             buildScanTags.map(::buildScanTag)
         ).joinToString(" ")
     steps {
         gradleWrapper {
             name = "GRADLE_RUNNER"
-            tasks = "createBuildReceipt" + if (stage.stageName == StageNames.READY_FOR_NIGHTLY) " updateBranchStatus" else ""
+            tasks = ":base-services:createBuildReceipt" + if (stage.stageName == StageNames.READY_FOR_NIGHTLY) " updateBranchStatus -PgithubToken=%github.bot-teamcity.token%" else ""
             gradleParams = defaultGradleParameters
         }
         script {
             name = "CHECK_CLEAN_M2"
             executionMode = BuildStep.ExecutionMode.ALWAYS
             scriptContent = m2CleanScriptUnixLike
-        }
-        if (model.tagBuilds) {
-            gradleWrapper {
-                name = "TAG_BUILD"
-                executionMode = BuildStep.ExecutionMode.ALWAYS
-                tasks = "tagBuild"
-                gradleParams = "$defaultGradleParameters -PteamCityToken=%teamcity.user.bot-gradle.token% -PteamCityBuildId=%teamcity.build.id% -PgithubToken=%github.ci.oauth.token% ${buildScanTag("StagePasses")}"
-            }
         }
     }
 

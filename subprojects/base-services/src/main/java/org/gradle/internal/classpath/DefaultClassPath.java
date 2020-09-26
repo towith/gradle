@@ -18,6 +18,7 @@ package org.gradle.internal.classpath;
 
 import org.gradle.api.specs.NotSpec;
 import org.gradle.api.specs.Spec;
+import org.gradle.internal.Cast;
 import org.gradle.internal.UncheckedException;
 import org.gradle.util.CollectionUtils;
 
@@ -78,13 +79,6 @@ public class DefaultClassPath implements ClassPath, Serializable {
 
     DefaultClassPath() {
         this(ImmutableUniqueList.<File>empty());
-    }
-
-    /**
-     * @deprecated Only here for the Kotlin DSL, use {@link #of(File...)} instead.
-     */
-    public DefaultClassPath(File... files) {
-        this(new ImmutableUniqueList<File>(Arrays.asList(files)));
     }
 
     protected DefaultClassPath(ImmutableUniqueList<File> files) {
@@ -235,7 +229,7 @@ public class DefaultClassPath implements ClassPath, Serializable {
             if (index >= size) {
                 throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
             }
-            return (T) asArray[index];
+            return Cast.uncheckedNonnullCast(asArray[index]);
         }
 
         @Override

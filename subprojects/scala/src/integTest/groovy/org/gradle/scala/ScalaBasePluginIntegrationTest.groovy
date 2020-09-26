@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.gradle.scala
+
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.ZincScalaCompileFixture
 import org.gradle.integtests.fixtures.MultiVersionIntegrationSpec
 import org.gradle.integtests.fixtures.TargetCoverage
@@ -86,6 +88,7 @@ task verify {
         succeeds("verify")
     }
 
+    @ToBeFixedForConfigurationCache
     def "not specifying a scala runtime produces decent error message"() {
         given:
         buildFile << """

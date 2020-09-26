@@ -26,24 +26,29 @@ import org.gradle.language.base.internal.compile.Compiler;
 import org.gradle.util.GradleVersion;
 
 import javax.inject.Inject;
-import java.io.File;
 import java.io.Serializable;
 
 public class ZincScalaCompilerFacade implements Compiler<ScalaJavaJointCompileSpec>, Serializable {
     private final CacheRepository cacheRepository;
-    private final Iterable<File> scalaClasspath;
+
+    private final HashedClasspath scalaClasspath;
+
+    private final boolean leakCompilerClasspath;
+
 
     @Inject
-    public ZincScalaCompilerFacade(CacheFactory cacheFactory, GradleUserHomeDirProvider gradleUserHomeDirProvider, Iterable<File> scalaClasspath) {
+    public ZincScalaCompilerFacade(CacheFactory cacheFactory, GradleUserHomeDirProvider gradleUserHomeDirProvider, HashedClasspath scalaClasspath, @Deprecated boolean leakCompilerClasspath) {
         // TODO: This should be injectable
+        // TODO: remove leakCompilerClasspath when ScalaLanguagePlugin is removed
         DefaultCacheScopeMapping cacheScopeMapping = new DefaultCacheScopeMapping(
                 gradleUserHomeDirProvider.getGradleUserHomeDirectory(), null, GradleVersion.current());
         this.cacheRepository = new DefaultCacheRepository(cacheScopeMapping, cacheFactory);
         this.scalaClasspath = scalaClasspath;
+        this.leakCompilerClasspath = leakCompilerClasspath;
     }
 
     @Override
     public WorkResult execute(ScalaJavaJointCompileSpec spec) {
-        return ZincScalaCompilerFactory.getCompiler(cacheRepository, scalaClasspath).execute(spec);
+        return ZincScalaCompilerFactory.getCompiler(cacheRepository, scalaClasspath, leakCompilerClasspath).execute(spec);
     }
 }

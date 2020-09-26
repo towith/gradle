@@ -49,6 +49,8 @@ class IvyFileModule extends AbstractModule implements IvyModule {
     final Map extendsFrom = [:]
     final Map extraAttributes = [:]
     final Map extraInfo = [:]
+    final List<Map<String, ?>> configurationExcludes = []
+
     private final List<VariantMetadataSpec> variants = [new VariantMetadataSpec("api", [(Usage.USAGE_ATTRIBUTE.name): Usage.JAVA_API, (LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE.name): LibraryElements.JAR, (Category.CATEGORY_ATTRIBUTE.name): Category.LIBRARY]),
                                                         new VariantMetadataSpec("runtime", [(Usage.USAGE_ATTRIBUTE.name): Usage.JAVA_RUNTIME, (LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE.name): LibraryElements.JAR, (Category.CATEGORY_ATTRIBUTE.name): Category.LIBRARY])]
     String branch = null
@@ -214,6 +216,17 @@ class IvyFileModule extends AbstractModule implements IvyModule {
 
     IvyFileModule dependsOn(Map<String, ?> attributes) {
         dependencies << attributes
+        return this
+    }
+
+    IvyFileModule exclude(Map<String, ?> attributes) {
+        configurationExcludes.add(attributes)
+        return this
+    }
+
+    IvyFileModule excludeFromConfig(String group, String module, String configuration) {
+        Map<String, ?> allAttrs = [organisation: group, module: module, conf: configuration]
+        configurationExcludes.add allAttrs
         return this
     }
 
@@ -536,6 +549,22 @@ class IvyFileModule extends AbstractModule implements IvyModule {
                     }
 
                 }
+            }
+            configurationExcludes.each { exclude ->
+                ivyFileWriter << "\n  <exclude"
+                if (exclude.containsKey("organisation")) {
+                    ivyFileWriter << " org=\"${exclude.organisation}\""
+                }
+                if (exclude.containsKey("module")) {
+                    ivyFileWriter << " module=\"${exclude.module}\""
+                }
+                if (exclude.containsKey("artifact")) {
+                    ivyFileWriter << " artifact=\"${exclude.artifact}\""
+                }
+                if (exclude.containsKey("conf")) {
+                    ivyFileWriter << " conf=\"${exclude.conf}\""
+                }
+                ivyFileWriter << "/>"
             }
             def compileDependencies = variants.find{ it.name == 'api' }?.dependencies
             def runtimeDependencies = variants.find{ it.name == 'runtime' }?.dependencies

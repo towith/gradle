@@ -16,7 +16,6 @@
 package org.gradle.integtests;
 
 import org.gradle.integtests.fixtures.AbstractIntegrationTest;
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution;
 import org.gradle.integtests.fixtures.executer.ExecutionFailure;
 import org.gradle.test.fixtures.file.TestFile;
 import org.junit.Test;
@@ -40,11 +39,10 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
     public void handlesWhitespaceOnlySettingsAndBuildFiles() {
         testFile("settings.gradle").write("   \n  ");
         testFile("build.gradle").write("   ");
-        inTestDirectory().withTaskList().run();
+        inTestDirectory().withTasks("help").run();
     }
 
     @Test
@@ -245,7 +243,7 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
 
         result = usingProjectDir(subDirectory).withTasks("help").runWithFailure();
         result.assertHasDescription(String.format("Project directory '%s' is not part of the build defined by settings file '%s'.", subDirectory, settingsFile));
-   }
+    }
 
     @Test
     public void canTargetRootProjectDirectoryFromSubDirectory() {
@@ -301,11 +299,14 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
     public void multiProjectBuildCanHaveSettingsFileAndRootBuildFileInSubDir() {
+        // Stop traversing to parent directory; otherwise embedded test execution will
+        // find and load the `gradle.properties` file in the root of the source repository
+        getTestDirectory().file("settings.gradle").createFile();
+
         TestFile buildFilesDir = getTestDirectory().file("root");
-        TestFile settingsFile = buildFilesDir.file("settings.gradle");
-        settingsFile.writelns(
+        TestFile relocatedSettingsFile = buildFilesDir.file("settings.gradle");
+        relocatedSettingsFile.writelns(
             "includeFlat 'child'",
             "rootProject.projectDir = new File(settingsDir, '..')",
             "rootProject.buildFileName = 'root/build.gradle'"
@@ -317,9 +318,9 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
         TestFile childBuildFile = testFile("child/build.gradle");
         childBuildFile.writelns("task('do-stuff')", "task('task')");
 
-        usingProjectDir(getTestDirectory()).usingSettingsFile(settingsFile).withTasks("do-stuff").run().assertTasksExecuted(":child:task", ":do-stuff", ":child:do-stuff").assertTaskOrder(":child:task", ":do-stuff");
+        usingProjectDir(getTestDirectory()).usingSettingsFile(relocatedSettingsFile).withTasks("do-stuff").run().assertTasksExecuted(":child:task", ":do-stuff", ":child:do-stuff").assertTaskOrder(":child:task", ":do-stuff");
         usingBuildFile(rootBuildFile).withTasks("do-stuff").run().assertTasksExecuted(":child:task", ":do-stuff", ":child:do-stuff").assertTaskOrder(":child:task", ":do-stuff");
-        usingBuildFile(childBuildFile).usingSettingsFile(settingsFile).withTasks("do-stuff").run().assertTasksExecutedInOrder(":child:do-stuff");
+        usingBuildFile(childBuildFile).usingSettingsFile(relocatedSettingsFile).withTasks("do-stuff").run().assertTasksExecutedInOrder(":child:do-stuff");
     }
 
     @Test
@@ -356,9 +357,9 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
         TestFile settingsDir = testFile("gradle");
         TestFile settingsFile = settingsDir.file("settings.gradle");
         settingsFile.writelns(
-                "rootProject.projectDir = new File(settingsDir, '../root')",
-                "include 'sub'",
-                "project(':sub').projectDir = new File(settingsDir, '../sub')"
+            "rootProject.projectDir = new File(settingsDir, '../root')",
+            "include 'sub'",
+            "project(':sub').projectDir = new File(settingsDir, '../sub')"
         );
         getTestDirectory().createDir("sub").file("build.gradle").writelns("task thing");
 
@@ -370,11 +371,11 @@ public class ProjectLoadingIntegrationTest extends AbstractIntegrationTest {
         TestFile settingsDir = testFile("gradle");
         TestFile settingsFile = settingsDir.file("settings.gradle");
         settingsFile.writelns(
-                "rootProject.projectDir = new File(settingsDir, '../root')"
+            "rootProject.projectDir = new File(settingsDir, '../root')"
         );
         getTestDirectory().createDir("root").file("build.gradle").writelns("task thing");
 
         inTestDirectory().withArguments("-p", settingsDir.getAbsolutePath()).withTasks("thing").runWithFailure()
-                .assertHasDescription("Task 'thing' not found in root project 'gradle'.");
+            .assertHasDescription("Task 'thing' not found in root project 'gradle'.");
     }
 }

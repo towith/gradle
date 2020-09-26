@@ -154,7 +154,7 @@ public class WriteDependencyVerificationFile implements DependencyVerificationOv
 
     private void warnAboutInsecureChecksums() {
         if (checksums.stream().noneMatch(SECURE_CHECKSUMS::contains)) {
-            LOGGER.warn("You chose to generate " + checksums.stream().collect(Collectors.joining(" and ")) + " checksums but they are all considered insecure. You should consider adding at least one of " + SECURE_CHECKSUMS.stream().collect(Collectors.joining(" or ")) + ".");
+            LOGGER.warn("You chose to generate " + String.join(" and ", checksums) + " checksums but they are all considered insecure. You should consider adding at least one of " + String.join(" or ", SECURE_CHECKSUMS) + ".");
         }
     }
 
@@ -352,6 +352,7 @@ public class WriteDependencyVerificationFile implements DependencyVerificationOv
                 }
                 if (!entry.getFile().exists()) {
                     LOGGER.warn("Cannot compute checksum for " + entry.getFile() + " because it doesn't exist. It may indicate a corrupt or tampered cache.");
+                    continue;
                 }
                 if (entry instanceof ChecksumEntry) {
                     queueChecksumVerification(queue, (ChecksumEntry) entry);
@@ -426,10 +427,7 @@ public class WriteDependencyVerificationFile implements DependencyVerificationOv
     }
 
     private boolean shouldSkipVerification(ArtifactVerificationOperation.ArtifactKind kind) {
-        if (kind == ArtifactVerificationOperation.ArtifactKind.METADATA && !verificationsBuilder.isVerifyMetadata()) {
-            return true;
-        }
-        return false;
+        return kind == ArtifactKind.METADATA && !verificationsBuilder.isVerifyMetadata();
     }
 
     private void addChecksum(ModuleComponentArtifactIdentifier id, ArtifactKind artifactKind, File file, ChecksumKind kind) {
@@ -440,18 +438,20 @@ public class WriteDependencyVerificationFile implements DependencyVerificationOv
     }
 
     private boolean isTrustedArtifact(ModuleComponentArtifactIdentifier id) {
-        if (verificationsBuilder.getTrustedArtifacts().stream().anyMatch(artifact -> artifact.matches(id))) {
-            return true;
-        }
-        return false;
+        return verificationsBuilder.getTrustedArtifacts().stream().anyMatch(artifact -> artifact.matches(id));
     }
 
     private String createHash(File file, ChecksumKind kind) {
-        return checksumService.hash(file, kind.getAlgorithm()).toString();
+        try {
+            return checksumService.hash(file, kind.getAlgorithm()).toString();
+        } catch (Exception e) {
+            LOGGER.debug("Error while snapshotting " + file, e);
+            return null;
+        }
     }
 
-    private static void resolveAllConfigurationsAndForceDownload(Project p) {
-        ((ProjectInternal) p).getMutationState().withMutableState(() ->
+    private static void resolveAllConfigurationsAndForceDownload(Project project) {
+        ((ProjectInternal) project).getMutationState().applyToMutableState(p ->
             p.getConfigurations().all(cnf -> {
                 if (((DeprecatableConfiguration) cnf).canSafelyBeResolved()) {
                     try {

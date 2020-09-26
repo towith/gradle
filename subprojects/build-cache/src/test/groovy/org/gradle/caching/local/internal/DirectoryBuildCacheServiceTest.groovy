@@ -20,8 +20,8 @@ import org.gradle.cache.PersistentCache
 import org.gradle.caching.BuildCacheEntryReader
 import org.gradle.caching.BuildCacheEntryWriter
 import org.gradle.caching.BuildCacheKey
+import org.gradle.internal.file.FileAccessTracker
 import org.gradle.internal.resource.local.DefaultPathKeyFileStore
-import org.gradle.internal.resource.local.FileAccessTracker
 import org.gradle.test.fixtures.file.CleanupTestDirectory
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.gradle.util.TestUtil
@@ -32,7 +32,7 @@ import spock.lang.Specification
 @UsesNativeServices
 @CleanupTestDirectory
 class DirectoryBuildCacheServiceTest extends Specification {
-    @Rule TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider()
+    @Rule TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass())
     def cacheDir = temporaryFolder.createDir("cache")
     def fileStore = new DefaultPathKeyFileStore(TestUtil.checksumService, cacheDir)
     def persistentCache = Mock(PersistentCache) {

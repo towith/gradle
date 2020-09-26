@@ -18,13 +18,14 @@ package org.gradle.integtests
 
 import groovy.transform.NotYetImplemented
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.StaleOutputJavaProject
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.integtests.fixtures.executer.ExecutionResult
 import org.gradle.integtests.fixtures.executer.GradleExecuter
 import org.gradle.integtests.fixtures.timeout.IntegrationTestTimeout
 import org.gradle.integtests.fixtures.versions.ReleasedVersionDistributions
 import org.gradle.internal.jvm.Jvm
+import org.gradle.util.GradleVersion
 import org.junit.Assume
 import spock.lang.Issue
 import spock.lang.Unroll
@@ -48,9 +49,12 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
         Assume.assumeTrue(releasedVersionDistributions.mostRecentRelease.worksWith(Jvm.current()))
     }
 
+    GradleVersion getMostRecentReleaseVersion() {
+        releasedVersionDistributions.mostRecentRelease.version
+    }
+
     @Issue("https://github.com/gradle/gradle/issues/821")
     @Unroll
-    @ToBeFixedForInstantExecution
     def "production class files are removed in a single project build for #description"() {
         given:
         def javaProject = new StaleOutputJavaProject(testDirectory, buildDirName)
@@ -91,13 +95,12 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
         'out'        | false      | 'reconfigured build directory'
     }
 
-    @ToBeFixedForInstantExecution
     def "production class files outside of 'build' are removed"() {
         given:
         def javaProject = new StaleOutputJavaProject(testDirectory, 'out')
         buildFile << """
             apply plugin: 'java'
-            
+
             sourceSets {
                 main {
                     java.outputDir = file('out/classes/java/main')
@@ -129,20 +132,20 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
 
     // We register the output directory before task execution and would have deleted output files at the end of configuration.
     @Issue("https://github.com/gradle/gradle/issues/821")
-    @ToBeFixedForInstantExecution
+    @UnsupportedWithConfigurationCache
     def "production class files are removed even if output directory is reconfigured during execution phase"() {
         given:
         def javaProject = new StaleOutputJavaProject(testDirectory)
         buildFile << """
             apply plugin: 'java'
-            
+
             task configureCompileJava {
                 doLast {
                     compileJava.destinationDir = file('build/out')
                     jar.from compileJava
                 }
             }
-            
+
             compileJava.dependsOn configureCompileJava
         """
         when:
@@ -157,7 +160,6 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
         javaProject.redundantClassFileAlternate.assertIsFile()
 
         when:
-        buildFile.text = buildFile.text.replace('compileJava.destinationDir', 'compileJava.destinationDirectory')
         forceDelete(javaProject.redundantSourceFile)
         succeeds JAR_TASK_NAME
 
@@ -278,7 +280,6 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Issue("https://github.com/gradle/gradle/issues/821")
-    @ToBeFixedForInstantExecution
     def "task history is deleted"() {
         def javaProject = new StaleOutputJavaProject(testDirectory)
         buildFile << "apply plugin: 'java'"
@@ -506,7 +507,7 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
         def targetFile2 = file('build/target/source2.txt')
         def taskPath = ':customCopy'
 
-        buildFile << """                
+        buildFile << """
             task customCopy(type: CustomCopy) {
                 sourceDir = fileTree('source')
                 targetDir = file('build/target')
@@ -559,7 +560,7 @@ class StaleOutputHistoryLossIntegrationTest extends AbstractIntegrationSpec {
         def targetFile2 = file('build/target/source2.txt')
         def taskPath = ':copy'
 
-        buildFile << """                     
+        buildFile << """
             tasks.register("copy", Copy) {
                 from file('source')
                 into 'build/target'

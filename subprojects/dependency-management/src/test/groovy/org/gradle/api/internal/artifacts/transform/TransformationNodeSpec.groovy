@@ -17,7 +17,7 @@
 package org.gradle.api.internal.artifacts.transform
 
 import org.gradle.api.Action
-import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.ResolvableArtifact
+import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.ResolvedArtifactSet
 import org.gradle.api.internal.tasks.TaskDependencyContainer
 import org.gradle.execution.plan.Node
 import org.gradle.execution.plan.TaskDependencyResolver
@@ -26,9 +26,8 @@ import spock.lang.Specification
 
 class TransformationNodeSpec extends Specification {
 
-    def artifact = Mock(ResolvableArtifact)
+    def artifact = Mock(ResolvedArtifactSet.LocalArtifactSet)
     def dependencyResolver = Mock(TaskDependencyResolver)
-    def transformerDependencies = Mock(TaskDependencyContainer)
     def hardSuccessor = Mock(Action)
     def transformationStep = Mock(TransformationStep)
     def graphDependenciesResolver = Mock(ExecutionGraphDependenciesResolver)
@@ -36,7 +35,8 @@ class TransformationNodeSpec extends Specification {
     def transformListener = Mock(ArtifactTransformListener)
 
     def "initial node adds dependency on artifact node and dependencies"() {
-        def container = Stub(TaskDependencyContainer)
+        def artifactDependencies = Stub(TaskDependencyContainer)
+        def artifactDependencyDependencies = Stub(TaskDependencyContainer)
         def artifactNode = node()
         def additionalNode = node()
         def isolationNode = node()
@@ -48,15 +48,16 @@ class TransformationNodeSpec extends Specification {
         node.resolveDependencies(dependencyResolver, hardSuccessor)
 
         then:
-        1 * dependencyResolver.resolveDependenciesFor(null, artifact) >> [artifactNode]
+        1 * artifact.taskDependencies >> artifactDependencies
+        1 * dependencyResolver.resolveDependenciesFor(null, artifactDependencies) >> [artifactNode]
         1 * hardSuccessor.execute(artifactNode)
-        1 * graphDependenciesResolver.computeDependencyNodes(transformationStep) >> container
-        1 * dependencyResolver.resolveDependenciesFor(null, container) >> [additionalNode]
+        1 * graphDependenciesResolver.computeDependencyNodes(transformationStep) >> artifactDependencyDependencies
+        1 * dependencyResolver.resolveDependenciesFor(null, artifactDependencyDependencies) >> [additionalNode]
         1 * hardSuccessor.execute(additionalNode)
-        1 * transformationStep.dependencies >> transformerDependencies
-        1 * dependencyResolver.resolveDependenciesFor(null, transformerDependencies) >> [isolationNode]
+        1 * dependencyResolver.resolveDependenciesFor(null, transformationStep) >> [isolationNode]
         1 * hardSuccessor.execute(isolationNode)
         0 * hardSuccessor._
+        0 * dependencyResolver._
     }
 
     def "chained node with empty extra resolver only adds dependency on previous step and dependencies"() {
@@ -72,14 +73,14 @@ class TransformationNodeSpec extends Specification {
         node.resolveDependencies(dependencyResolver, hardSuccessor)
 
         then:
-        1 * transformationStep.dependencies >> transformerDependencies
-        1 * dependencyResolver.resolveDependenciesFor(null, transformerDependencies) >> [isolationNode]
+        1 * dependencyResolver.resolveDependenciesFor(null, transformationStep) >> [isolationNode]
         1 * hardSuccessor.execute(isolationNode)
         1 * graphDependenciesResolver.computeDependencyNodes(transformationStep) >> container
         1 * dependencyResolver.resolveDependenciesFor(null, container) >> [additionalNode]
         1 * hardSuccessor.execute(additionalNode)
         1 * hardSuccessor.execute(initialNode)
         0 * hardSuccessor._
+        0 * dependencyResolver._
     }
 
     private Node node() {

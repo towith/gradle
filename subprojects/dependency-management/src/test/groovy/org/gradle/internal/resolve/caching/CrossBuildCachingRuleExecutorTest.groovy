@@ -26,7 +26,7 @@ import org.gradle.cache.CacheDecorator
 import org.gradle.cache.CacheRepository
 import org.gradle.cache.PersistentCache
 import org.gradle.cache.PersistentIndexedCache
-import org.gradle.cache.internal.InMemoryCacheDecoratorFactory
+import org.gradle.cache.internal.DefaultInMemoryCacheDecoratorFactory
 import org.gradle.internal.action.DefaultConfigurableRule
 import org.gradle.internal.action.DefaultConfigurableRules
 import org.gradle.internal.action.InstantiatingAction
@@ -47,9 +47,9 @@ import javax.inject.Inject
 class CrossBuildCachingRuleExecutorTest extends Specification {
 
     CacheRepository cacheRepository = Mock()
-    InMemoryCacheDecoratorFactory cacheDecoratorFactory = Mock()
+    DefaultInMemoryCacheDecoratorFactory cacheDecoratorFactory = Mock()
     ValueSnapshotter valueSnapshotter = Mock()
-    BuildCommencedTimeProvider timeProvider = new BuildCommencedTimeProvider()
+    BuildCommencedTimeProvider timeProvider = Stub()
     PersistentIndexedCache<ValueSnapshot, CrossBuildCachingRuleExecutor.CachedEntry<Result>> store = Mock()
     CrossBuildCachingRuleExecutor.EntryValidator<Result> validator = Mock()
     Transformer<Serializable, Id> keyTransformer = new Transformer<Serializable, Id>() {
@@ -357,7 +357,7 @@ class CrossBuildCachingRuleExecutorTest extends Specification {
         private final SomeService service
 
         @Inject
-        WithServiceInjected(SomeService service){
+        WithServiceInjected(SomeService service) {
             this.service = service
         }
 

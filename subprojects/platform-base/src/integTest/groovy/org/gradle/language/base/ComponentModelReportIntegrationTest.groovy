@@ -17,8 +17,10 @@
 package org.gradle.language.base
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import spock.lang.Unroll
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class ComponentModelReportIntegrationTest extends AbstractIntegrationSpec {
 
     def "model report for unmanaged software components shows them all"() {

@@ -22,6 +22,7 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.tasks.scala.IncrementalCompileOptions;
 import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.jvm.JvmByteCode;
@@ -64,7 +65,10 @@ public class ScalaLanguagePlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        DeprecationLogger.deprecatePlugin("scala-lang").withUpgradeGuideSection(6, "upgrading_jvm_plugins").nagUser();
+        DeprecationLogger.deprecatePlugin("scala-lang")
+            .willBeRemovedInGradle7()
+            .withUpgradeGuideSection(6, "upgrading_jvm_plugins")
+            .nagUser();
         project.getPluginManager().apply(ComponentModelBasePlugin.class);
         project.getPluginManager().apply(JvmResourcesPlugin.class);
     }
@@ -148,8 +152,14 @@ public class ScalaLanguagePlugin implements Plugin<Project> {
                     compile.setDescription(description);
                     compile.getDestinationDirectory().set(single(assembly.getClassDirectories()));
 
-                    compile.getScalaCompileOptions().getIncrementalOptions().getAnalysisFile().set(
+                    IncrementalCompileOptions incrementalOptions = compile.getScalaCompileOptions().getIncrementalOptions();
+
+                    incrementalOptions.getAnalysisFile().set(
                         compile.getProject().getLayout().getBuildDirectory().file("tmp/scala/compilerAnalysis/" + compile.getName() + ".analysis")
+                    );
+
+                    incrementalOptions.getClassfileBackupDir().set(
+                        compile.getProject().getLayout().getBuildDirectory().file("tmp/scala/classfileBackup/" + compile.getName() + ".bak")
                     );
 
                     JavaPlatform javaPlatform = assembly.getTargetPlatform();

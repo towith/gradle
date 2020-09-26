@@ -1,5 +1,6 @@
 package Gradle_Util
 
+import Gradle_Util.buildTypes.WarmupEc2Agent
 import jetbrains.buildServer.configs.kotlin.v2019_2.*
 import jetbrains.buildServer.configs.kotlin.v2019_2.Project
 import jetbrains.buildServer.configs.kotlin.v2019_2.projectFeatures.VersionedSettings
@@ -10,10 +11,6 @@ object Project : Project({
     id("Gradle_Util")
     parentId("Gradle")
     name = "Util"
-
-    params {
-        password("teamcity.user.bot-gradle.token", "credentialsJSON:f7693dfa-ff3d-48a3-8309-9cd5a2770810", display = ParameterDisplay.HIDDEN)
-    }
 
     features {
         versionedSettings {
@@ -26,4 +23,6 @@ object Project : Project({
             storeSecureParamsOutsideOfVcs = true
         }
     }
+
+    buildType(WarmupEc2Agent)
 })

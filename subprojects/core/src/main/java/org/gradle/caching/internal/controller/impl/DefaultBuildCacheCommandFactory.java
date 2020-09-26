@@ -27,6 +27,7 @@ import org.gradle.caching.internal.controller.BuildCacheStoreCommand;
 import org.gradle.caching.internal.origin.OriginMetadata;
 import org.gradle.caching.internal.origin.OriginMetadataFactory;
 import org.gradle.caching.internal.packaging.BuildCacheEntryPacker;
+import org.gradle.internal.file.FileMetadata.AccessType;
 import org.gradle.internal.file.FileType;
 import org.gradle.internal.fingerprint.CurrentFileCollectionFingerprint;
 import org.gradle.internal.fingerprint.FingerprintingStrategy;
@@ -35,7 +36,7 @@ import org.gradle.internal.fingerprint.impl.DefaultCurrentFileCollectionFingerpr
 import org.gradle.internal.snapshot.CompleteFileSystemLocationSnapshot;
 import org.gradle.internal.snapshot.FileSystemSnapshot;
 import org.gradle.internal.snapshot.MissingFileSnapshot;
-import org.gradle.internal.vfs.VirtualFileSystem;
+import org.gradle.internal.vfs.FileSystemAccess;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,13 +49,13 @@ public class DefaultBuildCacheCommandFactory implements BuildCacheCommandFactory
 
     private final BuildCacheEntryPacker packer;
     private final OriginMetadataFactory originMetadataFactory;
-    private final VirtualFileSystem virtualFileSystem;
+    private final FileSystemAccess fileSystemAccess;
     private final Interner<String> stringInterner;
 
-    public DefaultBuildCacheCommandFactory(BuildCacheEntryPacker packer, OriginMetadataFactory originMetadataFactory, VirtualFileSystem virtualFileSystem, Interner<String> stringInterner) {
+    public DefaultBuildCacheCommandFactory(BuildCacheEntryPacker packer, OriginMetadataFactory originMetadataFactory, FileSystemAccess fileSystemAccess, Interner<String> stringInterner) {
         this.packer = packer;
         this.originMetadataFactory = originMetadataFactory;
-        this.virtualFileSystem = virtualFileSystem;
+        this.fileSystemAccess = fileSystemAccess;
         this.stringInterner = stringInterner;
     }
 
@@ -88,7 +89,7 @@ public class DefaultBuildCacheCommandFactory implements BuildCacheCommandFactory
             ImmutableList.Builder<String> roots = ImmutableList.builder();
             entity.visitOutputTrees((name, type, root) -> roots.add(root.getAbsolutePath()));
             // TODO: Actually unpack the roots inside of the action
-            virtualFileSystem.update(roots.build(), () -> {});
+            fileSystemAccess.write(roots.build(), () -> {});
             BuildCacheEntryPacker.UnpackResult unpackResult = packer.unpack(entity, input, originMetadataFactory.createReader(entity));
             // TODO: Update the snapshots from the action
             ImmutableSortedMap<String, CurrentFileCollectionFingerprint> snapshots = snapshotUnpackedData(unpackResult.getSnapshots());
@@ -124,8 +125,8 @@ public class DefaultBuildCacheCommandFactory implements BuildCacheCommandFactory
                 List<FileSystemSnapshot> roots = new ArrayList<>();
 
                 if (treeSnapshot == null) {
-                    MissingFileSnapshot missingFileSnapshot = new MissingFileSnapshot(internedAbsolutePath);
-                    virtualFileSystem.updateWithKnownSnapshot(missingFileSnapshot);
+                    MissingFileSnapshot missingFileSnapshot = new MissingFileSnapshot(internedAbsolutePath, AccessType.DIRECT);
+                    fileSystemAccess.record(missingFileSnapshot);
                     builder.put(treeName, fingerprintingStrategy.getEmptyFingerprint());
                     return;
                 }
@@ -136,11 +137,11 @@ public class DefaultBuildCacheCommandFactory implements BuildCacheCommandFactory
                             throw new IllegalStateException(String.format("Only a regular file should be produced by unpacking tree '%s', but saw a %s", treeName, treeSnapshot.getType()));
                         }
                         roots.add(treeSnapshot);
-                        virtualFileSystem.updateWithKnownSnapshot(treeSnapshot);
+                        fileSystemAccess.record(treeSnapshot);
                         break;
                     case DIRECTORY:
                         roots.add(treeSnapshot);
-                        virtualFileSystem.updateWithKnownSnapshot(treeSnapshot);
+                        fileSystemAccess.record(treeSnapshot);
                         break;
                     default:
                         throw new AssertionError();

@@ -18,11 +18,12 @@ package org.gradle.integtests.language
 
 import org.apache.commons.lang.StringUtils
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.test.fixtures.archive.JarTestFixture
 
 import java.util.regex.Pattern
 
+@UnsupportedWithConfigurationCache(because = "software model")
 abstract class AbstractJvmPluginLanguageIntegrationTest extends AbstractIntegrationSpec {
 
     abstract String getSourceSetTypeName();
@@ -49,7 +50,6 @@ abstract class AbstractJvmPluginLanguageIntegrationTest extends AbstractIntegrat
             "Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_6.html#upgrading_jvm_plugins")
     }
 
-    @ToBeFixedForInstantExecution
     def "creates default source sets"() {
         when:
         buildFile << """
@@ -88,7 +88,6 @@ abstract class AbstractJvmPluginLanguageIntegrationTest extends AbstractIntegrat
         !file("build").exists()
     }
 
-    @ToBeFixedForInstantExecution
     def "can configure additional language source sets for library"() {
         when:
         buildFile << """

@@ -17,29 +17,25 @@
 package org.gradle.plugins.signing
 
 import org.gradle.integtests.fixtures.AbstractSampleIntegrationTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.Sample
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.UsesSample
 import org.gradle.test.fixtures.maven.MavenFileRepository
 import org.gradle.util.Requires
 import org.junit.Rule
 import spock.lang.Unroll
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
-
-@Requires(KOTLIN_SCRIPT)
 class SigningSamplesSpec extends AbstractSampleIntegrationTest {
     @Rule
     public final Sample sample = new Sample(testDirectoryProvider)
 
     def setup() {
         using m2
-        requireGradleDistribution()
     }
 
     @Unroll
     @UsesSample('signing/maven')
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "upload attaches signatures with dsl #dsl"() {
         given:
         inDirectory(sample.dir.file(dsl))
@@ -60,7 +56,7 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample('signing/conditional')
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "conditional signing with dsl #dsl"() {
         given:
         inDirectory(sample.dir.file(dsl))
@@ -82,7 +78,7 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
     @Unroll
     @UsesSample('signing/gnupg-signatory')
     @Requires(adhoc = { GpgCmdFixture.getAvailableGpg() != null })
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "use gnupg signatory with dsl #dsl"() {
         setup:
         def projectDir = sample.dir.file(dsl)
@@ -106,7 +102,7 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample('signing/maven-publish')
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "publish attaches signatures with dsl #dsl"() {
         given:
         inDirectory(sample.dir.file(dsl))
@@ -144,7 +140,7 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample('signing/in-memory')
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "uses in-memory PGP keys with dsl #dsl"() {
         given:
         def projectDir = sample.dir.file(dsl)
@@ -165,8 +161,8 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
     }
 
     @Unroll
-    @UsesSample('signing/in-memory')
-    @ToBeFixedForInstantExecution
+    @UsesSample('signing/in-memory-subkey')
+    @ToBeFixedForConfigurationCache
     def "uses in-memory PGP subkeys with dsl #dsl"() {
         given:
         def projectDir = sample.dir.file(dsl)
@@ -184,7 +180,7 @@ class SigningSamplesSpec extends AbstractSampleIntegrationTest {
         projectDir.file('build/distributions/stuff.zip.asc').exists()
 
         where:
-        dsl << ['groovy-subkey', 'kotlin-subkey']
+        dsl << ['groovy', 'kotlin']
     }
 
     MavenFileRepository repoFor(String dsl) {

@@ -15,9 +15,9 @@
  */
 package org.gradle.testing
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.TargetCoverage
 import org.gradle.integtests.fixtures.TestResources
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.testing.fixture.JUnitMultiVersionIntegrationSpec
 import org.junit.Before
 import org.junit.Rule
@@ -62,7 +62,7 @@ public class SomeTest {
         buildFile << """
 apply plugin: 'java'
 ${mavenCentralRepository()}
-dependencies { testImplementation "junit:junit:4.12" }
+dependencies { testImplementation "junit:junit:4.13" }
 
 test.addTestOutputListener(new VerboseOutputListener(logger: project.logger))
 
@@ -99,6 +99,7 @@ class RemoveMeListener implements TestOutputListener {
     }
 
     @Test
+    @UnsupportedWithConfigurationCache
     def "can register output listener at gradle level and using onOutput method"() {
         given:
         def test = file("src/test/java/SomeTest.java")
@@ -115,7 +116,7 @@ public class SomeTest {
         buildFile << """
 apply plugin: 'java'
 ${mavenCentralRepository()}
-dependencies { testImplementation "junit:junit:4.12" }
+dependencies { testImplementation "junit:junit:4.13" }
 
 test.onOutput { descriptor, event ->
     logger.lifecycle("first: " + event.message)
@@ -158,7 +159,7 @@ public class SomeTest {
         buildFile << """
 apply plugin: 'java'
 ${mavenCentralRepository()}
-dependencies { testImplementation "junit:junit:4.12" }
+dependencies { testImplementation "junit:junit:4.13" }
 
 test.testLogging {
     showStandardStreams = true
@@ -174,7 +175,6 @@ test.testLogging {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
     def "shows standard stream also for testNG"() {
         given:
         ignoreWhenJUnitPlatform()

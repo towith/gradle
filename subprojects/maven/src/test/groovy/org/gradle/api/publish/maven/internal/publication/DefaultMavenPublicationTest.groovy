@@ -17,6 +17,7 @@ package org.gradle.api.publish.maven.internal.publication
 
 import org.gradle.api.Action
 import org.gradle.api.InvalidUserDataException
+import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.DependencyArtifact
 import org.gradle.api.artifacts.ExcludeRule
@@ -54,7 +55,7 @@ import spock.lang.Unroll
 
 class DefaultMavenPublicationTest extends Specification {
     @Rule
-    final TestNameTestDirectoryProvider testDirectoryProvider = new TestNameTestDirectoryProvider()
+    final TestNameTestDirectoryProvider testDirectoryProvider = new TestNameTestDirectoryProvider(getClass())
 
     MutableMavenProjectIdentity module
     NotationParser<Object, MavenArtifact> notationParser = Mock(NotationParser)
@@ -391,7 +392,9 @@ class DefaultMavenPublicationTest extends Specification {
     def "maps project dependency to maven dependency"() {
         given:
         def publication = createPublication()
-        def projectDependency = Mock(ProjectDependency)
+        def projectDependency = Mock(ProjectDependency) {
+            getDependencyProject() >> Mock(Project)
+        }
 
         and:
         projectDependency.excludeRules >> []

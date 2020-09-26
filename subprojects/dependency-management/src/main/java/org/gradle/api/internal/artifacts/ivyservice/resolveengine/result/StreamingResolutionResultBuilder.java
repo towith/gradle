@@ -60,13 +60,13 @@ public class StreamingResolutionResultBuilder implements DependencyGraphVisitor 
     private final static byte SELECTOR = 4;
     private final static byte DEPENDENCY = 5;
 
-    private final Map<ComponentSelector, ModuleVersionResolveException> failures = new HashMap<ComponentSelector, ModuleVersionResolveException>();
+    private final Map<ComponentSelector, ModuleVersionResolveException> failures = new HashMap<>();
     private final BinaryStore store;
     private final ComponentResultSerializer componentResultSerializer;
     private final Store<ResolvedComponentResult> cache;
     private final ComponentSelectorSerializer componentSelectorSerializer;
     private final DependencyResultSerializer dependencyResultSerializer;
-    private final Set<Long> visitedComponents = new HashSet<Long>();
+    private final Set<Long> visitedComponents = new HashSet<>();
     private final AttributeContainerSerializer attributeContainerSerializer;
     private final AttributeDesugaring desugaring;
 
@@ -77,10 +77,12 @@ public class StreamingResolutionResultBuilder implements DependencyGraphVisitor 
                                             Store<ResolvedComponentResult> cache,
                                             ImmutableModuleIdentifierFactory moduleIdentifierFactory,
                                             AttributeContainerSerializer attributeContainerSerializer,
-                                            AttributeDesugaring desugaring) {
-        ResolvedVariantResultSerializer resolvedVariantResultSerializer = new ResolvedVariantResultSerializer(attributeContainerSerializer);
-        this.dependencyResultSerializer = new DependencyResultSerializer(resolvedVariantResultSerializer);
-        this.componentResultSerializer = new ComponentResultSerializer(moduleIdentifierFactory, resolvedVariantResultSerializer);
+                                            AttributeDesugaring desugaring,
+                                            ComponentSelectionDescriptorFactory componentSelectionDescriptorFactory) {
+        ComponentIdentifierSerializer componentIdentifierSerializer = new ComponentIdentifierSerializer();
+        ResolvedVariantResultSerializer resolvedVariantResultSerializer = new ResolvedVariantResultSerializer(componentIdentifierSerializer, attributeContainerSerializer);
+        this.dependencyResultSerializer = new DependencyResultSerializer(resolvedVariantResultSerializer, componentSelectionDescriptorFactory);
+        this.componentResultSerializer = new ComponentResultSerializer(moduleIdentifierFactory, resolvedVariantResultSerializer, componentSelectionDescriptorFactory, componentIdentifierSerializer);
         this.store = store;
         this.cache = cache;
         this.componentSelectorSerializer = new ComponentSelectorSerializer(attributeContainerSerializer);
@@ -204,7 +206,7 @@ public class StreamingResolutionResultBuilder implements DependencyGraphVisitor 
             Timer clock = Time.startTimer();
             try {
                 DefaultResolutionResultBuilder builder = new DefaultResolutionResultBuilder();
-                Map<Long, ComponentSelector> selectors = new HashMap<Long, ComponentSelector>();
+                Map<Long, ComponentSelector> selectors = new HashMap<>();
                 while (true) {
                     type = decoder.readByte();
                     valuesRead++;

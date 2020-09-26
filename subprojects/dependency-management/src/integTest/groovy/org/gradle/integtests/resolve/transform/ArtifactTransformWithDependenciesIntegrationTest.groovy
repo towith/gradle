@@ -24,16 +24,17 @@ import groovy.transform.Canonical
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.CompileClasspath
 import org.gradle.integtests.fixtures.AbstractHttpDependencyResolutionTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import org.hamcrest.CoreMatchers
 import spock.lang.IgnoreIf
+import spock.lang.Issue
 import spock.lang.Unroll
 
 import javax.annotation.Nonnull
 import java.util.regex.Pattern
 
-@IgnoreIf({ GradleContextualExecuter.parallel})
+@IgnoreIf({ GradleContextualExecuter.parallel })
 class ArtifactTransformWithDependenciesIntegrationTest extends AbstractHttpDependencyResolutionTest implements ArtifactTransformTestFixture {
 
     def setup() {
@@ -44,14 +45,14 @@ class ArtifactTransformWithDependenciesIntegrationTest extends AbstractHttpDepen
         withColorVariants(mavenHttpRepo.module("org.slf4j", "slf4j-api", "1.7.24")).publish().allowAll()
         withColorVariants(mavenHttpRepo.module("org.slf4j", "slf4j-api", "1.7.25")).publish().allowAll()
         withColorVariants(mavenHttpRepo.module("junit", "junit", "4.11"))
-                .dependsOn("hamcrest", "hamcrest-core", "1.3")
-                .publish()
-                .allowAll()
+            .dependsOn("hamcrest", "hamcrest-core", "1.3")
+            .publish()
+            .allowAll()
         withColorVariants(mavenHttpRepo.module("hamcrest", "hamcrest-core", "1.3")).publish().allowAll()
     }
 
     void setupBuildWithNoSteps(@DelegatesTo(Builder) Closure cl = {}) {
-        setupBuildWithColorAttributes(cl)
+        setupBuildWithColorAttributes(buildFile, cl)
         buildFile << """
 
 allprojects {
@@ -84,11 +85,7 @@ project(':common') {
 
 project(':lib') {
     dependencies {
-        if (rootProject.hasProperty("useOldDependencyVersion")) {
-            implementation 'org.slf4j:slf4j-api:1.7.24'
-        } else {
-            implementation 'org.slf4j:slf4j-api:1.7.25'
-        }
+        implementation providers.gradleProperty('useOldDependencyVersion').forUseAtConfigurationTime().map { 'org.slf4j:slf4j-api:1.7.24' }.orElse('org.slf4j:slf4j-api:1.7.25')
         implementation project(':common')
     }
 }
@@ -212,7 +209,6 @@ allprojects {
 """
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can access artifact dependencies as a set of files when using ArtifactView"() {
         given:
         setupBuildWithSingleStep()
@@ -270,7 +266,6 @@ project(':common') {
         )
     }
 
-    @ToBeFixedForInstantExecution
     def "transform can access artifact dependencies, in previous transform step, as set of files when using ArtifactView"() {
         given:
         setupBuildWithTwoSteps()
@@ -294,7 +289,167 @@ project(':common') {
         )
     }
 
-    @ToBeFixedForInstantExecution
+    def "transform of project artifact can consume different transform of external artifact as dependency"() {
+        given:
+        mavenHttpRepo.module("test", "test", "1.2")
+            .adhocVariants()
+            .variant('runtime', [color: 'blue'])
+            .variant('test', [color: 'orange'])
+            .withModuleMetadata()
+            .publish()
+            .allowAll()
+
+        settingsFile << "include 'a', 'b'"
+        setupBuildWithColorAttributes()
+        buildFile << """
+            allprojects {
+                repositories {
+                    maven { url = '${mavenHttpRepo.uri}' }
+                }
+                configurations.implementation.outgoing.variants {
+                    additional {
+                        attributes {
+                            attribute(color, 'purple')
+                            artifact(producer.output)
+                        }
+                    }
+                }
+                dependencies {
+                    registerTransform(ExternalTransform) {
+                        from.attribute(color, 'blue')
+                        to.attribute(color, 'purple')
+                        parameters {
+                            transformName = 'external'
+                        }
+                    }
+                    registerTransform(LocalTransform) {
+                        from.attribute(color, 'purple')
+                        to.attribute(color, 'green')
+                        parameters {
+                            transformName = 'local'
+                        }
+                    }
+                }
+            }
+            project('a') {
+                dependencies {
+                    implementation "test:test:1.2"
+                }
+            }
+            dependencies {
+                implementation project('a')
+            }
+
+            interface Params extends TransformParameters {
+                @Input
+                Property<String> getTransformName()
+            }
+
+            abstract class ExternalTransform implements TransformAction<Params> {
+                @InputArtifact
+                abstract Provider<FileSystemLocation> getInputArtifact()
+
+                void transform(TransformOutputs outputs) {
+                    println("transform external " + inputArtifact.get().asFile.name)
+                    def input = inputArtifact.get().asFile
+                    def output = outputs.file(input.name + ".external")
+                    output.text = "content"
+                }
+            }
+
+            abstract class LocalTransform implements TransformAction<Params> {
+                @InputArtifact
+                abstract Provider<FileSystemLocation> getInputArtifact()
+
+                @InputArtifactDependencies
+                abstract FileCollection getInputArtifactDependencies()
+
+                void transform(TransformOutputs outputs) {
+                    println("transform local " + inputArtifact.get().asFile.name + " using " + inputArtifactDependencies.files.name)
+                    def input = inputArtifact.get().asFile
+                    def output = outputs.file(input.name + ".local")
+                    output.text = "content"
+                }
+            }
+        """
+
+        when:
+        run(":resolve")
+
+        then:
+        outputContains("transform external test-1.2.jar")
+        outputContains("transform local a.jar using [test-1.2.jar.external]")
+        outputContains("transform local test-1.2.jar.external using []")
+        outputContains("result = [a.jar.local, test-1.2.jar.external.local]")
+
+        when:
+        run(":resolve")
+
+        then:
+        outputDoesNotContain("transform")
+        outputContains("result = [a.jar.local, test-1.2.jar.external.local]")
+    }
+
+    @Issue("https://github.com/gradle/gradle/issues/14529")
+    def "transform of project artifact can consume transform of external artifact whose upstream dependency has been substituted with local project"() {
+        given:
+        def m1 = mavenRepo.module("test", "lib", "1.2").publish()
+        mavenRepo.module("test", "lib2", "1.2").dependsOn(m1).publish()
+
+        settingsFile << "include 'app', 'lib'"
+        setupBuildWithChainedColorTransformThatTakesUpstreamArtifacts()
+        buildFile << """
+            allprojects {
+                repositories {
+                    maven { url = '${mavenRepo.uri}' }
+                }
+            }
+            project(':lib') {
+                // To trigger the substitution: use coordinates that conflict with the published library but which are newer
+                group = 'test'
+                version = '2.0'
+            }
+            project(':app') {
+                dependencies {
+                    // To trigger the subsitution: include paths to the other project via both a project dependency and external dependency
+                    implementation "test:lib2:1.2"
+                    implementation project(':lib')
+
+                    artifactTypes {
+                        jar {
+                            attributes.attribute(color, 'red')
+                        }
+                    }
+                }
+                configurations.implementation.resolutionStrategy.dependencySubstitution.all {
+                    // To trigger the substitution: include dependency substitution rule to include external dependencies in the execution graph calculation
+                }
+
+                tasks.resolveArtifacts.collection = configurations.implementation.incoming.artifactView {
+                    attributes.attribute(color, 'green')
+                    // To trigger the problem: exclude the local library from the result, so that only the execution node edges that are reachable via the external dependency are included in the graph
+                    componentFilter { it instanceof ModuleComponentIdentifier }
+                }.artifacts
+
+            }
+        """
+
+        when:
+        run(":app:resolveArtifacts")
+
+        then:
+        outputContains("processing lib.jar")
+        outputContains("processing lib2-1.2.jar using [lib.jar.red]")
+        outputContains("files = [lib2-1.2.jar.green]")
+
+        when:
+        run(":app:resolveArtifacts")
+
+        then:
+        outputDoesNotContain("processing")
+        outputContains("files = [lib2-1.2.jar.green]")
+    }
+
     def "transform with changed set of dependencies are re-executed"() {
         given:
         setupBuildWithSingleStep()
@@ -308,7 +463,7 @@ project(':common') {
             singleStep('hamcrest-core-1.3.jar'),
             singleStep('junit-4.11.jar', 'hamcrest-core-1.3.jar'),
             singleStep('common.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common.jar'),
         )
 
         when:
@@ -317,7 +472,7 @@ project(':common') {
         then: // new version, should run
         assertTransformationsExecuted(
             singleStep('slf4j-api-1.7.24.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.24.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.24.jar', 'common.jar'),
         )
 
         when:
@@ -333,7 +488,6 @@ project(':common') {
         assertTransformationsExecuted()
     }
 
-    @ToBeFixedForInstantExecution
     def "transform with changed project file dependencies content or path are re-executed"() {
         given:
         setupBuildWithSingleStep()
@@ -347,7 +501,7 @@ project(':common') {
             singleStep('hamcrest-core-1.3.jar'),
             singleStep('junit-4.11.jar', 'hamcrest-core-1.3.jar'),
             singleStep('common.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common.jar'),
         )
 
         when:
@@ -364,7 +518,7 @@ project(':common') {
         result.assertTasksNotSkipped(":common:producer")
         assertTransformationsExecuted(
             singleStep('common.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common.jar'),
         )
 
         when:
@@ -381,7 +535,7 @@ project(':common') {
         result.assertTasksNotSkipped(":common:producer", ":app:resolveGreen")
         assertTransformationsExecuted(
             singleStep('common-blue.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common-blue.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common-blue.jar'),
         )
 
         when:
@@ -398,7 +552,7 @@ project(':common') {
         result.assertTasksNotSkipped(":common:producer", ":app:resolveGreen")
         assertTransformationsExecuted(
             singleStep('common-blue.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common-blue.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common-blue.jar'),
         )
 
         when:
@@ -409,7 +563,6 @@ project(':common') {
         assertTransformationsExecuted()
     }
 
-    @ToBeFixedForInstantExecution
     def "can attach @PathSensitive(NONE) to dependencies property"() {
         given:
         setupBuildWithNoSteps()
@@ -451,7 +604,7 @@ abstract class NoneTransform implements TransformAction<TransformParameters.None
             singleStep('hamcrest-core-1.3.jar'),
             singleStep('junit-4.11.jar', 'hamcrest-core-1.3.jar'),
             singleStep('common.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common.jar'),
         )
 
         when:
@@ -493,7 +646,7 @@ abstract class NoneTransform implements TransformAction<TransformParameters.None
         result.assertTasksNotSkipped(":common:producer", ":app:resolveGreen")
         assertTransformationsExecuted(
             singleStep('common-blue.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common-blue.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common-blue.jar'),
         )
 
         when:
@@ -505,7 +658,6 @@ abstract class NoneTransform implements TransformAction<TransformParameters.None
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     def "can attach @#classpathAnnotation.simpleName to dependencies property"() {
         given:
         setupBuildWithNoSteps {
@@ -549,7 +701,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
             singleStep('hamcrest-core-1.3.jar'),
             singleStep('junit-4.11.jar', 'hamcrest-core-1.3.jar'),
             singleStep('common.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common.jar'),
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common.jar'),
         )
 
         when:
@@ -591,7 +743,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         result.assertTasksNotSkipped(":common:producer", ":app:resolveGreen")
         assertTransformationsExecuted(
             singleStep('common-blue.jar'),
-            singleStep('lib.jar','slf4j-api-1.7.25.jar', 'common-blue.jar')
+            singleStep('lib.jar', 'slf4j-api-1.7.25.jar', 'common-blue.jar')
         )
 
         when:
@@ -605,7 +757,6 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         classpathAnnotation << [Classpath, CompileClasspath]
     }
 
-    @ToBeFixedForInstantExecution
     def "transforms with different dependencies in multiple dependency graphs are executed"() {
         given:
         withColorVariants(mavenHttpRepo.module("org.slf4j", "slf4j-api", "1.7.26")).publish().allowAll()
@@ -664,7 +815,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         assert libTransformWithNewSlf4j < app2Resolve
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "treating file collection visit failures as a configuration cache problem adds an additional failure to the build summary")
     def "transform does not execute when dependencies cannot be found"() {
         given:
         mavenHttpRepo.module("unknown", "not-found", "4.3").allowAll().assertNotPublished()
@@ -682,12 +833,13 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
 
         then:
         assertTransformationsExecuted()
+        failure.assertHasDescription("Execution failed for task ':app:resolveGreen'") // failure is reported for task that takes the files as input
         failure.assertResolutionFailure(":app:implementation")
         failure.assertHasFailures(1)
         failure.assertThatCause(CoreMatchers.containsString("Could not find unknown:not-found:4.3"))
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "treating file collection visit failures as a configuration cache problem adds an additional failure to the build summary")
     def "transform does not execute when dependencies cannot be downloaded"() {
         given:
         def cantBeDownloaded = withColorVariants(mavenHttpRepo.module("test", "cant-be-downloaded", "4.3")).publish()
@@ -707,6 +859,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         fails ":app:resolveGreen"
 
         then:
+        failure.assertHasDescription("Execution failed for task ':app:resolveGreen'") // failure is reported for task that takes the files as input
         failure.assertResolutionFailure(":app:implementation")
         failure.assertHasFailures(1)
         failure.assertThatCause(CoreMatchers.containsString("Could not download cant-be-downloaded-4.3.jar (test:cant-be-downloaded:4.3)"))
@@ -723,7 +876,6 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         )
     }
 
-    @ToBeFixedForInstantExecution
     def "transform does not execute when dependencies cannot be transformed"() {
         given:
         setupBuildWithFirstStepThatDoesNotUseDependencies()
@@ -732,6 +884,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         fails ":app:resolveGreen", '-DfailTransformOf=slf4j-api-1.7.25.jar'
 
         then:
+        failure.assertHasDescription("Execution failed for task ':app:resolveGreen'") // failure is reported for task that takes the files as input
         failure.assertResolutionFailure(":app:implementation")
         failure.assertHasFailures(1)
         failure.assertThatCause(CoreMatchers.containsString("Failed to transform slf4j-api-1.7.25.jar (org.slf4j:slf4j-api:1.7.25)"))
@@ -749,7 +902,6 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
         )
     }
 
-    @ToBeFixedForInstantExecution
     def "transform does not execute when dependencies cannot be built"() {
         given:
         setupBuildWithTwoSteps()
@@ -796,11 +948,11 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
     }
 
     Transformation transformStep2(Map<String, List<String>> artifactWithDependencies) {
-        return Transformation.fromMap("Transform step 2", artifactWithDependencies.collectEntries { artifact, dependencies -> [(artifact + ".txt"): dependencies.collect { it + ".txt"}]})
+        return Transformation.fromMap("Transform step 2", artifactWithDependencies.collectEntries { artifact, dependencies -> [(artifact + ".txt"): dependencies.collect { it + ".txt" }] })
     }
 
     void assertTransformationsExecuted(Transformation... expectedTransforms) {
-        assertTransformationsExecuted(ImmutableSortedMultiset.<Transformation>copyOf(expectedTransforms as List))
+        assertTransformationsExecuted(ImmutableSortedMultiset.<Transformation> copyOf(expectedTransforms as List))
     }
 
     void assertTransformationsExecuted(Multiset<Transformation> expectedTransforms) {
@@ -848,7 +1000,7 @@ abstract class ClasspathTransform implements TransformAction<TransformParameters
 
         @Override
         int compareTo(@Nonnull Transformation o) {
-            name <=> o.name ?: artifact <=> o.artifact ?: Comparators.lexicographical(Comparator.<String>naturalOrder()).compare(dependencies, o.dependencies)
+            name <=> o.name ?: artifact <=> o.artifact ?: Comparators.lexicographical(Comparator.<String> naturalOrder()).compare(dependencies, o.dependencies)
         }
     }
 }

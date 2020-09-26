@@ -19,6 +19,7 @@ package org.gradle.api.tasks.testing.testng;
 import groovy.lang.MissingMethodException;
 import groovy.lang.MissingPropertyException;
 import groovy.xml.MarkupBuilder;
+import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Internal;
@@ -31,6 +32,7 @@ import org.gradle.internal.ErroringAction;
 import org.gradle.internal.IoActions;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.StringWriter;
@@ -80,8 +82,9 @@ public class TestNGOptions extends TestFrameworkOptions {
 
     private final File projectDir;
 
-    public TestNGOptions(File projectDir) {
-        this.projectDir = projectDir;
+    @Inject
+    public TestNGOptions(ProjectLayout projectLayout) {
+        this.projectDir = projectLayout.getProjectDirectory().getAsFile();
     }
 
     public MarkupBuilder suiteXmlBuilder() {
@@ -173,7 +176,7 @@ public class TestNGOptions extends TestFrameworkOptions {
             return suiteXmlBuilder.getMetaClass().invokeMethod(suiteXmlBuilder, name, args);
         }
 
-        throw new MissingMethodException(name, getClass(), (Object[])args);
+        throw new MissingMethodException(name, getClass(), (Object[]) args);
     }
 
     /**

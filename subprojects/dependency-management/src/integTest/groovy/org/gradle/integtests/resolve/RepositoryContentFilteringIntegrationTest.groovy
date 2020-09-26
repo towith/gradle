@@ -26,7 +26,7 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
 
     def setup() {
         settingsFile << "rootProject.name = 'test'"
-        buildFile << """                      
+        buildFile << """
             configurations {
                 conf
             }
@@ -316,7 +316,7 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
 
         given:
         repositories {
-            maven("""content { 
+            maven("""content {
                 onlyForConfigurations("conf2")
             }""")
         }
@@ -330,7 +330,7 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
             }
             tasks.register("verify") {
                 doFirst {
-                    $check1               
+                    $check1
                     $check2
                 }
             }
@@ -360,7 +360,7 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
         """
         given:
         repositories {
-            maven("""content { 
+            maven("""content {
                 onlyForAttribute(colorAttribute, 'red')
             }""")
             ivy()
@@ -426,14 +426,18 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
         where:
         notation << [
                 "excludeVersion('org', 'foo', '1.1')",
+                "excludeVersion('org', 'foo', '[1.0,)')",
+                "excludeVersion('org', 'foo', '[1.0,1.2)')",
+                "excludeVersion('org', 'foo', '(,1.1]')",
+                "excludeVersion('org', 'foo', '(,1.2]')",
                 "excludeVersionByRegex('or.+', 'f.+', '1\\\\.[1-2]')"
         ]
     }
 
     @Unroll
     def "can include by module version using #notation"() {
-        def modIvy = ivyHttpRepo.module('org', 'foo', '1.1').publish()
-        def modMaven = mavenHttpRepo.module('org', 'foo', '1.0').publish()
+        def modIvy = ivyHttpRepo.module('org', 'foo', '1.0').publish()
+        def modMaven = mavenHttpRepo.module('org', 'foo', '1.1').publish()
 
         given:
         repositories {
@@ -449,8 +453,8 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
         """
 
         when:
-        modIvy.ivy.expectGet()
-        modIvy.artifact.expectGet()
+        modMaven.pom.expectGet()
+        modMaven.artifact.expectGet()
 
         run 'checkDeps'
 
@@ -463,8 +467,12 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
 
         where:
         notation << [
-                "includeVersion('org', 'foo', '1.0')",
-                "includeVersionByRegex('or.+', 'fo.+', '.+0')",
+                "includeVersion('org', 'foo', '1.1')",
+                "includeVersion('org', 'foo', '[1.1,)')",
+                "includeVersion('org', 'foo', '[1.1,1.3)')",
+                "includeVersion('org', 'foo', '(,1.1]')",
+                "includeVersion('org', 'foo', '(,1.2]')",
+                "includeVersionByRegex('or.+', 'f.+', '1\\\\.[1-3]')"
         ]
     }
 
@@ -638,6 +646,24 @@ class RepositoryContentFilteringIntegrationTest extends AbstractHttpDependencyRe
                 snapshot('org:foo:1.0-SNAPSHOT', latestSnapshot.uniqueSnapshotVersion, 'latest.integration')
             }
         }
+    }
+
+    def "mavenContent does not resolve repository url eagerly"() {
+        given:
+        buildFile << """
+            repositories {
+                maven {
+                    url = { throw new RuntimeException("url resolved") }
+                    mavenContent { snapshotsOnly() }
+                }
+            }
+            dependencies {
+                conf "org:foo:latest.integration"
+            }
+        """
+
+        expect:
+        succeeds("help")
     }
 
     static String checkConfIsUnresolved() {

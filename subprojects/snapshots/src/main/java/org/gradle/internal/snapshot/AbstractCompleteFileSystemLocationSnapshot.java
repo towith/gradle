@@ -16,20 +16,23 @@
 
 package org.gradle.internal.snapshot;
 
-import javax.annotation.Nullable;
+import org.gradle.internal.file.FileMetadata.AccessType;
+
 import java.util.Optional;
 
 public abstract class AbstractCompleteFileSystemLocationSnapshot implements CompleteFileSystemLocationSnapshot {
     private final String absolutePath;
     private final String name;
+    private final AccessType accessType;
 
-    public AbstractCompleteFileSystemLocationSnapshot(String absolutePath, String name) {
+    public AbstractCompleteFileSystemLocationSnapshot(String absolutePath, String name, AccessType accessType) {
         this.absolutePath = absolutePath;
         this.name = name;
+        this.accessType = accessType;
     }
 
     protected static MissingFileSnapshot missingSnapshotForAbsolutePath(String filePath) {
-        return new MissingFileSnapshot(filePath);
+        return new MissingFileSnapshot(filePath, AccessType.DIRECT);
     }
 
     @Override
@@ -43,13 +46,28 @@ public abstract class AbstractCompleteFileSystemLocationSnapshot implements Comp
     }
 
     @Override
+    public AccessType getAccessType() {
+        return accessType;
+    }
+
+    @Override
     public String getPathToParent() {
         return getName();
     }
 
     @Override
-    public CompleteFileSystemLocationSnapshot store(VfsRelativePath relativePath, CaseSensitivity caseSensitivity, MetadataSnapshot snapshot) {
+    public CompleteFileSystemLocationSnapshot store(VfsRelativePath relativePath, CaseSensitivity caseSensitivity, MetadataSnapshot snapshot, SnapshotHierarchy.NodeDiffListener diffListener) {
         return this;
+    }
+
+    @Override
+    public void accept(SnapshotHierarchy.SnapshotVisitor snapshotVisitor) {
+        snapshotVisitor.visitSnapshotRoot(this);
+    }
+
+    @Override
+    public boolean hasDescendants() {
+        return true;
     }
 
     @Override
@@ -80,6 +98,15 @@ public abstract class AbstractCompleteFileSystemLocationSnapshot implements Comp
         return Optional.of(missingSnapshotForAbsolutePath(relativePath.getAbsolutePath()));
     }
 
+    @Override
+    public ReadOnlyFileSystemNode getNode(VfsRelativePath relativePath, CaseSensitivity caseSensitivity) {
+        return getChildNode(relativePath, caseSensitivity);
+    }
+
+    protected ReadOnlyFileSystemNode getChildNode(VfsRelativePath relativePath, CaseSensitivity caseSensitivity) {
+        return missingSnapshotForAbsolutePath(relativePath.getAbsolutePath());
+    }
+
     /**
      * A wrapper that changes the relative path of the snapshot to something different.
      *
@@ -94,12 +121,12 @@ public abstract class AbstractCompleteFileSystemLocationSnapshot implements Comp
         }
 
         @Override
-        public Optional<FileSystemNode> invalidate(VfsRelativePath relativePath, CaseSensitivity caseSensitivity) {
-            return delegate.invalidate(relativePath, caseSensitivity).map(splitSnapshot -> splitSnapshot.withPathToParent(getPathToParent()));
+        public Optional<FileSystemNode> invalidate(VfsRelativePath relativePath, CaseSensitivity caseSensitivity, SnapshotHierarchy.NodeDiffListener diffListener) {
+            return delegate.invalidate(relativePath, caseSensitivity, diffListener).map(splitSnapshot -> splitSnapshot.withPathToParent(getPathToParent()));
         }
 
         @Override
-        public FileSystemNode store(VfsRelativePath relativePath, CaseSensitivity caseSensitivity, MetadataSnapshot newSnapshot) {
+        public FileSystemNode store(VfsRelativePath relativePath, CaseSensitivity caseSensitivity, MetadataSnapshot newSnapshot, SnapshotHierarchy.NodeDiffListener diffListener) {
             return this;
         }
 
@@ -114,6 +141,16 @@ public abstract class AbstractCompleteFileSystemLocationSnapshot implements Comp
         }
 
         @Override
+        public boolean hasDescendants() {
+            return delegate.hasDescendants();
+        }
+
+        @Override
+        public ReadOnlyFileSystemNode getNode(VfsRelativePath relativePath, CaseSensitivity caseSensitivity) {
+            return delegate.getNode(relativePath, caseSensitivity);
+        }
+
+        @Override
         public FileSystemNode withPathToParent(String newPathToParent) {
             return getPathToParent().equals(newPathToParent)
                 ? this
@@ -121,8 +158,8 @@ public abstract class AbstractCompleteFileSystemLocationSnapshot implements Comp
         }
 
         @Override
-        public void accept(NodeVisitor visitor, @Nullable FileSystemNode parent) {
-            delegate.accept(visitor, parent);
+        public void accept(SnapshotHierarchy.SnapshotVisitor snapshotVisitor) {
+            delegate.accept(snapshotVisitor);
         }
     }
 }

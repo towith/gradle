@@ -17,7 +17,7 @@
 package org.gradle.integtests.composite
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import spock.lang.Unroll
 
 class CompositeBuildConfigurationAttributesResolveIntegrationTest extends AbstractIntegrationSpec {
@@ -26,7 +26,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         using m2
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "context travels to transitive dependencies"() {
         given:
         file('settings.gradle') << """
@@ -116,7 +116,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         notExecuted ':includedBuild:fooJar'
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "context travels to transitive dependencies via external components (Maven)"() {
         given:
         mavenRepo.module('com.acme.external', 'external', '1.2')
@@ -211,7 +211,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         notExecuted ':includedBuild:fooJar'
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "context travels to transitive dependencies via external components (Ivy)"() {
         given:
         ivyRepo.module('com.acme.external', 'external', '1.2')
@@ -307,7 +307,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "attribute values are matched across builds - #type"() {
         given:
         file('settings.gradle') << """
@@ -407,7 +407,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         'OtherThing' | 'new OtherThing(name: "free")' | 'new OtherThing(name: "paid")'
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "compatibility and disambiguation rules can be defined by consuming build"() {
         given:
         file('settings.gradle') << """
@@ -416,7 +416,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         """
         buildFile << """
             interface Thing extends Named { }
-            
+
             class CompatRule implements AttributeCompatibilityRule<Thing> {
                 void execute(CompatibilityCheckDetails<Thing> details) {
                     if (details.consumerValue.name == 'paid' && details.producerValue.name == 'blue') {
@@ -525,7 +525,7 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
         """
         buildFile << """
             interface Thing extends Named { }
-            
+
             class CompatRule implements AttributeCompatibilityRule<Thing> {
                 void execute(CompatibilityCheckDetails<Thing> details) {
                     if (details.consumerValue.name == 'paid') {
@@ -602,33 +602,27 @@ class CompositeBuildConfigurationAttributesResolveIntegrationTest extends Abstra
 
         then:
         failure.assertHasCause("Could not resolve com.acme.external:external:1.0.")
-        failure.assertHasCause("""Unable to find a matching variant of project :includedBuild:
+        failure.assertHasCause("""No matching variant of project :includedBuild was found. The consumer was configured to find attribute 'flavor' with value 'free' but:
   - Variant 'bar' capability com.acme.external:external:2.0-SNAPSHOT:
-      - Incompatible attribute:
-          - Required flavor 'free' and found incompatible value 'blue'.
+      - Incompatible because this component declares attribute 'flavor' with value 'blue' and the consumer needed attribute 'flavor' with value 'free'
   - Variant 'foo' capability com.acme.external:external:2.0-SNAPSHOT:
-      - Incompatible attribute:
-          - Required flavor 'free' and found incompatible value 'red'.""")
+      - Incompatible because this component declares attribute 'flavor' with value 'red' and the consumer needed attribute 'flavor' with value 'free'""")
 
         when:
         fails ':a:checkPaid'
 
         then:
         failure.assertHasCause("Could not resolve com.acme.external:external:1.0.")
-        failure.assertHasCause("""Cannot choose between the following variants of project :includedBuild:
+        failure.assertHasCause("""The consumer was configured to find attribute 'flavor' with value 'paid'. However we cannot choose between the following variants of project :includedBuild:
   - bar
   - foo
 All of them match the consumer attributes:
-  - Variant 'bar' capability com.acme.external:external:2.0-SNAPSHOT:
-      - Compatible attribute:
-          - Required flavor 'paid' and found compatible value 'blue'.
-  - Variant 'foo' capability com.acme.external:external:2.0-SNAPSHOT:
-      - Compatible attribute:
-          - Required flavor 'paid' and found compatible value 'red'.""")
+  - Variant 'bar' capability com.acme.external:external:2.0-SNAPSHOT declares attribute 'flavor' with value 'blue'
+  - Variant 'foo' capability com.acme.external:external:2.0-SNAPSHOT declares attribute 'flavor' with value 'red'""")
     }
 
     @Unroll("context travels down to transitive dependencies with typed attributes using plugin [#v1, #v2, pluginsDSL=#usePluginsDSL]")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "context travels down to transitive dependencies with typed attributes"() {
         buildTypedAttributesPlugin('1.0')
         buildTypedAttributesPlugin('1.1')

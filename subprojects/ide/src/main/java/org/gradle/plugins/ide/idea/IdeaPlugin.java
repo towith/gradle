@@ -44,7 +44,6 @@ import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.xml.XmlTransformer;
-import org.gradle.language.scala.plugins.ScalaLanguagePlugin;
 import org.gradle.plugins.ide.api.XmlFileContentMerger;
 import org.gradle.plugins.ide.idea.internal.IdeaModuleMetadata;
 import org.gradle.plugins.ide.idea.internal.IdeaScalaConfigurer;
@@ -433,7 +432,6 @@ public class IdeaPlugin extends IdePlugin {
 
         Collection<Configuration> provided = scopes.get(GeneratedIdeaScope.PROVIDED.name()).get(IdeaDependenciesProvider.SCOPE_PLUS);
         provided.add(configurations.getByName(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME));
-        provided.add(configurations.getByName(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME));
 
         Collection<Configuration> runtime = scopes.get(GeneratedIdeaScope.RUNTIME.name()).get(IdeaDependenciesProvider.SCOPE_PLUS);
         runtime.add(configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME));
@@ -441,7 +439,6 @@ public class IdeaPlugin extends IdePlugin {
         Collection<Configuration> test = scopes.get(GeneratedIdeaScope.TEST.name()).get(IdeaDependenciesProvider.SCOPE_PLUS);
         test.add(configurations.getByName(JavaPlugin.TEST_COMPILE_CLASSPATH_CONFIGURATION_NAME));
         test.add(configurations.getByName(JavaPlugin.TEST_RUNTIME_CLASSPATH_CONFIGURATION_NAME));
-        test.add(configurations.getByName(JavaPlugin.TEST_ANNOTATION_PROCESSOR_CONFIGURATION_NAME));
 
         ideaModel.getModule().setScopes(scopes);
     }
@@ -480,6 +477,8 @@ public class IdeaPlugin extends IdePlugin {
         return !moduleLanguageLevel.equals(ideaProject.getLanguageLevel());
     }
 
+
+    @SuppressWarnings("deprecation")
     private void configureForScalaPlugin() {
         project.getPlugins().withType(ScalaBasePlugin.class, new Action<ScalaBasePlugin>() {
             @Override
@@ -487,9 +486,9 @@ public class IdeaPlugin extends IdePlugin {
                 ideaModuleDependsOnRoot();
             }
         });
-        project.getPlugins().withType(ScalaLanguagePlugin.class, new Action<ScalaLanguagePlugin>() {
+        project.getPlugins().withType(org.gradle.language.scala.plugins.ScalaLanguagePlugin.class, new Action<org.gradle.language.scala.plugins.ScalaLanguagePlugin>() {
             @Override
-            public void execute(ScalaLanguagePlugin scalaLanguagePlugin) {
+            public void execute(org.gradle.language.scala.plugins.ScalaLanguagePlugin scalaLanguagePlugin) {
                 ideaModuleDependsOnRoot();
             }
 

@@ -26,8 +26,10 @@ public class DefaultScalaJavaJointCompileSpec extends DefaultJavaCompileSpec imp
     private BaseScalaCompileOptions options;
     private Iterable<File> scalaClasspath;
     private Iterable<File> zincClasspath;
+    private Iterable<File> scalaCompilerPlugins;
     private Map<File, File> analysisMap;
     private File analysisFile;
+    private File classfileBackupDir;
     private long buildStartTimestamp;
 
     @Override
@@ -49,6 +51,16 @@ public class DefaultScalaJavaJointCompileSpec extends DefaultJavaCompileSpec imp
         this.options = options;
     }
 
+    @Override
+    public File getClassfileBackupDir() {
+        return classfileBackupDir;
+    }
+
+    @Override
+    public void setClassfileBackupDir(File classfileBackupDir) {
+        this.classfileBackupDir = classfileBackupDir;
+    }
+
     public Iterable<File> getScalaClasspath() {
         return scalaClasspath;
     }
@@ -63,6 +75,16 @@ public class DefaultScalaJavaJointCompileSpec extends DefaultJavaCompileSpec imp
 
     public void setZincClasspath(Iterable<File> zincClasspath) {
         this.zincClasspath = zincClasspath;
+    }
+
+    @Override
+    public Iterable<File> getScalaCompilerPlugins() {
+        return scalaCompilerPlugins;
+    }
+
+    @Override
+    public void setScalaCompilerPlugins(Iterable<File> scalaCompilerPlugins) {
+        this.scalaCompilerPlugins = scalaCompilerPlugins;
     }
 
     @Override

@@ -32,7 +32,7 @@ import org.junit.Rule
 
 class CleanupOutputsStepTest extends StepSpec<InputChangesContext> implements FingerprinterFixture {
     @Rule
-    TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass())
     def afterPreviousExecution = Mock(AfterPreviousExecutionState)
     def beforeExecutionState = Mock(BeforeExecutionState)
     def delegateResult = Mock(Result)
@@ -63,7 +63,7 @@ class CleanupOutputsStepTest extends StepSpec<InputChangesContext> implements Fi
         0 * _
 
         !outputs.file.exists()
-        outputs.dir.assertHasDescendants("some/notOutput1.txt")
+        outputs.dir.assertHasDescendants("some/notOutput1.txt", "some/notOutput2")
         !outputs.dir.file("some/dir").exists()
         !outputs.dir.file("some/lonelyDir").exists()
         !outputs.dir.file("some/another").exists()
@@ -185,8 +185,8 @@ class CleanupOutputsStepTest extends StepSpec<InputChangesContext> implements Fi
         _ * context.beforeExecutionState >> Optional.of(beforeExecutionState)
         1 * beforeExecutionState.detectedOverlappingOutputs >> Optional.of(new OverlappingOutputs("test", "/absolute/path"))
         _ * work.visitOutputProperties(_) >> { OutputPropertyVisitor visitor ->
-            visitor.visitOutputProperty("dir", TreeType.DIRECTORY, outputs.dir)
-            visitor.visitOutputProperty("file", TreeType.FILE, outputs.file)
+            visitor.visitOutputProperty("dir", TreeType.DIRECTORY, outputs.dir, TestFiles.fixed(outputs.dir))
+            visitor.visitOutputProperty("file", TreeType.FILE, outputs.file, TestFiles.fixed(outputs.file))
         }
         _ * context.afterPreviousExecutionState >> Optional.of(afterPreviousExecution)
         1 * afterPreviousExecution.outputFileProperties >> ImmutableSortedMap.<String, FileCollectionFingerprint>of("dir", outputs.dirFingerprint, "file", outputs.fileFingerprint)
@@ -200,8 +200,8 @@ class CleanupOutputsStepTest extends StepSpec<InputChangesContext> implements Fi
         _ * context.beforeExecutionState >> Optional.of(beforeExecutionState)
         1 * beforeExecutionState.detectedOverlappingOutputs >> Optional.empty()
         _ * work.visitOutputProperties(_) >> { OutputPropertyVisitor visitor ->
-            visitor.visitOutputProperty("dir", TreeType.DIRECTORY, outputs.dir)
-            visitor.visitOutputProperty("file", TreeType.FILE, outputs.file)
+            visitor.visitOutputProperty("dir", TreeType.DIRECTORY, outputs.dir, TestFiles.fixed(outputs.dir))
+            visitor.visitOutputProperty("file", TreeType.FILE, outputs.file, TestFiles.fixed(outputs.file))
         }
     }
 

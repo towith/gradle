@@ -30,19 +30,21 @@ import org.gradle.cache.internal.UnusedVersionsCacheCleanup;
 import org.gradle.cache.internal.UsedGradleVersions;
 import org.gradle.cache.internal.VersionStrategy;
 import org.gradle.internal.file.FileAccessTimeJournal;
-import org.gradle.internal.resource.local.FileAccessTracker;
-import org.gradle.internal.resource.local.SingleDepthFileAccessTracker;
+import org.gradle.internal.file.FileAccessTracker;
+import org.gradle.internal.file.impl.SingleDepthFileAccessTracker;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.List;
 
 import static org.gradle.cache.internal.CacheVersionMapping.introducedIn;
 import static org.gradle.cache.internal.LeastRecentlyUsedCacheCleanup.DEFAULT_MAX_AGE_IN_DAYS_FOR_RECREATABLE_CACHE_ENTRIES;
 import static org.gradle.cache.internal.filelock.LockOptionsBuilder.mode;
 
 public class DefaultClasspathTransformerCacheFactory implements ClasspathTransformerCacheFactory {
-    private static final CacheVersionMapping CACHE_VERSION_MAPPING = introducedIn("3.1-rc-1").incrementedIn("3.2-rc-1").incrementedIn("3.5-rc-1").build();
+    private static final CacheVersionMapping CACHE_VERSION_MAPPING = introducedIn("3.1-rc-1")
+        .incrementedIn("3.2-rc-1")
+        .incrementedIn("3.5-rc-1")
+        .changedTo(8, "6.5-rc-1")
+        .build();
     @VisibleForTesting
     static final String CACHE_NAME = "jars";
     @VisibleForTesting
@@ -74,10 +76,5 @@ public class DefaultClasspathTransformerCacheFactory implements ClasspathTransfo
     @Override
     public FileAccessTracker createFileAccessTracker(FileAccessTimeJournal fileAccessTimeJournal) {
         return new SingleDepthFileAccessTracker(fileAccessTimeJournal, cacheDir, FILE_TREE_DEPTH_TO_TRACK_AND_CLEANUP);
-    }
-
-    @Override
-    public List<File> getAdditiveCacheRoots() {
-        return Collections.singletonList(cacheDir);
     }
 }

@@ -18,20 +18,18 @@ package org.gradle.integtests.samples
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.DefaultTestExecutionResult
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.Sample
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.Requires
 import org.junit.Rule
 import spock.lang.Unroll
 
 import java.util.jar.Manifest
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
 import static org.hamcrest.CoreMatchers.equalTo
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 
-@Requires(KOTLIN_SCRIPT)
+@UnsupportedWithConfigurationCache(because = ":uploadArchives")
 class SamplesJavaQuickstartIntegrationTest extends AbstractIntegrationSpec {
 
     @Rule
@@ -43,7 +41,6 @@ class SamplesJavaQuickstartIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     def "can build and upload jar with #dsl dsl"() {
         given:
         TestFile javaprojectDir = sample.dir.file(dsl)

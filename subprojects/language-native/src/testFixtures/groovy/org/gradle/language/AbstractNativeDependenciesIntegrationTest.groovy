@@ -16,7 +16,7 @@
 
 package org.gradle.language
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.nativeplatform.fixtures.AbstractInstalledToolChainIntegrationSpec
 
 
@@ -27,7 +27,11 @@ abstract class AbstractNativeDependenciesIntegrationTest extends AbstractInstall
         """
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(bottomSpecs = [
+        'CppUnitTestDependenciesIntegrationTest',
+        'CppApplicationDependenciesIntegrationTest',
+        'CppLibraryDependenciesIntegrationTest',
+    ])
     def "can define implementation dependencies on component"() {
         given:
         settingsFile << 'include "lib"'
@@ -47,14 +51,18 @@ abstract class AbstractNativeDependenciesIntegrationTest extends AbstractInstall
         result.assertTasksExecuted(libDebugTasks, assembleDevBinaryTasks, assembleDevBinaryTask)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(bottomSpecs = [
+        'CppLibraryDependenciesIntegrationTest',
+        'CppApplicationDependenciesIntegrationTest',
+        'CppUnitTestDependenciesIntegrationTest'
+    ])
     def "can define implementation dependencies on each binary"() {
         given:
         settingsFile << 'include "lib"'
         makeComponentWithLibrary()
         buildFile << """
             ${componentUnderTestDsl} {
-                binaries.configureEach { b ->                
+                binaries.configureEach { b ->
                     b.dependencies {
                         implementation project(':lib')
                     }

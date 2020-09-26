@@ -17,9 +17,11 @@
 package org.gradle.language.scala
 
 import org.gradle.api.tasks.compile.AbstractComponentCompilerDaemonReuseIntegrationTest
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.integtests.fixtures.jvm.TestJvmComponent
 import org.gradle.language.scala.fixtures.TestScalaComponent
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class ScalaComponentCompilerDaemonReuseIntegrationTest extends AbstractComponentCompilerDaemonReuseIntegrationTest {
 
     def setup() {

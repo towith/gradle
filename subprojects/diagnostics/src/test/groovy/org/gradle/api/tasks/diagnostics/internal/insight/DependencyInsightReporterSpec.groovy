@@ -16,8 +16,11 @@
 
 package org.gradle.api.tasks.diagnostics.internal.insight
 
+
 import org.gradle.api.artifacts.result.ComponentSelectionReason
+import org.gradle.api.internal.FeaturePreviews
 import org.gradle.api.internal.artifacts.DefaultModuleIdentifier
+import org.gradle.api.internal.artifacts.DefaultModuleVersionIdentifier
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.DefaultVersionComparator
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.DefaultVersionSelectorScheme
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.VersionParser
@@ -40,8 +43,8 @@ import static org.gradle.internal.component.external.model.DefaultModuleComponen
 
 class DependencyInsightReporterSpec extends Specification {
     def versionParser = new VersionParser()
-    def versionSelectorScheme = new DefaultVersionSelectorScheme(new DefaultVersionComparator(), versionParser)
-    def versionComparator = new DefaultVersionComparator()
+    def versionComparator = new DefaultVersionComparator(new FeaturePreviews())
+    def versionSelectorScheme = new DefaultVersionSelectorScheme(versionComparator, versionParser)
 
     @Subject
     def reporter = new DependencyInsightReporter(versionSelectorScheme, versionComparator, versionParser)
@@ -198,8 +201,11 @@ class DependencyInsightReporterSpec extends Specification {
                 new DefaultResolvedComponentResult(newId("a", "root", "1"), ComponentSelectionReasons.requested(), new DefaultModuleComponentIdentifier(DefaultModuleIdentifier.newId(group, name), selected), [defaultVariant()], "repoId"))
     }
 
-    private static DefaultResolvedVariantResult defaultVariant() {
-        new DefaultResolvedVariantResult(Describables.of("default"), ImmutableAttributes.EMPTY, [])
+    private static DefaultResolvedVariantResult defaultVariant(String ownerGroup = 'com', String ownerModule = 'foo', String ownerVersion = '1.0') {
+        def ownerId = DefaultModuleComponentIdentifier.newId(
+            DefaultModuleVersionIdentifier.newId(ownerGroup, ownerModule, ownerVersion)
+        )
+        new DefaultResolvedVariantResult(ownerId, Describables.of("default"), ImmutableAttributes.EMPTY, [], null)
     }
 
     private static DefaultResolvedDependencyResult path(String path) {

@@ -15,11 +15,11 @@
  */
 package org.gradle.plugins.ide.eclipse
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class EclipseWtpJavaProjectIntegrationTest extends AbstractEclipseIntegrationSpec {
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "generates configuration files for a Java project"() {
         file('src/main/java').mkdirs()
         file('src/main/resources').mkdirs()
@@ -36,7 +36,7 @@ class EclipseWtpJavaProjectIntegrationTest extends AbstractEclipseIntegrationSpe
 
            dependencies {
                implementation 'com.google.guava:guava:18.0'
-               testImplementation "junit:junit:4.12"
+               testImplementation "junit:junit:4.13"
            }
         """
 
@@ -51,9 +51,9 @@ class EclipseWtpJavaProjectIntegrationTest extends AbstractEclipseIntegrationSpe
 
         // Classpath
         def classpath = classpath
-        classpath.assertHasLibs('guava-18.0.jar', 'junit-4.12.jar', 'hamcrest-core-1.3.jar')
+        classpath.assertHasLibs('guava-18.0.jar', 'junit-4.13.jar', 'hamcrest-core-1.3.jar')
         classpath.lib('guava-18.0.jar').assertIsExcludedFromDeployment()
-        classpath.lib('junit-4.12.jar').assertIsExcludedFromDeployment()
+        classpath.lib('junit-4.13.jar').assertIsExcludedFromDeployment()
         classpath.lib('hamcrest-core-1.3.jar').assertIsExcludedFromDeployment()
 
         // Facets

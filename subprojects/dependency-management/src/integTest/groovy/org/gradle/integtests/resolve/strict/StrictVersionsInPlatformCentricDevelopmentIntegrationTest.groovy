@@ -17,19 +17,17 @@ package org.gradle.integtests.resolve.strict
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.resolve.AbstractModuleDependencyResolveTest
 import spock.lang.Ignore
 import spock.lang.Unroll
 
+import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.ENFORCED_PLATFORM
+import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.LEGACY_PLATFORM
 import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.MODULE
 import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.PLATFORM
-import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.LEGACY_PLATFORM
-import static org.gradle.integtests.resolve.strict.StrictVersionsInPlatformCentricDevelopmentIntegrationTest.PlatformType.ENFORCED_PLATFORM
 
-@RequiredFeatures([
-    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")]
-)
+@RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
 class StrictVersionsInPlatformCentricDevelopmentIntegrationTest extends AbstractModuleDependencyResolveTest {
 
     enum PlatformType {
@@ -270,6 +268,11 @@ class StrictVersionsInPlatformCentricDevelopmentIntegrationTest extends Abstract
     }
 
     @Unroll
+    @ToBeFixedForConfigurationCache(iterationMatchers = [
+        ".*\\[PLATFORM\\].*",
+        ".*\\[LEGACY_PLATFORM\\].*",
+        ".*\\[MODULE\\].*"
+    ])
     void "(3) library developer has issues with org:foo:3.1.1 and overrides platform decision with 3.2 which fails due to reject [#platformType]"() {
         updatedRepository(platformType)
         singleLibraryBuildFile(platformType)
@@ -325,6 +328,9 @@ class StrictVersionsInPlatformCentricDevelopmentIntegrationTest extends Abstract
     }
 
     @Unroll
+    @ToBeFixedForConfigurationCache(iterationMatchers = [
+        ".*\\[ENFORCED_PLATFORM\\].*"
+    ])
     void "(4) library developer has issues with org:foo:3.1.1 and forces an override of the platform decision with strictly [#platformType]"() {
         // issue with enforced platform: consumer can not override platform decision via constraint
         //                               (an override via an own forced dependency is possible)
@@ -407,6 +413,7 @@ class StrictVersionsInPlatformCentricDevelopmentIntegrationTest extends Abstract
     }
 
     @Unroll
+    @ToBeFixedForConfigurationCache
     void "(5) if two libraries are combined without agreeing on an override, the original platform constraint is brought back [#platformType]"() {
         updatedRepository(platformType)
         settingsFile << "\ninclude 'recklessLibrary', 'secondLibrary'"

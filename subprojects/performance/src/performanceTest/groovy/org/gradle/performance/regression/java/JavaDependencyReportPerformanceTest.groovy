@@ -16,31 +16,26 @@
 
 package org.gradle.performance.regression.java
 
-import org.gradle.performance.AbstractCrossVersionGradleProfilerPerformanceTest
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
+import org.gradle.performance.generator.JavaTestProject
 import spock.lang.Unroll
 
 import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_JAVA_PROJECT
 
-class JavaDependencyReportPerformanceTest extends AbstractCrossVersionGradleProfilerPerformanceTest {
+class JavaDependencyReportPerformanceTest extends AbstractCrossVersionPerformanceTest {
 
     @Unroll
-    def "generate dependency report for #testProject"() {
+    def "generate dependency report"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
+        def subProject = (JavaTestProject.projectFor(runner.testProject) == LARGE_JAVA_MULTI_PROJECT) ? 'project363:' : ''
+        runner.gradleOpts = runner.projectMemoryOptions
         runner.tasksToRun = ["${subProject}dependencyReport"]
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.7-20200824220048+0000"]
 
         when:
         def result = runner.run()
 
         then:
         result.assertCurrentVersionHasNotRegressed()
-
-        where:
-        testProject                   | subProject
-        LARGE_MONOLITHIC_JAVA_PROJECT | ''
-        LARGE_JAVA_MULTI_PROJECT      | 'project363:'
     }
 }

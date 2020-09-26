@@ -18,6 +18,7 @@ package org.gradle.internal.fingerprint.classpath.impl
 
 import org.gradle.api.internal.cache.StringInterner
 import org.gradle.api.internal.changedetection.state.DefaultResourceSnapshotterCacheService
+import org.gradle.api.internal.changedetection.state.ResourceEntryFilter
 import org.gradle.api.internal.changedetection.state.ResourceFilter
 import org.gradle.api.internal.file.TestFiles
 import org.gradle.internal.fingerprint.FileSystemLocationFingerprint
@@ -36,19 +37,21 @@ import spock.lang.Specification
 @UsesNativeServices
 class DefaultClasspathFingerprinterTest extends Specification {
     @Rule
-    public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     def stringInterner = Stub(StringInterner) {
         intern(_) >> { String s -> s }
     }
-    def virtualFileSystem = TestFiles.virtualFileSystem()
-    def fileCollectionSnapshotter = new DefaultFileCollectionSnapshotter(virtualFileSystem, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
+    def fileSystemAccess = TestFiles.fileSystemAccess()
+    def fileCollectionSnapshotter = new DefaultFileCollectionSnapshotter(fileSystemAccess, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
     InMemoryIndexedCache<HashCode, HashCode> resourceHashesCache = new InMemoryIndexedCache<>(new HashCodeSerializer())
     def cacheService = new DefaultResourceSnapshotterCacheService(resourceHashesCache)
     def fingerprinter = new DefaultClasspathFingerprinter(
         cacheService,
         fileCollectionSnapshotter,
         ResourceFilter.FILTER_NOTHING,
+        ResourceEntryFilter.FILTER_NOTHING,
+        ResourceEntryFilter.FILTER_NOTHING,
         stringInterner)
 
     def "directories and missing files are ignored"() {
@@ -220,7 +223,7 @@ class DefaultClasspathFingerprinterTest extends Specification {
     }
 
     def fingerprint(TestFile... classpath) {
-        virtualFileSystem.invalidateAll()
+        fileSystemAccess.write(classpath.collect { it.absolutePath }, {})
         def fileCollectionFingerprint = fingerprinter.fingerprint(files(classpath))
         return fileCollectionFingerprint.fingerprints.collect { String path, FileSystemLocationFingerprint fingerprint ->
             [new File(path).getName(), fingerprint.normalizedPath, fingerprint.normalizedContentHash.toString()]

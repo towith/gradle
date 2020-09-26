@@ -18,7 +18,6 @@ package org.gradle.java.fixtures
 
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.resolve.ResolveTestFixture
 import org.gradle.test.fixtures.GradleModuleMetadata
 import org.gradle.test.fixtures.file.TestFile
@@ -40,8 +39,8 @@ abstract class AbstractJavaTestFixturesIntegrationTest extends AbstractIntegrati
                 apply plugin: '${pluginName}'
 
                 ${mavenCentralRepository()}
-                
-                dependencies { testImplementation 'junit:junit:4.12' }
+
+                dependencies { testImplementation 'junit:junit:4.13' }
             }
         """
     }
@@ -84,7 +83,7 @@ abstract class AbstractJavaTestFixturesIntegrationTest extends AbstractIntegrati
 ---
 ${compileClasspathPackaging ? 'libs/root-1.0-test-fixtures.jar' : 'classes/java/testFixtures'}
 ${pluginName == 'java' || compileClasspathPackaging ? 'libs/root-1.0.jar' : 'classes/java/main'}
-junit-4.12.jar
+junit-4.13.jar
 hamcrest-core-1.3.jar
 ---
 """
@@ -101,7 +100,7 @@ classes/java/test
 resources/test
 libs/root-1.0-test-fixtures.jar
 libs/root-1.0.jar
-junit-4.12.jar
+junit-4.13.jar
 hamcrest-core-1.3.jar
 ---
 """
@@ -116,7 +115,7 @@ hamcrest-core-1.3.jar
         toggleCompileClasspathPackaging(compileClasspathPackaging)
         buildFile << """
             apply plugin: 'java-test-fixtures'
-        
+
             dependencies {
                 testFixturesImplementation 'org.apache.commons:commons-lang3:3.9'
             }
@@ -155,7 +154,7 @@ hamcrest-core-1.3.jar
     def "test fixtures implementation dependencies do not leak into the test compile classpath"() {
         buildFile << """
             apply plugin: 'java-test-fixtures'
-        
+
             dependencies {
                 testFixturesImplementation 'org.apache.commons:commons-lang3:3.9'
             }
@@ -166,7 +165,7 @@ hamcrest-core-1.3.jar
         file("src/test/java/org/Leaking.java") << """
             package org;
             import org.apache.commons.lang3.StringUtils;
-            
+
             public class Leaking {
             }
         """
@@ -181,7 +180,7 @@ hamcrest-core-1.3.jar
     def "test fixtures api dependencies are visible on the test compile classpath"() {
         buildFile << """
             apply plugin: 'java-test-fixtures'
-        
+
             dependencies {
                 testFixturesApi 'org.apache.commons:commons-lang3:3.9'
             }
@@ -192,7 +191,7 @@ hamcrest-core-1.3.jar
         file("src/test/java/org/Leaking.java") << """
             package org;
             import org.apache.commons.lang3.StringUtils;
-            
+
             public class Leaking {
             }
         """
@@ -211,7 +210,7 @@ hamcrest-core-1.3.jar
         buildFile << """
             dependencies {
                 testImplementation(testFixtures(project(":sub")))
-            }           
+            }
         """
         addPersonDomainClass("sub")
         addPersonTestFixture("sub")
@@ -234,13 +233,13 @@ hamcrest-core-1.3.jar
         """
         file("sub/build.gradle") << """
             apply plugin: 'java-test-fixtures'
-            
+
             group = 'other' // this is applied _after_ the dependency is created
         """
         buildFile << """
             dependencies {
                 testImplementation(testFixtures(project(":sub")))
-            }           
+            }
         """
         addPersonDomainClass("sub")
         addPersonTestFixture("sub")
@@ -257,7 +256,6 @@ hamcrest-core-1.3.jar
         )
     }
 
-    @ToBeFixedForInstantExecution
     def "can publish test fixtures"() {
         buildFile << """
             apply plugin: 'maven-publish'
@@ -314,7 +312,6 @@ hamcrest-core-1.3.jar
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "can deactivate test fixture publishing"() {
         buildFile << """
             apply plugin: 'maven-publish'
@@ -364,7 +361,6 @@ hamcrest-core-1.3.jar
         gmm.variants.size() == 2
     }
 
-    @ToBeFixedForInstantExecution
     def "can consume test fixtures of an external module"() {
         mavenRepo.module("com.acme", "external-module", "1.3")
             .variant("testFixturesApiElements", ['org.gradle.usage': 'java-api', 'org.gradle.libraryelements': 'jar']) {
@@ -388,7 +384,7 @@ hamcrest-core-1.3.jar
                 maven {
                     url "${mavenRepo.uri}"
                 }
-            }           
+            }
         """
         when:
         def resolve = new ResolveTestFixture(buildFile, "testCompileClasspath")
@@ -398,7 +394,7 @@ hamcrest-core-1.3.jar
         then:
         resolve.expectGraph {
             root(":", ":root:unspecified") {
-                module('junit:junit:4.12') {
+                module('junit:junit:4.13') {
                     configuration = 'compile' // external POM
                     module("org.hamcrest:hamcrest-core:1.3")
                 }
@@ -424,7 +420,7 @@ hamcrest-core-1.3.jar
         then:
         resolve.expectGraph {
             root(":", ":root:unspecified") {
-                module('junit:junit:4.12') {
+                module('junit:junit:4.13') {
                     configuration = 'runtime' // external POM
                     module("org.hamcrest:hamcrest-core:1.3")
                 }
@@ -452,7 +448,7 @@ hamcrest-core-1.3.jar
             import org.Person;
             import org.junit.Test;
             import static org.junit.Assert.*;
-            
+
             public class PersonTest {
                 @Test
                 public void testAny() {
@@ -467,20 +463,20 @@ hamcrest-core-1.3.jar
     protected TestFile addPersonDomainClass(String subproject = "", String lang = 'java') {
         file("${subproject ? "${subproject}/" : ""}src/main/$lang/org/Person.$lang") << """
             package org;
-            
+
             public class Person {
                 private final String firstName;
                 private final String lastName;
-                
+
                 public Person(String first, String last) {
                     this.firstName = first;
                     this.lastName = last;
                 }
-                
+
                 public String getFirstName() {
                     return firstName;
                 }
-                
+
                 public String getLastName() {
                     return lastName;
                 }
@@ -491,7 +487,7 @@ hamcrest-core-1.3.jar
     protected TestFile addPersonTestFixture(String subproject = "", String lang = "java") {
         file("${subproject ? "${subproject}/" : ""}src/testFixtures/$lang/org/PersonFixture.$lang") << """
             package org;
-            
+
             public class PersonFixture {
                 public static Person anyone() {
                     return new Person("John", "Doe");
@@ -504,7 +500,7 @@ hamcrest-core-1.3.jar
         file("${subproject ? "${subproject}/" : ""}src/testFixtures/java/org/PersonFixture.java") << """
             package org;
             import org.apache.commons.lang3.StringUtils;
-            
+
             public class PersonFixture {
                 public static Person anyone() {
                     return new Person(StringUtils.capitalize("john"), StringUtils.capitalize("doe"));
@@ -531,7 +527,7 @@ hamcrest-core-1.3.jar
                    println "---"
                }
             }
-            
+
             test {
                doFirst {
                   println "Test runtime classpath"

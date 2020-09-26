@@ -17,7 +17,6 @@
 package org.gradle
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import spock.lang.Ignore
 import spock.lang.Issue
 
@@ -34,7 +33,7 @@ class JansiEndUserIntegrationTest extends AbstractIntegrationSpec {
         buildFile << """
             dependencies {
                 testImplementation 'org.fusesource.jansi:jansi:$JANSI_VERSION'
-                testImplementation 'junit:junit:4.12'
+                testImplementation 'junit:junit:4.13'
             }
         """
 
@@ -94,7 +93,6 @@ class JansiEndUserIntegrationTest extends AbstractIntegrationSpec {
         outputContains('Hello World')
     }
 
-    @ToBeFixedForInstantExecution
     def "groovy compiler uses a different version of Jansi than initialized by Gradle's native services"() {
         when:
         AnnotationProcessorPublisher annotationProcessorPublisher = new AnnotationProcessorPublisher()

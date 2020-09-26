@@ -16,7 +16,7 @@
 
 package org.gradle.api.internal.artifacts.result;
 
-import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import org.gradle.api.InvalidUserCodeException;
@@ -41,13 +41,13 @@ import java.util.stream.Collectors;
 
 public class DefaultResolvedComponentResult implements ResolvedComponentResultInternal {
     private final ModuleVersionIdentifier moduleVersion;
-    private final Set<DependencyResult> dependencies = new LinkedHashSet<DependencyResult>();
-    private final Set<ResolvedDependencyResult> dependents = new LinkedHashSet<ResolvedDependencyResult>();
+    private final Set<DependencyResult> dependencies = new LinkedHashSet<>();
+    private final Set<ResolvedDependencyResult> dependents = new LinkedHashSet<>();
     private final ComponentSelectionReason selectionReason;
     private final ComponentIdentifier componentId;
     private final List<ResolvedVariantResult> variants;
     private final String repositoryName;
-    private final Multimap<ResolvedVariantResult, DependencyResult> variantDependencies = HashMultimap.create();
+    private final Multimap<ResolvedVariantResult, DependencyResult> variantDependencies = ArrayListMultimap.create();
 
     public DefaultResolvedComponentResult(ModuleVersionIdentifier moduleVersion, ComponentSelectionReason selectionReason, ComponentIdentifier componentId, List<ResolvedVariantResult> variants, String repositoryName) {
         assert moduleVersion != null;
@@ -104,9 +104,10 @@ public class DefaultResolvedComponentResult implements ResolvedComponentResultIn
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public ResolvedVariantResult getVariant() {
         if (variants.isEmpty()) {
-            return new DefaultResolvedVariantResult(Describables.of("<empty>"), ImmutableAttributes.EMPTY, Collections.emptyList());
+            return new DefaultResolvedVariantResult(componentId, Describables.of("<empty>"), ImmutableAttributes.EMPTY, Collections.emptyList(), null);
         }
         // Returns an approximation of a composite variant
         List<String> parts = variants.stream()
@@ -114,7 +115,7 @@ public class DefaultResolvedComponentResult implements ResolvedComponentResultIn
             .collect(Collectors.toList());
         DisplayName variantName = new VariantNameBuilder().getVariantName(parts);
         ResolvedVariantResult firstVariant = variants.get(0);
-        return new DefaultResolvedVariantResult(variantName, firstVariant.getAttributes(), firstVariant.getCapabilities());
+        return new DefaultResolvedVariantResult(componentId, variantName, firstVariant.getAttributes(), firstVariant.getCapabilities(), null);
     }
 
     @Override

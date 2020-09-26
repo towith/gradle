@@ -16,8 +16,10 @@
 
 package org.gradle.jvm.plugins
 
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.integtests.fixtures.WellBehavedPluginTest
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class JvmComponentPluginGoodBehaviourTest extends WellBehavedPluginTest {
 
     def setup() {

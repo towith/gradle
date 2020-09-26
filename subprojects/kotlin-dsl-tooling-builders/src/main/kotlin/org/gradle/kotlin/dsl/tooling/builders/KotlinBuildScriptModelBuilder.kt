@@ -28,48 +28,36 @@ import org.gradle.api.internal.project.ProjectInternal
 import org.gradle.api.invocation.Gradle
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.SourceSetContainer
-
 import org.gradle.groovy.scripts.TextResourceScriptSource
-
 import org.gradle.internal.classpath.ClassPath
 import org.gradle.internal.classpath.DefaultClassPath
-import org.gradle.internal.resource.DefaultTextFileResourceLoader
+import org.gradle.internal.resource.TextFileResourceLoader
 import org.gradle.internal.time.Time.startTimer
-
 import org.gradle.kotlin.dsl.*
 import org.gradle.kotlin.dsl.accessors.AccessorsClassPath
-import org.gradle.kotlin.dsl.accessors.pluginSpecBuildersClassPath
-import org.gradle.kotlin.dsl.accessors.projectAccessorsClassPath
-
+import org.gradle.kotlin.dsl.accessors.PluginAccessorClassPathGenerator
+import org.gradle.kotlin.dsl.accessors.ProjectAccessorsClassPathGenerator
 import org.gradle.kotlin.dsl.execution.EvalOption
-
 import org.gradle.kotlin.dsl.precompile.PrecompiledScriptDependenciesResolver
-
 import org.gradle.kotlin.dsl.provider.ClassPathModeExceptionCollector
 import org.gradle.kotlin.dsl.provider.KotlinScriptClassPathProvider
 import org.gradle.kotlin.dsl.provider.KotlinScriptEvaluator
 import org.gradle.kotlin.dsl.provider.ignoringErrors
-
 import org.gradle.kotlin.dsl.resolver.EditorReports
 import org.gradle.kotlin.dsl.resolver.SourceDistributionResolver
 import org.gradle.kotlin.dsl.resolver.SourcePathProvider
-
 import org.gradle.kotlin.dsl.support.ImplicitImports
 import org.gradle.kotlin.dsl.support.KotlinScriptType
 import org.gradle.kotlin.dsl.support.kotlinScriptTypeFor
 import org.gradle.kotlin.dsl.support.serviceOf
-
 import org.gradle.kotlin.dsl.tooling.models.EditorReport
 import org.gradle.kotlin.dsl.tooling.models.KotlinBuildScriptModel
-
 import org.gradle.tooling.model.kotlin.dsl.KotlinDslModelsParameters
 import org.gradle.tooling.provider.model.ToolingModelBuilder
-
 import java.io.File
 import java.io.PrintWriter
 import java.io.Serializable
 import java.io.StringWriter
-
 import java.util.EnumSet
 
 
@@ -248,7 +236,8 @@ fun implicitImportsFrom(file: File): List<String> =
 
 
 private
-fun hashOf(scriptFile: File) = PrecompiledScriptDependenciesResolver.hashOf(scriptFile.readText())
+fun hashOf(scriptFile: File) =
+    PrecompiledScriptDependenciesResolver.hashOf(scriptFile.readText())
 
 
 private
@@ -260,7 +249,9 @@ fun projectScriptModelBuilder(
     project = project,
     scriptClassPath = project.scriptCompilationClassPath,
     accessorsClassPath = { classPath ->
-        projectAccessorsClassPath(project, classPath) + pluginSpecBuildersClassPath(project)
+        val pluginAccessorClassPathGenerator = project.serviceOf<PluginAccessorClassPathGenerator>()
+        val projectAccessorClassPathGenerator = project.serviceOf<ProjectAccessorsClassPathGenerator>()
+        projectAccessorClassPathGenerator.projectAccessorsClassPath(project, classPath) + pluginAccessorClassPathGenerator.pluginSpecBuildersClassPath(project)
     },
     sourceLookupScriptHandlers = sourceLookupScriptHandlersFor(project),
     enclosingScriptProjectDir = project.projectDir
@@ -353,7 +344,7 @@ fun compilationClassPathForScriptPluginOf(
     resourceDescription: String
 ): Pair<ScriptHandlerInternal, ClassPath> {
 
-    val scriptSource = textResourceScriptSource(resourceDescription, scriptFile)
+    val scriptSource = textResourceScriptSource(resourceDescription, scriptFile, project.serviceOf())
     val scriptScope = baseScope.createChild("model-${scriptFile.toURI()}")
     val scriptHandler = scriptHandlerFactory.create(scriptSource, scriptScope)
 
@@ -387,8 +378,8 @@ fun scriptHandlerFactoryOf(gradle: Gradle) =
 
 
 private
-fun textResourceScriptSource(description: String, scriptFile: File) =
-    TextResourceScriptSource(DefaultTextFileResourceLoader().loadFile(description, scriptFile))
+fun textResourceScriptSource(description: String, scriptFile: File, resourceLoader: TextFileResourceLoader) =
+    TextResourceScriptSource(resourceLoader.loadFile(description, scriptFile))
 
 
 private

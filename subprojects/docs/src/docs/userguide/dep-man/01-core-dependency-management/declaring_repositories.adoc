@@ -27,8 +27,8 @@ To declare the link:https://repo.maven.apache.org/maven2/[Maven Central reposito
 
 .Adding central Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-central]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-central]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-central]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-central]"]
 ====
 
 [[sub:maven_jcenter]]
@@ -40,8 +40,8 @@ To declare the link:https://jcenter.bintray.com[JCenter Maven repository] add th
 
 .Adding Bintray's JCenter Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-jcenter]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-jcenter]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-jcenter]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-jcenter]"]
 ====
 
 [[sub:maven_google]]
@@ -53,8 +53,8 @@ To declare the link:https://maven.google.com/[Google Maven repository] add this 
 
 .Adding Google Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-google]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-google]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-google]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-google]"]
 ====
 
 [[sec:declaring_custom_repository]]
@@ -81,8 +81,8 @@ This example demonstrates how to declare various named and custom URL repositori
 
 .Declaring multiple repositories
 ====
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/multipleRepositories/groovy",files="build.gradle[tags=multiple-repositories]"]
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/multipleRepositories/kotlin",files="build.gradle.kts[tags=multiple-repositories]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-multipleRepositories/groovy",files="build.gradle[tags=multiple-repositories]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-multipleRepositories/kotlin",files="build.gradle.kts[tags=multiple-repositories]"]
 ====
 
 [NOTE]
@@ -124,8 +124,8 @@ Some projects might prefer to store dependencies on a shared drive or as part of
 
 .Flat repository resolver
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=flat-dir-multi]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=flat-dir-multi]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=flat-dir-multi]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=flat-dir-multi]"]
 ====
 
 This adds repositories which look into one or more directories for finding dependencies.
@@ -136,11 +136,11 @@ Instead, Gradle will dynamically generate a module descriptor (without any depen
 [NOTE]
 ====
 As Gradle prefers to use modules whose descriptor has been created from real meta-data rather than being generated, flat directory repositories cannot be used to override artifacts with real meta-data from other repositories declared in the build.
-====
 
 For example, if Gradle finds only `jmxri-1.2.1.jar` in a flat directory repository, but `jmxri-1.2.1.pom` in another repository that supports meta-data, it will use the second repository to provide the module.
 
 For the use case of overriding remote artifacts with local ones consider using an Ivy or Maven repository instead whose URL points to a local directory.
+====
 
 If you only work with flat directory repositories you don't need to set all attributes of a dependency.
 
@@ -167,8 +167,8 @@ For adding a custom Maven repository you can do:
 
 .Adding custom Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-like-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-like-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-like-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-like-repo]"]
 ====
 
 [[sub:custom-maven-repo]]
@@ -179,8 +179,8 @@ To define such a repository, you can do:
 
 .Adding additional Maven repositories for JAR files
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-like-repo-with-jar-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-like-repo-with-jar-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-like-repo-with-jar-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-like-repo-with-jar-repo]"]
 ====
 
 Gradle will look at the base `url` location for the POM and the JAR.
@@ -214,8 +214,8 @@ To declare the local Maven cache as a repository add this to your build script:
 
 .Adding the local Maven cache as a repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-local]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-local]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-local]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-local]"]
 ====
 
 Gradle uses the same logic as Maven to identify the location of your local Maven cache.
@@ -264,8 +264,8 @@ To declare an Ivy repository using the standard layout no additional customizati
 
 .Ivy repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo]"]
 ====
 
 [[sub:defining_a_named_layout_for_an_ivy_repository]]
@@ -275,8 +275,8 @@ You can specify that your repository conforms to the Ivy or Maven default layout
 
 .Ivy repository with named layout
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-maven-layout]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-maven-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-maven-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-maven-layout]"]
 ====
 
 Valid named layout values are `'gradle'` (the default), `'maven'` and `'ivy'`. See link:{groovyDslPath}/org.gradle.api.artifacts.repositories.IvyArtifactRepository.html#org.gradle.api.artifacts.repositories.IvyArtifactRepository:layout(java.lang.String)[IvyArtifactRepository.layout(java.lang.String)] in the API documentation for details of these named layouts.
@@ -288,8 +288,8 @@ To define an Ivy repository with a non-standard layout, you can define a _patter
 
 .Ivy repository with pattern layout
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-pattern-layout]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-pattern-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-pattern-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-pattern-layout]"]
 ====
 
 To define an Ivy repository which fetches Ivy files and artifacts from different locations, you can define separate patterns to use to locate the Ivy files and artifacts:
@@ -298,16 +298,16 @@ Each `artifact` or `ivy` specified for a repository adds an _additional_ pattern
 
 .Ivy repository with multiple custom patterns
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-custom-pattern]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-custom-pattern]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-custom-pattern]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-custom-pattern]"]
 ====
 
 Optionally, a repository with pattern layout can have its `'organisation'` part laid out in Maven style, with forward slashes replacing dots as separators. For example, the organisation `my.company` would then be represented as `my/company`.
 
 .Ivy repository with Maven compatible layout
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-m2compatible-layout]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-m2compatible-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=ivy-repo-with-m2compatible-layout]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=ivy-repo-with-m2compatible-layout]"]
 ====
 
 [[sub:accessing_secured_ivy_repositories]]
@@ -317,8 +317,8 @@ You can specify credentials for Ivy repositories secured by basic authentication
 
 .Ivy repository with authentication
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=authenticated-ivy-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=authenticated-ivy-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=authenticated-ivy-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=authenticated-ivy-repo]"]
 ====
 
 See <<#sec:supported_transport_protocols>> for authentication options.
@@ -340,8 +340,8 @@ It's even more important when considering that the declared order of repositorie
 
 .Declaring repository contents
 ====
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/groovy",files="build.gradle[tags=repository-filter]"]
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/kotlin",files="build.gradle.kts[tags=repository-filter]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-filtering/groovy",files="build.gradle[tags=repository-filter]"]
+include::sample[dir="snippets//dependencyManagement/declaringRepositories-filtering/kotlin",files="build.gradle.kts[tags=repository-filter]"]
 ====
 
 By default, repositories include everything and exclude nothing:
@@ -351,6 +351,8 @@ By default, repositories include everything and exclude nothing:
 * If you declare both includes and excludes, then it includes only what is explicitly included and not excluded.
 
 It is possible to filter either by explicit _group_, _module_ or _version_, either strictly or using regular expressions.
+When using a strict version, it is possible to use a version range, using <<single_versions.adoc#,the format supported>> by Gradle.
+In addition, there are filtering options by resolution context: configuration name or even configuration attributes.
 See link:{javadocPath}/org/gradle/api/artifacts/repositories/RepositoryContentDescriptor.html[RepositoryContentDescriptor] for details.
 
 === Declaring content exclusively found in one repository
@@ -362,12 +364,12 @@ Alternatively, Gradle provides an API which lets you declare that a repository _
 If you do so:
 
 - an artifact declared in a repository _can't_ be found in any other
-- exclusive repository content must be declared in extension (just like for <<#sec:declaring-repository-filter, repository-level content))
+- exclusive repository content must be declared in extension (just like for <<#sec:declaring-repository-filter, repository-level content>>)
 
 .Declaring exclusive repository contents
 ====
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/groovy",files="build.gradle[tags=exclusive-repository-filter]"]
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/kotlin",files="build.gradle.kts[tags=exclusive-repository-filter]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-filtering/groovy",files="build.gradle[tags=exclusive-repository-filter]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-filtering/kotlin",files="build.gradle.kts[tags=exclusive-repository-filter]"]
 ====
 
 It is possible to filter either by explicit _group_, _module_ or _version_, either strictly or using regular expressions.
@@ -380,8 +382,8 @@ Gradle lets you declare what kind of artifacts are found in a repository using t
 
 .Splitting snapshots and releases
 ====
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/groovy",files="build.gradle[tags=repository-snapshots]"]
-include::sample[dir="snippets//userguide/dependencyManagement/declaringRepositories/filtering/kotlin",files="build.gradle.kts[tags=repository-snapshots]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-filtering/groovy",files="build.gradle[tags=repository-snapshots]"]
+include::sample[dir="snippets/dependencyManagement/declaringRepositories-filtering/kotlin",files="build.gradle.kts[tags=repository-snapshots]"]
 ====
 
 [[sec:supported_metadata_sources]]
@@ -397,8 +399,8 @@ To do so, you can configure _metadata sources_ for any repository.
 
 .Maven repository that supports artifacts without metadata
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-repo-with-metadata-sources]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-repo-with-metadata-sources]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-repo-with-metadata-sources]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-repo-with-metadata-sources]"]
 ====
 
 You can specify multiple sources to tell Gradle to keep looking if a file was not found.
@@ -406,7 +408,7 @@ In that case, the order of checking for sources is predefined.
 
 The following metadata sources are supported:
 
-.Repository transport protocols
+.Supported metadata sources
 [%header%autowidth,compact]
 |===
 | Metadata source | Description | Order | Maven | Ivy / flat dir
@@ -451,8 +453,8 @@ Starting with Gradle 5.6, you can disable this behavior by adding `ignoreGradleM
 
 .Maven repository that does not use gradle metadata redirection
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-repo-with-ignore-gradle-metadata-redirection]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-repo-with-ignore-gradle-metadata-redirection]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-repo-with-ignore-gradle-metadata-redirection]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-repo-with-ignore-gradle-metadata-redirection]"]
 ====
 
 [[sec:plugin-vs-build-repos]]
@@ -521,34 +523,34 @@ The following build script demonstrates how to create HTTP-based Maven and Ivy r
 
 .Declaring a Maven and Ivy repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-repository-no-auth]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-repository-no-auth]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-repository-no-auth]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-repository-no-auth]"]
 ====
 
 The following example shows how to declare SFTP repositories:
 
 .Using the SFTP protocol for a repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-repository-auth]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-repository-auth]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-repository-auth]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-repository-auth]"]
 ====
 
 For details on HTTP related authentication, see the section <<#sec:authentication_schemes>>.
 
 When using an AWS S3 backed repository you need to authenticate using link:{groovyDslPath}/org.gradle.api.credentials.AwsCredentials.html[AwsCredentials], providing access-key and a private-key. The following example shows how to declare a S3 backed repository and providing AWS credentials:
 
-.Declaring a S3 backed Maven and Ivy repository
+.Declaring an S3 backed Maven and Ivy repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-s3-repository]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-s3-repository]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-s3-repository]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-s3-repository]"]
 ====
 
 You can also delegate all credentials to the AWS sdk by using the AwsImAuthentication. The following example shows how:
 
-.Declaring a S3 backed Maven and Ivy repository using IAM
+.Declaring an S3 backed Maven and Ivy repository using IAM
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-s3-repository-with-iam]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-s3-repository-with-iam]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-s3-repository-with-iam]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-s3-repository-with-iam]"]
 ====
 
 For details on AWS S3 related authentication, see the section <<#sec:s3-repositories>>.
@@ -557,8 +559,8 @@ When using a Google Cloud Storage backed repository default application credenti
 
 .Declaring a Google Cloud Storage backed Maven and Ivy repository using default application credentials
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-gcs-repository]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-gcs-repository]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=maven-ivy-gcs-repository]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=maven-ivy-gcs-repository]"]
 ====
 
 For details on Google GCS related authentication, see the section <<#sec:gcs-repositories>>.
@@ -572,18 +574,17 @@ You can specify credentials for Maven repositories secured by basic authenticati
 
 .Accessing password-protected Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=authenticated-maven-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=authenticated-maven-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=authenticated-maven-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=authenticated-maven-repo]"]
 ====
 
-NOTE: The code for this example can be found at **`samples/userguide/artifacts/defineRepository`** in the ‘-all’ distribution of Gradle.
 
 The following example show how to configure a repository to use only link:{javadocPath}/org/gradle/authentication/http/DigestAuthentication.html[DigestAuthentication]:
 
 .Configure repository to use only digest authentication
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=digest-authentication]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=digest-authentication]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=digest-authentication]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=digest-authentication]"]
 ====
 
 Currently supported authentication schemes are:
@@ -600,12 +601,15 @@ Authentication based on any custom HTTP header, e.g. private tokens, OAuth token
 [[sub:preemptive_authentication]]
 === Using preemptive authentication
 
-Gradle's default behavior is to only submit credentials when a server responds with an authentication challenge in the form of a HTTP 401 response. In some cases, the server will respond with a different code (ex. for repositories hosted on GitHub a 404 is returned) causing dependency resolution to fail. To get around this behavior, credentials may be sent to the server preemptively. To enable preemptive authentication simply configure your repository to explicitly use the link:{javadocPath}/org/gradle/authentication/http/BasicAuthentication.html[BasicAuthentication] scheme:
+Gradle's default behavior is to only submit credentials when a server responds with an authentication challenge in the form of an HTTP 401 response.
+In some cases, the server will respond with a different code (ex. for repositories hosted on GitHub a 404 is returned) causing dependency resolution to fail.
+To get around this behavior, credentials may be sent to the server preemptively.
+To enable preemptive authentication simply configure your repository to explicitly use the link:{javadocPath}/org/gradle/authentication/http/BasicAuthentication.html[BasicAuthentication] scheme:
 
 .Configure repository to use preemptive authentication
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=preemptive-authentication]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=preemptive-authentication]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=preemptive-authentication]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=preemptive-authentication]"]
 ====
 
 [[sub:http-header-auth]]
@@ -615,11 +619,10 @@ You can specify any HTTP header for secured Maven repositories requiring token, 
 
 .Accessing header-protected Maven repository
 ====
-include::sample[dir="snippets/userguide/artifacts/defineRepository/groovy",files="build.gradle[tags=header-authenticated-maven-repo]"]
-include::sample[dir="snippets/userguide/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=header-authenticated-maven-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/groovy",files="build.gradle[tags=header-authenticated-maven-repo]"]
+include::sample[dir="snippets/artifacts/defineRepository/kotlin",files="build.gradle.kts[tags=header-authenticated-maven-repo]"]
 ====
 
-NOTE: The code for this example can be found at **`samples/userguide/artifacts/defineRepository`** in the ‘-all’ distribution of Gradle.
 
 [[sec:s3-repositories]]
 == AWS S3 repositories configuration
@@ -721,3 +724,35 @@ e.g. `gcs://myBucket/maven/release`
 
 * `myBucket` is the Google Cloud Storage bucket name.
 * `/maven/release` is the Google Cloud Storage key (unique identifier for an object within a bucket)
+
+[[sec:handling_credentials]]
+== Handling credentials
+
+Repository credentials should never be part of your build script but rather be kept external.
+Gradle provides link:{javadocPath}/org/gradle/api/artifacts/repositories/AuthenticationSupported.html#credentials-java.lang.Class-[an API in artifact repositories]
+that allows you to declare only the type of required credentials. Credential values are looked up from the <<build_environment.adoc#sec:gradle_configuration_properties,Gradle Properties>>
+during the build that requires them.
+
+For example, given repository configuration:
+
+.Externalized repository credentials
+====
+include::sample[dir="samples/credentials-handling/publishing-credentials/groovy",files="build.gradle[tags=repositories]"]
+include::sample[dir="samples/credentials-handling/publishing-credentials/kotlin",files="build.gradle.kts[tags=repositories]"]
+====
+
+The username and password will be looked up from `mySecureRepositoryUsername` and `mySecureRepositoryPassword` properties.
+
+Note that the configuration property prefix - the identity - is determined from the repository name.
+Credentials can then be provided in any of supported ways for Gradle Properties -
+`gradle.properties` file, command line arguments, environment variables or a combination of those options.
+
+Also, note that credentials will only be required if the invoked build requires them. If for example a project is configured
+to publish artifacts to a secured repository, but the build does not invoke publishing task, Gradle will not require
+publishing credentials to be present. On the other hand, if the build needs to execute a task that requires credentials
+at some point, Gradle will check for credential presence first thing and will not start running any of the tasks
+if it knows that the build will fail at a later point because of missing credentials.
+
+Here is a link:../samples/sample_publishing_credentials.html[downloadable sample] that demonstrates the concept in more detail.
+
+The same rules apply for supplying link:{javadocPath}/org/gradle/api/credentials/AwsCredentials.html[AwsCredentials].

@@ -33,13 +33,10 @@ import org.gradle.kotlin.dsl.execution.ProgramParser
 import org.gradle.kotlin.dsl.execution.ProgramSource
 import org.gradle.kotlin.dsl.execution.ProgramTarget
 import org.gradle.kotlin.dsl.fixtures.DeepThought
-import org.gradle.soak.categories.SoakTest
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import java.util.UUID
 
 
-@Category(SoakTest::class)
 class ScriptCachingIntegrationTest : AbstractScriptCachingIntegrationTest() {
 
     @Test
@@ -231,7 +228,7 @@ class ScriptCachingIntegrationTest : AbstractScriptCachingIntegrationTest() {
             import org.gradle.api.tasks.*
 
             class MyTask extends DefaultTask {
-                static final byte[][] MEMORY_HOG = new byte[1024][1024 * 64]
+                static final byte[][] MEMORY_HOG = new byte[1024][1024 * 128]
                 @TaskAction void runAction0() {}
             }
         """)
@@ -253,7 +250,7 @@ class ScriptCachingIntegrationTest : AbstractScriptCachingIntegrationTest() {
         // expect: memory hog released
         for (run in 1..4) {
             myTask.writeText(myTask.readText().replace("runAction${run - 1}", "runAction$run"))
-            buildWithDaemonHeapSize(256, "myTask").apply {
+            buildWithDaemonHeapSize(512, "myTask").apply {
                 compilationCache {
                     assertCacheHits(run)
                 }

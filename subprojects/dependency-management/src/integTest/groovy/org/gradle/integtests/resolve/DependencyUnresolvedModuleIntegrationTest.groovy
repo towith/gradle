@@ -17,7 +17,7 @@
 package org.gradle.integtests.resolve
 
 import org.gradle.integtests.fixtures.AbstractHttpDependencyResolutionTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.keystore.TestKeyStore
 import org.gradle.test.fixtures.maven.MavenFileRepository
@@ -85,7 +85,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails single application dependency resolution if #protocol connection exceeds timeout (retries = #maxRetries)"() {
         maxHttpRetries = maxRetries
 
@@ -115,7 +115,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails concurrent application dependency resolution if #protocol connection exceeds timeout"() {
         given:
         MavenHttpModule moduleB = publishMavenModule(mavenHttpRepo, 'b')
@@ -140,7 +140,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
         protocol << ['http', 'https']
     }
 
-    def "blacklists repository from later resolution within the same build on HTTP timeout "() {
+    def "prevents using repository in later resolution within the same build on HTTP timeout"() {
         given:
         MavenHttpModule moduleB = publishMavenModule(mavenHttpRepo, 'b')
         MavenHttpModule moduleC = publishMavenModule(mavenHttpRepo, 'c')
@@ -148,7 +148,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
         buildFile << """
             ${mavenRepository(mavenHttpRepo)}
             ${customConfigDependencyAssignment(moduleA)}
-            
+
             configurations {
                 first
                 second
@@ -159,7 +159,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
                 second '${mavenModuleCoordinates(moduleB)}'
                 third '${mavenModuleCoordinates(moduleC)}'
             }
-            
+
             task resolve {
                 doLast {
                     def filesA = configurations.first.resolvedConfiguration.lenientConfiguration.files*.name
@@ -182,8 +182,8 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
         output.contains "Resolved: [a-1.0.jar] [] []"
     }
 
-    @ToBeFixedForInstantExecution
-    def "repository is blacklisted only for the current build execution"() {
+    @ToBeFixedForConfigurationCache
+    def "repository is disabled only for the current build execution"() {
         given:
 
         buildFile << """
@@ -233,7 +233,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails build and #abortDescriptor repository search if HTTP connection #reason when resolving metadata"() {
         given:
         MavenHttpRepository backupMavenHttpRepo = new MavenHttpRepository(server, '/repo-2', new MavenFileRepository(file('maven-repo-2')))
@@ -267,7 +267,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails build and aborts repository search if HTTP connection #reason when resolving artifact for found module"() {
         given:
         MavenHttpRepository backupMavenHttpRepo = new MavenHttpRepository(server, '/repo-2', new MavenFileRepository(file('maven-repo-2')))
@@ -297,7 +297,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails build and #abortDescriptor repository search if HTTP connection #reason when resolving dynamic version"() {
         given:
         MavenHttpRepository backupMavenHttpRepo = new MavenHttpRepository(server, '/repo-2', new MavenFileRepository(file('maven-repo-2')))
@@ -343,7 +343,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
             configurations {
                 deps
             }
-            
+
             dependencies {
                 deps ${modules.collect { "'${it}'" }.join(', ')}
             }
@@ -385,7 +385,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
         failure.assertHasCause("Failed to list versions for ${group}:${module}.")
         failure.assertHasCause("Could not get resource '${mavenHttpRepo.uri.toString()}/${group}/${module}/maven-metadata.xml'.")
         failure.assertHasCause("Unable to load Maven meta-data from ${mavenHttpRepo.uri.toString()}/${group}/${module}/maven-metadata.xml.")
-        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${group}/${module}/maven-metadata.xml'. Received status code 401 from server: unauthorized")
+        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${group}/${module}/maven-metadata.xml'. Received status code 401 from server: Unauthorized")
     }
 
     private void assertDependencyMetaDataReadTimeout(MavenModule module) {
@@ -404,7 +404,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     private void assertDependencyMetaDataUnauthorizedError(MavenModule module) {
         failure.assertHasCause("Could not resolve ${mavenModuleCoordinates(module)}.")
         failure.assertHasCause("Could not get resource '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.pom'.")
-        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.pom'. Received status code 401 from server: unauthorized")
+        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.pom'. Received status code 401 from server: Unauthorized")
     }
 
     private void assertDependencyArtifactReadTimeout(MavenModule module) {
@@ -423,7 +423,7 @@ class DependencyUnresolvedModuleIntegrationTest extends AbstractHttpDependencyRe
     private void assertDependencyArtifactUnauthorizedError(MavenModule module) {
         failure.assertHasCause("Could not download ${module.artifactFile.name} (${mavenModuleCoordinates(module)})")
         failure.assertHasCause("Could not get resource '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.jar'.")
-        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.jar'. Received status code 401 from server: unauthorized")
+        failure.assertHasCause("Could not GET '${mavenHttpRepo.uri.toString()}/${mavenModuleRepositoryPath(module)}.jar'. Received status code 401 from server: Unauthorized")
     }
 
     private void assertDependencySkipped(MavenModule module) {

@@ -20,7 +20,6 @@ import groovy.transform.NotYetImplemented
 import org.gradle.api.Plugin
 import org.gradle.api.initialization.Settings
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.test.fixtures.file.LeaksFileHandles
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.plugin.PluginBuilder
@@ -54,6 +53,7 @@ class InitScriptIntegrationTest extends AbstractIntegrationSpec {
     @Issue(['GRADLE-1457', 'GRADLE-3197'])
     def 'init scripts passed on the command line are applied to buildSrc'() {
         given:
+        settingsFile << "rootProject.name = 'hello'"
         createProject()
         file("init.gradle") << initScript()
 
@@ -63,12 +63,13 @@ class InitScriptIntegrationTest extends AbstractIntegrationSpec {
         succeeds 'hello'
 
         then:
-        output.contains("Task hello executed")
-        output.contains("Task helloFromBuildSrc executed")
+        output.contains("Project buildSrc evaluated")
+        output.contains("Project hello evaluated")
     }
 
     def 'init scripts passed in the Gradle user home are applied to buildSrc'() {
         given:
+        settingsFile << "rootProject.name = 'hello'"
         createProject()
         executer.requireOwnGradleUserHomeDir()
         new TestFile(executer.gradleUserHomeDir, "init.gradle") << initScript()
@@ -77,8 +78,8 @@ class InitScriptIntegrationTest extends AbstractIntegrationSpec {
         succeeds 'hello'
 
         then:
-        output.contains("Task hello executed")
-        output.contains("Task helloFromBuildSrc executed")
+        output.contains("Project buildSrc evaluated")
+        output.contains("Project hello evaluated")
     }
 
     def 'init script can contribute to settings - before and after'() {
@@ -116,7 +117,6 @@ class InitScriptIntegrationTest extends AbstractIntegrationSpec {
         output.contains("subprojects: :sub1 - :sub2")
     }
 
-    @ToBeFixedForInstantExecution
     def "can apply settings plugin from init script"() {
         given:
         def pluginBuilder = new PluginBuilder(file("plugin"))
@@ -197,11 +197,9 @@ class InitScriptIntegrationTest extends AbstractIntegrationSpec {
 
     private static String initScript() {
         """
-            gradle.addListener(new TaskExecutionAdapter() {
-                public void afterExecute(Task task, TaskState state) {
-                    println "Task \${task.name} executed"
-                }
-            })
+            gradle.afterProject { p ->
+                println "Project \${p.name} evaluated"
+            }
         """
     }
 }

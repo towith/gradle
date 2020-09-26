@@ -16,10 +16,11 @@
 
 package org.gradle.integtests.composite
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.build.BuildTestFile
 import org.gradle.integtests.fixtures.resolve.ResolveTestFixture
 import spock.lang.Issue
+import spock.lang.Unroll
 
 /**
  * Tests for resolving dependency graph with substitution within a composite build.
@@ -56,7 +57,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "will only make declared substitutions when defined for included build"() {
         given:
         dependency "org.test:buildB:1.0"
@@ -82,7 +83,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can combine included builds with declared and discovered substitutions"() {
         given:
         dependency "org.test:b1:1.0"
@@ -106,7 +107,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can inject substitutions into other builds"() {
         given:
         mavenRepo.module("org.test", "plugin", "1.0").publish()
@@ -133,7 +134,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
     }
 
     @Issue("https://github.com/gradle/gradle/issues/5871")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can inject substitutions into other builds when root build does not reference included builds via a dependency and included build has non-empty script classpath"() {
         mavenRepo.module("org.test", "plugin", "1.0").publish()
 
@@ -145,7 +146,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         """
         dependency buildB, "org.test:XXX:1.0"
         buildC.buildFile.text = """
-            buildscript { 
+            buildscript {
                 repositories { maven { url = "${mavenRepo.uri}" } }
                 dependencies { classpath "org.test:plugin:1.0" }
             }
@@ -164,7 +165,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         result.assertTaskExecuted(":buildC:jar")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can substitute arbitrary coordinates for included build"() {
         given:
         dependency "org.test:buildX:1.0"
@@ -183,7 +184,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "resolves project substitution for build based on rootProject name"() {
         given:
         def buildB2 = rootDir.file("hierarchy", "buildB");
@@ -213,7 +214,7 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "substitutes external dependency with project dependency from same participant build"() {
         given:
         dependency "org.test:buildB:1.0"
@@ -236,6 +237,149 @@ class CompositeBuildDeclaredSubstitutionsIntegrationTest extends AbstractComposi
                 }
             }
         }
+    }
+
+    @ToBeFixedForConfigurationCache
+    def "preserves the requested attributes when performing a composite substitution"() {
+        platformDependency 'org.test:platform:1.0'
+
+        def platform = file("platform")
+
+        file("platform/build.gradle") << """
+            plugins {
+                id 'java-platform'
+            }
+
+            group = 'org.test'
+            version = '2.0'
+        """
+        file("platform/settings.gradle") << """
+            rootProject.name = 'platform'
+        """
+
+        when:
+        includeBuild(platform)
+
+        then:
+        resolvedGraph {
+            edge("org.test:platform:1.0", "project :platform", "org.test:platform:2.0") {
+                configuration = "runtimeElements"
+                compositeSubstitute()
+                noArtifacts()
+            }
+        }
+
+    }
+
+    @ToBeFixedForConfigurationCache
+    @Unroll
+    def "preserves the requested attributes when performing a composite substitution using mapping"() {
+        platformDependency 'org.test:platform:1.0'
+
+        def platform = file("platform")
+
+        file("platform/build.gradle") << """
+            plugins {
+                id 'java-platform'
+            }
+        """
+        file("platform/settings.gradle") << """
+            rootProject.name = 'platform'
+        """
+
+        when:
+        includeBuild(platform, """
+            substitute $source with $dest
+        """)
+
+        then:
+        resolvedGraph {
+            edge("org.test:platform:1.0", "project :platform", ":platform:") {
+                configuration = "runtimeElements"
+                compositeSubstitute()
+                noArtifacts()
+            }
+        }
+
+        where:
+        source                                  | dest
+        'platform(module("org.test:platform"))' | 'platform(project(":"))'
+        'module("org.test:platform")'           | 'platform(project(":"))'
+        'platform(module("org.test:platform"))' | 'project(":")'
+        'module("org.test:platform")'           | 'project(":")'
+        'module("org.test:platform")'           | 'project(":")'
+    }
+
+    @ToBeFixedForConfigurationCache
+    def "preserves the requested capabilities when performing a composite substitution"() {
+        buildA.buildFile << """
+            dependencies {
+                implementation('org.test:buildB:1.0') {
+                    capabilities {
+                        requireCapability 'org.test:buildB-test-fixtures'
+                    }
+                }
+            }
+        """
+
+        buildB.buildFile << """
+            apply plugin: 'java-test-fixtures'
+        """
+        when:
+        includeBuild buildB
+
+        then:
+        resolvedGraph {
+            edge("org.test:buildB:1.0", "project :buildB", "org.test:buildB:2.0") {
+                configuration = "testFixturesRuntimeElements"
+                compositeSubstitute()
+                artifact name: 'buildB'
+                artifact classifier: 'test-fixtures'
+                project(":buildB", "org.test:buildB:2.0") {
+                }
+            }
+        }
+
+    }
+
+    @ToBeFixedForConfigurationCache
+    def "preserves the requested capabilities when performing a composite substitution using mapping"() {
+        buildA.buildFile << """
+            dependencies {
+                implementation('org.test:buildB:1.0') {
+                    capabilities {
+                        requireCapability 'org.test:buildB-test-fixtures'
+                    }
+                }
+            }
+        """
+
+        buildB.buildFile << """
+            apply plugin: 'java-test-fixtures'
+        """
+
+        when:
+        includeBuild buildB, """
+            substitute $source with $dest
+        """
+
+        then:
+        resolvedGraph {
+            edge("org.test:buildB:1.0", "project :buildB", "org.test:buildB:2.0") {
+                configuration = "testFixturesRuntimeElements"
+                compositeSubstitute()
+                artifact name: 'buildB'
+                artifact classifier: 'test-fixtures'
+                project(":buildB", "org.test:buildB:2.0") {
+                }
+            }
+        }
+
+        where:
+        source                                                                                                  | dest
+        "module('org.test:buildB')"                                                                             | "project(':')"
+        "variant(module('org.test:buildB')) { capabilities { requireCapability('org:buildB-test-fixtures') } }" | "project(':')"
+        "module('org.test:buildB')"                                                                             | "variant(project(':')) { capabilities { requireCapability('org:should-not-be-used') } }"
     }
 
     void resolvedGraph(@DelegatesTo(ResolveTestFixture.NodeBuilder) Closure closure) {

@@ -1,31 +1,24 @@
 package configurations
 
+import Gradle_Check.configurations.allBranchesFilter
 import common.Os
 import common.applyDefaultSettings
 import common.buildToolGradleParameters
-import common.buildToolParametersString
 import common.checkCleanM2
 import common.compileAllDependency
 import common.gradleWrapper
-import common.verifyTestFilesCleanup
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildFeatures
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildType
 import jetbrains.buildServer.configs.kotlin.v2019_2.FailureAction
 import jetbrains.buildServer.configs.kotlin.v2019_2.ProjectFeatures
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildFeatures.PullRequests
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildFeatures.commitStatusPublisher
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildFeatures.pullRequests
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.script
 import model.CIBuildModel
 import model.StageNames
-
-val killAllGradleProcesses = """
-    free -m
-    ps aux | egrep 'Gradle(Daemon|Worker)'
-    ps aux | egrep 'Gradle(Daemon|Worker)' | awk '{print ${'$'}2}' | xargs kill -9
-    free -m
-    ps aux | egrep 'Gradle(Daemon|Worker)' | awk '{print ${'$'}2}'
-""".trimIndent()
 
 val m2CleanScriptUnixLike = """
     REPO=%teamcity.agent.jvm.user.home%/.m2/repository
@@ -53,13 +46,26 @@ fun BuildFeatures.publishBuildStatusToGithub(model: CIBuildModel) {
     }
 }
 
+fun BuildFeatures.triggeredOnPullRequests() {
+    pullRequests {
+        vcsRootExtId = "Gradle_Branches_GradlePersonalBranches"
+        provider = github {
+            authType = token {
+                token = "%github.bot-gradle.token%"
+            }
+            filterAuthorRole = PullRequests.GitHubRoleFilter.MEMBER
+            filterTargetBranch = allBranchesFilter
+        }
+    }
+}
+
 fun BuildFeatures.publishBuildStatusToGithub() {
     commitStatusPublisher {
         vcsRootExtId = "Gradle_Branches_GradlePersonalBranches"
         publisher = github {
             githubUrl = "https://api.github.com"
             authType = personalToken {
-                token = "credentialsJSON:5306bfc7-041e-46e8-8d61-1d49424e7b04"
+                token = "%github.bot-gradle.token%"
             }
         }
     }
@@ -74,24 +80,7 @@ fun ProjectFeatures.buildReportTab(title: String, startPage: String) {
     }
 }
 
-private
-fun BuildSteps.tagBuild(tagBuild: Boolean = true, daemon: Boolean = true) {
-    if (tagBuild) {
-        gradleWrapper {
-            name = "TAG_BUILD"
-            executionMode = BuildStep.ExecutionMode.ALWAYS
-            tasks = "tagBuild"
-            gradleParams = "${buildToolParametersString(daemon)} -PteamCityToken=%teamcity.user.bot-gradle.token% -PteamCityBuildId=%teamcity.build.id% -PgithubToken=%github.ci.oauth.token%"
-        }
-    }
-}
-
-fun BuildSteps.tagBuild(model: CIBuildModel, daemon: Boolean = true) {
-    tagBuild(tagBuild = model.tagBuilds, daemon = daemon)
-}
-
-private
-fun BaseGradleBuildType.gradleRunnerStep(model: CIBuildModel, gradleTasks: String, os: Os = Os.linux, extraParameters: String = "", daemon: Boolean = true) {
+fun BaseGradleBuildType.gradleRunnerStep(model: CIBuildModel, gradleTasks: String, os: Os = Os.LINUX, extraParameters: String = "", daemon: Boolean = true) {
     val buildScanTags = model.buildScanTags + listOfNotNull(stage?.id)
 
     steps {
@@ -99,7 +88,7 @@ fun BaseGradleBuildType.gradleRunnerStep(model: CIBuildModel, gradleTasks: Strin
             name = "GRADLE_RUNNER"
             tasks = "clean $gradleTasks"
             gradleParams = (
-                buildToolGradleParameters(daemon, os = os) +
+                buildToolGradleParameters(daemon) +
                     this@gradleRunnerStep.buildCache.gradleParameters(os) +
                     listOf(extraParameters) +
                     "-PteamCityToken=%teamcity.user.bot-gradle.token%" +
@@ -145,56 +134,30 @@ fun BuildType.dumpOpenFiles() {
 }
 
 private
-fun BaseGradleBuildType.gradleRerunnerStep(model: CIBuildModel, gradleTasks: String, os: Os = Os.linux, extraParameters: String = "", daemon: Boolean = true) {
-    val buildScanTags = model.buildScanTags + listOfNotNull(stage?.id)
-    val cleanedExtraParameters = extraParameters
-        .replace("-PincludeTestClasses=true", "")
-        .replace("-PexcludeTestClasses=true", "")
-        .replace("-PonlyTestGradleVersion=[\\d.-]+".toRegex(), "")
-
+fun BaseGradleBuildType.killProcessStep(stepName: String, daemon: Boolean, os: Os) {
     steps {
         gradleWrapper {
-            name = "GRADLE_RERUNNER"
-            tasks = "$gradleTasks tagBuild"
-            executionMode = BuildStep.ExecutionMode.RUN_ON_FAILURE
+            name = stepName
+            executionMode = BuildStep.ExecutionMode.ALWAYS
+            tasks = "killExistingProcessesStartedByGradle"
             gradleParams = (
-                buildToolGradleParameters(daemon, os = os) +
-                    this@gradleRerunnerStep.buildCache.gradleParameters(os) +
-                    listOf(cleanedExtraParameters) +
-                    "-PteamCityToken=%teamcity.user.bot-gradle.token%" +
-                    "-PteamCityBuildId=%teamcity.build.id%" +
-                    buildScanTags.map { buildScanTag(it) } +
-                    "-PonlyPreviousFailedTestClasses=true" +
-                    "-Dscan.tag.RERUN_TESTS" +
-                    "-PgithubToken=%github.ci.oauth.token%"
+                buildToolGradleParameters(daemon) +
+                    this@killProcessStep.buildCache.gradleParameters(os) +
+                    "-DpublishStrategy=publishOnFailure" // https://github.com/gradle/gradle-enterprise-conventions-plugin/pull/8
                 ).joinToString(separator = " ")
         }
     }
 }
 
-private
-fun BaseGradleBuildType.killProcessStepIfNecessary(stepName: String, os: Os = Os.linux, daemon: Boolean = true) {
-    if (os == Os.windows) {
-        steps {
-            gradleWrapper {
-                name = stepName
-                executionMode = BuildStep.ExecutionMode.ALWAYS
-                tasks = "killExistingProcessesStartedByGradle"
-                gradleParams = buildToolParametersString(daemon)
-            }
-        }
-    }
-}
-
-fun applyDefaults(model: CIBuildModel, buildType: BaseGradleBuildType, gradleTasks: String, notQuick: Boolean = false, os: Os = Os.linux, extraParameters: String = "", timeout: Int = 90, extraSteps: BuildSteps.() -> Unit = {}, daemon: Boolean = true) {
+fun applyDefaults(model: CIBuildModel, buildType: BaseGradleBuildType, gradleTasks: String, notQuick: Boolean = false, os: Os = Os.LINUX, extraParameters: String = "", timeout: Int = 90, extraSteps: BuildSteps.() -> Unit = {}, daemon: Boolean = true) {
     buildType.applyDefaultSettings(os, timeout)
 
+    buildType.killProcessStep("KILL_LEAKED_PROCESSES_FROM_PREVIOUS_BUILDS", daemon, os)
     buildType.gradleRunnerStep(model, gradleTasks, os, extraParameters, daemon)
 
     buildType.steps {
         extraSteps()
         checkCleanM2(os)
-        verifyTestFilesCleanup(daemon, os)
     }
 
     applyDefaultDependencies(model, buildType, notQuick)
@@ -205,14 +168,14 @@ fun applyTestDefaults(
     buildType: BaseGradleBuildType,
     gradleTasks: String,
     notQuick: Boolean = false,
-    os: Os = Os.linux,
+    os: Os = Os.LINUX,
     extraParameters: String = "",
     timeout: Int = 90,
     extraSteps: BuildSteps.() -> Unit = {}, // the steps after runner steps
     daemon: Boolean = true,
     preSteps: BuildSteps.() -> Unit = {} // the steps before runner steps
 ) {
-    if (os == Os.macos) {
+    if (os == Os.MACOS) {
         buildType.params.param("env.REPO_MIRROR_URLS", "")
     }
 
@@ -222,23 +185,22 @@ fun applyTestDefaults(
         preSteps()
     }
 
-    if (os == Os.windows) {
+    if (os == Os.WINDOWS) {
         buildType.attachFileLeakDetector()
     }
 
+    buildType.killProcessStep("KILL_LEAKED_PROCESSES_FROM_PREVIOUS_BUILDS", daemon, os)
+
     buildType.gradleRunnerStep(model, gradleTasks, os, extraParameters, daemon)
 
-    if (os == Os.windows) {
+    if (os == Os.WINDOWS) {
         buildType.dumpOpenFiles()
     }
-    buildType.killProcessStepIfNecessary("KILL_PROCESSES_STARTED_BY_GRADLE", os)
-    buildType.gradleRerunnerStep(model, gradleTasks, os, extraParameters, daemon)
-    buildType.killProcessStepIfNecessary("KILL_PROCESSES_STARTED_BY_GRADLE_RERUN", os)
+    buildType.killProcessStep("KILL_PROCESSES_STARTED_BY_GRADLE", daemon, os)
 
     buildType.steps {
         extraSteps()
         checkCleanM2(os)
-        verifyTestFilesCleanup(daemon, os)
     }
 
     applyDefaultDependencies(model, buildType, notQuick)
@@ -246,7 +208,6 @@ fun applyTestDefaults(
 
 fun buildScanTag(tag: String) = """"-Dscan.tag.$tag""""
 fun buildScanCustomValue(key: String, value: String) = """"-Dscan.value.$key=$value""""
-
 fun applyDefaultDependencies(model: CIBuildModel, buildType: BuildType, notQuick: Boolean = false) {
     if (notQuick) {
         // wait for quick feedback phase to finish successfully
@@ -259,7 +220,6 @@ fun applyDefaultDependencies(model: CIBuildModel, buildType: BuildType, notQuick
             }
         }
     }
-
     if (buildType !is CompileAll) {
         buildType.dependencies {
             compileAllDependency(CompileAll.buildTypeId(model))

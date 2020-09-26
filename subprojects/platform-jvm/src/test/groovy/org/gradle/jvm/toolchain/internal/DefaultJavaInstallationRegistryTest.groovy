@@ -26,7 +26,7 @@ import spock.lang.Specification
 
 class DefaultJavaInstallationRegistryTest extends Specification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     def probe = Mock(JavaInstallationProbe)
     def registry = new DefaultJavaInstallationRegistry(probe, TestUtil.providerFactory(), TestFiles.fileCollectionFactory(), TestFiles.fileFactory())
 
@@ -39,7 +39,7 @@ class DefaultJavaInstallationRegistryTest extends Specification {
 
         then:
         1 * probe.current() >> probeResult
-        _ * probeResult.javaHome >> javaHome
+        _ * probeResult.javaHome >> javaHome.toPath()
 
         and:
         provider.present
@@ -72,7 +72,7 @@ class DefaultJavaInstallationRegistryTest extends Specification {
         then:
         1 * probe.checkJdk(javaHome) >> probeResult
         _ * dir.asFile >> javaHome
-        _ * probeResult.javaHome >> javaHome
+        _ * probeResult.javaHome >> javaHome.toPath()
 
         and:
         result.installationDirectory.asFile == javaHome

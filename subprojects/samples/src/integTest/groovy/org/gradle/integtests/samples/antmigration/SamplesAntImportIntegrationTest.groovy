@@ -18,23 +18,19 @@ package org.gradle.integtests.samples.antmigration
 
 import org.gradle.integtests.fixtures.AbstractSampleIntegrationTest
 import org.gradle.integtests.fixtures.Sample
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.UsesSample
-import org.gradle.util.Requires
 import org.junit.Rule
 import spock.lang.Unroll
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
-
-@Requires(KOTLIN_SCRIPT)
 class SamplesAntImportIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Rule
     Sample sample = new Sample(testDirectoryProvider)
 
     @Unroll
-    @UsesSample("userguide/antMigration/importBuild")
-    @ToBeFixedForInstantExecution
+    @UsesSample("antMigration/importBuild")
+    @ToBeFixedForConfigurationCache
     def "can import an Ant build and reconfigure its tasks (#dsl)"() {
         given: "A sample project with an Ant build"
         def dslDir = sample.dir.file(dsl)
@@ -55,7 +51,7 @@ class SamplesAntImportIntegrationTest extends AbstractSampleIntegrationTest {
     }
 
     @Unroll
-    @UsesSample("userguide/antMigration/fileDeps")
+    @UsesSample("antMigration/fileDeps")
     def "can copy file and flatDir dependencies (#dsl)"() {
         given: "A sample Java project with file and flatDir dependencies"
         def dslDir = sample.dir.file(dsl)
@@ -74,7 +70,7 @@ class SamplesAntImportIntegrationTest extends AbstractSampleIntegrationTest {
     }
 
     @Unroll
-    @UsesSample("userguide/antMigration/fileDeps")
+    @UsesSample("antMigration/fileDeps")
     def "can use task properties to link tasks (#dsl)"() {
         given: "A sample Java project"
         def dslDir = sample.dir.file(dsl)
@@ -91,8 +87,8 @@ class SamplesAntImportIntegrationTest extends AbstractSampleIntegrationTest {
     }
 
     @Unroll
-    @UsesSample("userguide/antMigration/multiProject")
-    @ToBeFixedForInstantExecution
+    @UsesSample("antMigration/multiProject")
+    @ToBeFixedForConfigurationCache
     def "can link projects in a multi-project build via task dependencies (#dsl)"() {
         given: "A sample multi-project build"
         def dslDir = sample.dir.file(dsl)

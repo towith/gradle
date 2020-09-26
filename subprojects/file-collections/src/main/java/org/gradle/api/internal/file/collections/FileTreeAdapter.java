@@ -20,24 +20,20 @@ import org.gradle.api.file.FileTree;
 import org.gradle.api.file.FileVisitor;
 import org.gradle.api.internal.file.AbstractFileTree;
 import org.gradle.api.internal.file.FileCollectionStructureVisitor;
+import org.gradle.api.internal.file.FileTreeInternal;
 import org.gradle.api.internal.tasks.TaskDependencyResolveContext;
 import org.gradle.api.tasks.util.PatternFilterable;
 import org.gradle.api.tasks.util.PatternSet;
 import org.gradle.internal.Factory;
 
 import java.io.File;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.function.Consumer;
 
 /**
  * Adapts a {@link MinimalFileTree} into a full {@link FileTree} implementation.
  */
-public class FileTreeAdapter extends AbstractFileTree implements FileCollectionContainer {
+public class FileTreeAdapter extends AbstractFileTree {
     private final MinimalFileTree tree;
-
-    public FileTreeAdapter(MinimalFileTree tree) {
-        this.tree = tree;
-    }
 
     public FileTreeAdapter(MinimalFileTree tree, Factory<PatternSet> patternSetFactory) {
         super(patternSetFactory);
@@ -51,27 +47,6 @@ public class FileTreeAdapter extends AbstractFileTree implements FileCollectionC
     @Override
     public String getDisplayName() {
         return tree.getDisplayName();
-    }
-
-    @Override
-    public void visitContents(FileCollectionResolveContext context) {
-        context.add(tree);
-    }
-
-    @Override
-    protected Collection<DirectoryFileTree> getAsFileTrees() {
-        if (tree instanceof FileSystemMirroringFileTree) {
-            FileSystemMirroringFileTree mirroringTree = (FileSystemMirroringFileTree) tree;
-            if (visitAll()) {
-                return Collections.singletonList(mirroringTree.getMirror());
-            } else {
-                return Collections.emptyList();
-            }
-        } else if (tree instanceof LocalFileTree) {
-            LocalFileTree fileTree = (LocalFileTree) tree;
-            return fileTree.getLocalContents();
-        }
-        throw new UnsupportedOperationException(String.format("Cannot convert %s to local file system directories.", tree));
     }
 
     @Override
@@ -97,12 +72,14 @@ public class FileTreeAdapter extends AbstractFileTree implements FileCollectionC
     }
 
     @Override
-    public FileTree matching(PatternFilterable patterns) {
+    public FileTreeInternal matching(PatternFilterable patterns) {
         if (tree instanceof PatternFilterableFileTree) {
             PatternFilterableFileTree filterableTree = (PatternFilterableFileTree) tree;
             return new FileTreeAdapter(filterableTree.filter(patterns), patternSetFactory);
+        } else if (tree instanceof FileSystemMirroringFileTree) {
+            return new FileTreeAdapter(new FilteredMinimalFileTree((PatternSet) patterns, (FileSystemMirroringFileTree) tree), patternSetFactory);
         }
-        return super.matching(patterns);
+        throw new UnsupportedOperationException(String.format("Do not know how to filter %s.", tree));
     }
 
     @Override
@@ -112,33 +89,12 @@ public class FileTreeAdapter extends AbstractFileTree implements FileCollectionC
     }
 
     @Override
-    public void visitStructure(FileCollectionStructureVisitor visitor) {
-        if (tree instanceof GeneratedSingletonFileTree) {
-            GeneratedSingletonFileTree singletonFileTree = (GeneratedSingletonFileTree) tree;
-            if (visitor.prepareForVisit(singletonFileTree) == FileCollectionStructureVisitor.VisitType.NoContents) {
-                visitor.visitCollection(singletonFileTree, Collections.emptyList());
-            } else {
-                visitor.visitFileTree(singletonFileTree.getFile(), singletonFileTree.getPatterns(), this);
-            }
-            return;
-        }
+    public void visitContentsAsFileTrees(Consumer<FileTreeInternal> visitor) {
+        visitor.accept(this);
+    }
 
-        if (visitor.prepareForVisit(OTHER) == FileCollectionStructureVisitor.VisitType.NoContents) {
-            return;
-        }
-        if (tree instanceof DirectoryFileTree) {
-            DirectoryFileTree directoryFileTree = (DirectoryFileTree) tree;
-            visitor.visitFileTree(directoryFileTree.getDir(), directoryFileTree.getPatterns(), this);
-        } else if (tree instanceof ArchiveFileTree) {
-            ArchiveFileTree archiveFileTree = (ArchiveFileTree) tree;
-            File backingFile = archiveFileTree.getBackingFile();
-            if (backingFile != null) {
-                visitor.visitFileTreeBackedByFile(backingFile, this);
-            } else {
-                visitor.visitGenericFileTree(this);
-            }
-        } else {
-            visitor.visitGenericFileTree(this);
-        }
+    @Override
+    protected void visitContents(FileCollectionStructureVisitor visitor) {
+        tree.visitStructure(visitor, this);
     }
 }

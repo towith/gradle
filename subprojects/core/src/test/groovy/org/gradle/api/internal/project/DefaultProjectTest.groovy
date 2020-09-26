@@ -39,9 +39,8 @@ import org.gradle.api.internal.CollectionCallbackActionDecorator
 import org.gradle.api.internal.FactoryNamedDomainObjectContainer
 import org.gradle.api.internal.GradleInternal
 import org.gradle.api.internal.ProcessOperations
-import org.gradle.api.internal.artifacts.DefaultProjectModuleFactory
 import org.gradle.api.internal.artifacts.Module
-import org.gradle.api.internal.artifacts.ProjectModuleFactory
+import org.gradle.api.internal.artifacts.ProjectBackedModule
 import org.gradle.api.internal.artifacts.configurations.DependencyMetaDataProvider
 import org.gradle.api.internal.collections.DomainObjectCollectionFactory
 import org.gradle.api.internal.file.DefaultProjectLayout
@@ -57,6 +56,7 @@ import org.gradle.api.internal.initialization.loadercache.DummyClassLoaderCache
 import org.gradle.api.internal.plugins.PluginManagerInternal
 import org.gradle.api.internal.project.ant.AntLoggingAdapter
 import org.gradle.api.internal.project.taskfactory.ITaskFactory
+import org.gradle.api.internal.provider.PropertyHost
 import org.gradle.api.internal.resources.ApiTextResourceAdapter
 import org.gradle.api.internal.tasks.TaskContainerInternal
 import org.gradle.api.internal.tasks.TaskDependencyFactory
@@ -98,13 +98,14 @@ import spock.lang.Specification
 import java.awt.Point
 import java.lang.reflect.Type
 import java.text.FieldPosition
+import java.util.function.Consumer
 
 class DefaultProjectTest extends Specification {
 
     static final String TEST_BUILD_FILE_NAME = 'build.gradle'
 
     @Rule
-    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider()
+    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass())
 
     Task testTask
 
@@ -155,9 +156,6 @@ class DefaultProjectTest extends Specification {
     CrossProjectConfigurator crossProjectConfigurator = new BuildOperationCrossProjectConfigurator(buildOperationExecutor)
     ClassLoaderScope baseClassLoaderScope = new RootClassLoaderScope("root", getClass().classLoader, getClass().classLoader, new DummyClassLoaderCache(), Stub(ClassLoaderScopeRegistryListener))
     ClassLoaderScope rootProjectClassLoaderScope = baseClassLoaderScope.createChild("root-project")
-    ProjectModuleFactory moduleFactory = new DefaultProjectModuleFactory(Mock(ProjectRegistry) {
-        getAllProjects() >> []
-    })
 
     def setup() {
         rootDir = new File("/path/root").absoluteFile
@@ -230,11 +228,11 @@ class DefaultProjectTest extends Specification {
         ModelSchemaStore modelSchemaStore = Stub(ModelSchemaStore)
         serviceRegistryMock.get((Type) ModelSchemaStore) >> modelSchemaStore
         serviceRegistryMock.get(ModelSchemaStore) >> modelSchemaStore
-        serviceRegistryMock.get((Type) DefaultProjectLayout) >> new DefaultProjectLayout(rootDir, TestFiles.resolver(rootDir), Stub(TaskDependencyFactory), Stub(FileCollectionFactory))
+        serviceRegistryMock.get((Type) DefaultProjectLayout) >> new DefaultProjectLayout(rootDir, TestFiles.resolver(rootDir), Stub(TaskDependencyFactory), Stub(Factory), Stub(PropertyHost), Stub(FileCollectionFactory), TestFiles.filePropertyFactory(), TestFiles.fileFactory())
 
         build.getProjectEvaluationBroadcaster() >> Stub(ProjectEvaluationListener)
         build.getParent() >> null
-        build.getIdentityPath() >> Path.ROOT
+        build.isRootBuild() >> true
         build.getIdentityPath() >> Path.ROOT
 
         serviceRegistryMock.get((Type) ObjectFactory) >> Stub(ObjectFactory)
@@ -257,8 +255,9 @@ class DefaultProjectTest extends Specification {
         def container = Stub(ProjectState)
         _ * container.identityPath >> (parent == null ? Path.ROOT : parent.identityPath.child(name))
         _ * container.projectPath >> (parent == null ? Path.ROOT : parent.projectPath.child(name))
-        _ * container.withMutableState(_) >> { Runnable runnable -> runnable.run() }
-        TestUtil.instantiatorFactory().decorateLenient().newInstance(DefaultProject, name, parent, rootDir, new File(rootDir, 'build.gradle'), script, build, container, projectServiceRegistryFactoryMock, scope, baseClassLoaderScope)
+        def project = TestUtil.instantiatorFactory().decorateLenient().newInstance(DefaultProject, name, parent, rootDir, new File(rootDir, 'build.gradle'), script, build, container, projectServiceRegistryFactoryMock, scope, baseClassLoaderScope)
+        _ * container.applyToMutableState(_) >> { Consumer action -> action.accept(project) }
+        return project
     }
 
     Type getProjectRegistryType() {
@@ -957,7 +956,7 @@ def scriptMethod(Closure closure) {
 
     def getModule() {
         when:
-        Module moduleDummyResolve = moduleFactory.getModule(project)
+        Module moduleDummyResolve = new ProjectBackedModule(project)
         dependencyMetaDataProviderMock.getModule() >> moduleDummyResolve
         then:
         project.getModule() == moduleDummyResolve

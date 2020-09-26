@@ -193,8 +193,10 @@ project(':projectB') {
     }
 
     task checkClasspath {
+        def compileClasspathFiles = configurations.compileClasspath.files
+        def projectAJavaDestDir = project(':projectA').compileJava.destinationDir
         doLast {
-            assert configurations.compileClasspath.files == [project(':projectA').compileJava.destinationDir] as Set
+            assert compileClasspathFiles == [projectAJavaDestDir] as Set
         }
     }
 }
@@ -228,17 +230,23 @@ project(':projectB') {
                         extendsFrom implementation
                     }
                 }
-                
+
                 dependencies {
                     compileOnly project(':projectA')
                 }
 
                 task checkClasspath {
+                    def compileClasspathFiles = configurations.compileClasspath.files
+                    def runtimeClasspathFiles = configurations.runtimeClasspath.files
+                    def compileOnlyClasspathFiles = configurations.compileOnlyClasspath.files
+                    def implementationClasspathFiles = configurations.implementationClasspath.files
+                    def projectAJavaDir = project(':projectA').compileJava.destinationDir
+                    def projectAJarArchiveFile = project(':projectA').jar.archiveFile
                     doLast {
-                        assert configurations.compileClasspath.files == [project(':projectA').compileJava.destinationDir] as Set
-                        assert configurations.runtimeClasspath.files == [] as Set
-                        assert configurations.compileOnlyClasspath.files == [project(':projectA').jar.archiveFile.get().asFile] as Set
-                        assert configurations.implementationClasspath.files == [] as Set
+                        assert compileClasspathFiles == [projectAJavaDir] as Set
+                        assert runtimeClasspathFiles == [] as Set
+                        assert compileOnlyClasspathFiles == [projectAJarArchiveFile.get().asFile] as Set
+                        assert implementationClasspathFiles == [] as Set
                     }
                 }
             }

@@ -16,21 +16,20 @@
 
 package org.gradle.api.internal.artifacts.transform;
 
+import org.gradle.api.Project;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
-import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.artifacts.result.DependencyResult;
 import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.artifacts.result.ResolvedDependencyResult;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.internal.DomainObjectContext;
 import org.gradle.api.internal.artifacts.ResolverResults;
-import org.gradle.api.internal.artifacts.ivyservice.DefaultLenientConfiguration;
-import org.gradle.api.internal.artifacts.ivyservice.ResolvedFilesCollectingVisitor;
-import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.SelectedArtifactSet;
-import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.VisitedArtifactSet;
-import org.gradle.api.internal.file.FileCollectionFactory;
+import org.gradle.api.internal.attributes.ImmutableAttributes;
+import org.gradle.api.internal.file.FileCollectionInternal;
+import org.gradle.api.internal.tasks.NodeExecutionContext;
 import org.gradle.api.internal.tasks.TaskDependencyContainer;
+import org.gradle.api.internal.tasks.TaskDependencyResolveContext;
 import org.gradle.api.internal.tasks.WorkNodeAction;
-import org.gradle.api.specs.Specs;
 import org.gradle.internal.Factory;
 import org.gradle.internal.Try;
 import org.gradle.internal.fingerprint.CurrentFileCollectionFingerprint;
@@ -56,41 +55,52 @@ public class DefaultExecutionGraphDependenciesResolver implements ExecutionGraph
     private final ComponentIdentifier componentIdentifier;
     private final Factory<ResolverResults> graphResults;
     private final Factory<ResolverResults> artifactResults;
-    private final WorkNodeAction graphResolveAction;
-    private final FileCollectionFactory fileCollectionFactory;
-    private Set<ComponentIdentifier> buildDependencies;
+    private final DomainObjectContext owner;
+    private final FilteredResultFactory filteredResultFactory;
     private Set<ComponentIdentifier> dependencies;
+    private TaskDependencyContainer taskDependencies;
 
-    public DefaultExecutionGraphDependenciesResolver(ComponentIdentifier componentIdentifier, Factory<ResolverResults> graphResults, Factory<ResolverResults> artifactResults, WorkNodeAction graphResolveAction, FileCollectionFactory fileCollectionFactory) {
+    public DefaultExecutionGraphDependenciesResolver(ComponentIdentifier componentIdentifier, Factory<ResolverResults> graphResults, Factory<ResolverResults> artifactResults, DomainObjectContext owner, FilteredResultFactory filteredResultFactory) {
         this.componentIdentifier = componentIdentifier;
         this.graphResults = graphResults;
         this.artifactResults = artifactResults;
-        this.graphResolveAction = graphResolveAction;
-        this.fileCollectionFactory = fileCollectionFactory;
+        this.owner = owner;
+        this.filteredResultFactory = filteredResultFactory;
     }
 
     @Override
-    public Try<ArtifactTransformDependencies> forTransformer(Transformer transformer) {
+    public FileCollection selectedArtifacts(Transformer transformer) {
+        if (!transformer.requiresDependencies()) {
+            return MISSING_DEPENDENCIES.getFiles();
+        }
+        return selectedArtifacts(transformer.getFromAttributes());
+    }
+
+    @Override
+    public Try<ArtifactTransformDependencies> computeArtifacts(Transformer transformer) {
         if (!transformer.requiresDependencies()) {
             return Try.successful(MISSING_DEPENDENCIES);
         }
+        return resolvedArtifacts(transformer.getFromAttributes());
+    }
+
+    private Try<ArtifactTransformDependencies> resolvedArtifacts(ImmutableAttributes fromAttributes) {
+        try {
+            FileCollection files = selectedArtifacts(fromAttributes);
+            // Trigger resolution, including any failures
+            files.getFiles();
+            return Try.successful(new DefaultArtifactTransformDependencies(files));
+        } catch (Exception e) {
+            return Try.failure(e);
+        }
+    }
+
+    private FileCollectionInternal selectedArtifacts(ImmutableAttributes fromAttributes) {
         ResolverResults results = artifactResults.create();
         if (dependencies == null) {
             dependencies = computeDependencies(componentIdentifier, ComponentIdentifier.class, results.getResolutionResult().getAllComponents(), false);
         }
-        VisitedArtifactSet visitedArtifacts = results.getVisitedArtifacts();
-        SelectedArtifactSet artifacts = visitedArtifacts.select(Specs.satisfyAll(), transformer.getFromAttributes(), element -> {
-            return dependencies.contains(element);
-        }, false);
-        ResolvedFilesCollectingVisitor visitor = new ResolvedFilesCollectingVisitor();
-        artifacts.visitArtifacts(visitor, false);
-        if (!visitor.getFailures().isEmpty()) {
-            if (visitor.getFailures().size() == 1) {
-                return Try.failure(visitor.getFailures().iterator().next());
-            }
-            return Try.failure(new DefaultLenientConfiguration.ArtifactResolveException("transform dependencies", transformer.getDisplayName(), "artifact transform dependencies", visitor.getFailures()));
-        }
-        return Try.successful(new DefaultArtifactTransformDependencies(fileCollectionFactory.fixed(visitor.getFiles())));
+        return filteredResultFactory.resultsMatching(fromAttributes, element -> dependencies.contains(element));
     }
 
     @Override
@@ -98,23 +108,15 @@ public class DefaultExecutionGraphDependenciesResolver implements ExecutionGraph
         if (!transformationStep.requiresDependencies()) {
             return TaskDependencyContainer.EMPTY;
         }
-        return context -> {
-            ResolverResults results = graphResults.create();
-            if (buildDependencies == null) {
-                buildDependencies = computeDependencies(componentIdentifier, ProjectComponentIdentifier.class, results.getResolutionResult().getAllComponents(), true);
-            }
-            VisitedArtifactSet visitedArtifacts = results.getVisitedArtifacts();
-            if (!buildDependencies.isEmpty()) {
-                SelectedArtifactSet projectArtifacts = visitedArtifacts.select(
-                    Specs.satisfyAll(),
-                    transformationStep.getFromAttributes(),
-                    buildDependencies::contains,
-                    true
-                );
-                context.add(projectArtifacts);
-            }
-            context.add(graphResolveAction);
-        };
+        if (taskDependencies == null) {
+            taskDependencies = context -> {
+                ResolverResults results = graphResults.create();
+                Set<ComponentIdentifier> buildDependencies = computeDependencies(componentIdentifier, ComponentIdentifier.class, results.getResolutionResult().getAllComponents(), true);
+                FileCollectionInternal files = filteredResultFactory.resultsMatching(transformationStep.getFromAttributes(), element -> buildDependencies.contains(element));
+                context.add(new FinalizeTransformDependencies(files, transformationStep));
+            };
+        }
+        return taskDependencies;
     }
 
     private static Set<ComponentIdentifier> computeDependencies(ComponentIdentifier componentIdentifier, Class<? extends ComponentIdentifier> type, Set<ResolvedComponentResult> componentResults, boolean strict) {
@@ -153,4 +155,28 @@ public class DefaultExecutionGraphDependenciesResolver implements ExecutionGraph
         }
     }
 
+    public class FinalizeTransformDependencies implements WorkNodeAction {
+        private final FileCollectionInternal files;
+        private final TransformationStep transformationStep;
+
+        public FinalizeTransformDependencies(FileCollectionInternal files, TransformationStep transformationStep) {
+            this.files = files;
+            this.transformationStep = transformationStep;
+        }
+
+        @Override
+        public Project getProject() {
+            return owner.getProject();
+        }
+
+        @Override
+        public void visitDependencies(TaskDependencyResolveContext context) {
+            context.add(files);
+        }
+
+        @Override
+        public void run(NodeExecutionContext context) {
+            resolvedArtifacts(transformationStep.getFromAttributes());
+        }
+    }
 }

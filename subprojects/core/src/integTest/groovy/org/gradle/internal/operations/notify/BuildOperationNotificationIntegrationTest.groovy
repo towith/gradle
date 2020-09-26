@@ -32,7 +32,7 @@ import org.gradle.initialization.NotifyProjectsEvaluatedBuildOperationType
 import org.gradle.initialization.NotifyProjectsLoadedBuildOperationType
 import org.gradle.initialization.buildsrc.BuildBuildSrcBuildOperationType
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.internal.taskgraph.CalculateTaskGraphBuildOperationType
 import org.gradle.launcher.exec.RunBuildBuildOperationType
 
@@ -108,7 +108,7 @@ class BuildOperationNotificationIntegrationTest extends AbstractIntegrationSpec 
         notifications.finished(ExecuteTaskBuildOperationType.Result, [actionable: false, originExecutionTime: null, cachingDisabledReasonMessage: "Cacheability was not determined", upToDateMessages: [], cachingDisabledReasonCategory: "UNKNOWN", skipMessage: "UP-TO-DATE", originBuildInvocationId: null])
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "composite builds")
     def "can emit notifications for nested builds"() {
         when:
         file("buildSrc/build.gradle") << ""
@@ -212,16 +212,20 @@ class BuildOperationNotificationIntegrationTest extends AbstractIntegrationSpec 
         notifications.op(NotifyProjectAfterEvaluatedBuildOperationType.Details, [buildPath: ":buildSrc", projectPath: ":"]).parentId == notifications.op(ConfigureProjectBuildOperationType.Details, [buildPath: ":buildSrc", projectPath: ":"]).id
         notifications.op(NotifyProjectAfterEvaluatedBuildOperationType.Details, [buildPath: ":a:buildSrc", projectPath: ":"]).parentId == notifications.op(ConfigureProjectBuildOperationType.Details, [buildPath: ":a:buildSrc", projectPath: ":"]).id
 
-        notifications.op(RunRootBuildWorkBuildOperationType.Details).parentId == notifications.op(RunBuildBuildOperationType.Details).id
+        notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":"]).parentId == notifications.op(RunBuildBuildOperationType.Details).id
+        notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":a"]).parentId == notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":"]).id
+        notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":buildSrc"]).parentId == notifications.op(BuildBuildSrcBuildOperationType.Details, [buildPath: ':']).id
+        notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":a:buildSrc"]).parentId == notifications.op(BuildBuildSrcBuildOperationType.Details, [buildPath: ':a']).id
 
-        // TODO - this is incorrect, these should be accounted as configuration time, not task execution time
-        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":"]).parentId == notifications.op(RunRootBuildWorkBuildOperationType.Details).id
-        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":a"]).parentId == notifications.op(RunBuildBuildOperationType.Details).id
-        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":buildSrc"]).parentId == notifications.op(BuildBuildSrcBuildOperationType.Details, [buildPath: ':']).id
-        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":a:buildSrc"]).parentId == notifications.op(BuildBuildSrcBuildOperationType.Details, [buildPath: ':a']).id
+        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":"]).parentId == notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":"]).id
+        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":a"]).parentId == notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ":a"]).id
+        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":buildSrc"]).parentId == notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ':buildSrc']).id
+        notifications.op(NotifyTaskGraphWhenReadyBuildOperationType.Details, [buildPath: ":a:buildSrc"]).parentId == notifications.op(CalculateTaskGraphBuildOperationType.Details, [buildPath: ':a:buildSrc']).id
+
+        notifications.op(RunRootBuildWorkBuildOperationType.Details).parentId == notifications.op(RunBuildBuildOperationType.Details).id
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "GradleBuild task")
     def "emits for GradleBuild tasks"() {
         when:
         def initScript = file("init.gradle") << """

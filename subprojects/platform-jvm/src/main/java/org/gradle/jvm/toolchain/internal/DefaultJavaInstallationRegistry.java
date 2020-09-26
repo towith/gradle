@@ -28,7 +28,8 @@ import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
 import org.gradle.internal.exceptions.Contextual;
 import org.gradle.internal.jvm.Jvm;
-import org.gradle.internal.service.scopes.BuildTree;
+import org.gradle.internal.service.scopes.Scopes;
+import org.gradle.internal.service.scopes.ServiceScope;
 import org.gradle.jvm.toolchain.JavaDevelopmentKit;
 import org.gradle.jvm.toolchain.JavaInstallation;
 import org.gradle.jvm.toolchain.JavaInstallationRegistry;
@@ -39,7 +40,7 @@ import java.io.FileNotFoundException;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
-@BuildTree
+@ServiceScope(Scopes.Build.class)
 public class DefaultJavaInstallationRegistry implements JavaInstallationRegistry {
     private final JavaInstallationProbe installationProbe;
     private final ProviderFactory providerFactory;
@@ -102,7 +103,7 @@ public class DefaultJavaInstallationRegistry implements JavaInstallationRegistry
         private final FileFactory fileFactory;
 
         public DefaultJavaInstallation(JavaInstallationProbe.ProbeResult probeResult, FileCollectionFactory fileCollectionFactory, FileFactory fileFactory) {
-            this.jvm = Jvm.discovered(probeResult.getJavaHome(), probeResult.getImplementationJavaVersion(), probeResult.getJavaVersion());
+            this.jvm = Jvm.discovered(probeResult.getJavaHome().toFile(), probeResult.getImplementationJavaVersion(), probeResult.getJavaVersion());
             this.implementationName = probeResult.getImplementationName();
             this.fileCollectionFactory = fileCollectionFactory;
             this.fileFactory = fileFactory;

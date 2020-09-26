@@ -16,7 +16,7 @@
 package org.gradle.integtests.resolve.api
 
 import org.gradle.integtests.fixtures.AbstractDependencyResolutionTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.resolve.ResolveTestFixture
 
 class ConfigurationMutationIntegrationTest extends AbstractDependencyResolutionTest {
@@ -164,6 +164,7 @@ configurations.compile.withDependencies { deps ->
         }
     }
 
+    @ToBeFixedForConfigurationCache
     def "provides useful error message when withDependencies action fails to execute"() {
         when:
         buildFile << """
@@ -279,7 +280,7 @@ include 'consumer', 'producer'
         succeeds("resolve")
 
     }
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can use defaultDependencies in a composite build"() {
         buildTestFixture.withBuildInSubDir()
         mavenRepo.module("org", "explicit-dependency", "3.4").publish()

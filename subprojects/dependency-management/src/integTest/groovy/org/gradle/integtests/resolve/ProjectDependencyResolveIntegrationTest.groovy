@@ -16,9 +16,9 @@
 package org.gradle.integtests.resolve
 
 import groovy.transform.NotYetImplemented
-import org.gradle.api.JavaVersion
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.FluidDependenciesResolveRunner
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.resolve.ResolveTestFixture
 import org.junit.runner.RunWith
 import spock.lang.Issue
@@ -334,8 +334,11 @@ allprojects {
 }
 
 project(":a") {
-    configurations { 'default' {} }
-    dependencies { 'default' 'group:externalA:1.5' }
+    configurations {
+        deps
+        'default' { extendsFrom deps }
+    }
+    dependencies { deps 'group:externalA:1.5' }
     task xJar(type: Jar) { archiveBaseName='x' }
     task yJar(type: Jar) { archiveBaseName='y' }
     artifacts { 'default' xJar, yJar }
@@ -359,6 +362,7 @@ project(":b") {
         executedAndNotSkipped ":a:yJar"
     }
 
+    @ToBeFixedForConfigurationCache
     def "reports project dependency that refers to an unknown artifact"() {
         given:
         file('settings.gradle') << """
@@ -438,8 +442,11 @@ project(':b') {
 subprojects {
     apply plugin: 'base'
     configurations {
-        'default'
+        first
         other
+        'default' {
+            extendsFrom first
+        }
     }
     task jar(type: Jar)
     artifacts {
@@ -449,25 +456,25 @@ subprojects {
 
 project('a') {
     dependencies {
-        'default' project(':b')
+        first project(':b')
         other project(':b')
     }
     task listJars {
-        dependsOn configurations.default
+        dependsOn configurations.first
         dependsOn configurations.other
         doFirst {
-            def jars = configurations.default.collect { it.name } as Set
+            def jars = configurations.first.collect { it.name } as Set
             assert jars == ['a.jar', 'b.jar', 'c.jar'] as Set
 
             jars = configurations.other.collect { it.name } as Set
             assert jars == ['a.jar', 'b.jar', 'c.jar'] as Set
 
             // Check type of root component
-            def defaultResult = configurations.default.incoming.resolutionResult
+            def defaultResult = configurations.first.incoming.resolutionResult
             def defaultRootId = defaultResult.root.id
             assert defaultRootId instanceof ProjectComponentIdentifier
 
-            def otherResult = configurations.default.incoming.resolutionResult
+            def otherResult = configurations.other.incoming.resolutionResult
             def otherRootId = otherResult.root.id
             assert otherRootId instanceof ProjectComponentIdentifier
         }
@@ -476,13 +483,13 @@ project('a') {
 
 project('b') {
     dependencies {
-        'default' project(':c')
+        first project(':c')
     }
 }
 
 project('c') {
     dependencies {
-        'default' project(':a')
+        first project(':a')
     }
 }
 """
@@ -580,6 +587,7 @@ project('c') {
         file("b/build/copied/a-1.0.zip").exists()
     }
 
+    @ToBeFixedForConfigurationCache(because = "Task.getProject() during execution")
     def "resolving configuration with project dependency marks dependency's configuration as observed"() {
         settingsFile << "include 'api'; include 'impl'"
 
@@ -670,83 +678,4 @@ project(':b') {
         executedAndNotSkipped ":a:A1jar", ":a:A2jar", ":a:A3jar"
     }
 
-    @Issue("https://github.com/gradle/gradle/issues/847")
-    def "projects with the same name should be considered different when building the graph"() {
-        given:
-        settingsFile << """
-            rootProject.name='duplicates'
-            include 'a:core'
-            include 'b:core'
-        """
-
-        buildFile << """
-            allprojects {
-                apply plugin: 'java-library'
-                group 'org.test'
-                version '1.0'
-            }
-
-            project(':a:core') {
-                dependencies {
-                    implementation project(':b:core')
-                }
-            }
-        """
-
-        def resolve = new ResolveTestFixture(buildFile, "compileClasspath")
-        resolve.prepare()
-
-        when:
-        succeeds 'a:core:checkDeps'
-
-        then:
-        resolve.expectGraph {
-            root(":a:core", "org.test:a-core:1.0") {
-                project(":b:core", "org.test:b-core:1.0") {
-                    variant("apiElements", [
-                        'org.gradle.category': 'library',
-                        'org.gradle.dependency.bundling': 'external',
-                        'org.gradle.jvm.version': JavaVersion.current().majorVersion,
-                        'org.gradle.usage': 'java-api',
-                        'org.gradle.libraryelements': 'jar'])
-                    artifact(name: 'main', noType: true)
-                }
-            }
-        }
-    }
-
-    @Issue("https://github.com/gradle/gradle/issues/847")
-    def "can opt-out detection of circular dependencies with projects of same name"() {
-        given:
-        settingsFile << """
-            rootProject.name='duplicates'
-            include 'a:core'
-            include 'b:core'
-        """
-
-        buildFile << """
-            allprojects {
-                apply plugin: 'java-library'
-                group 'org.test'
-                version '1.0'
-            }
-
-            project(':a:core') {
-                dependencies {
-                    implementation project(':b:core')
-                }
-            }
-        """
-
-        def resolve = new ResolveTestFixture(buildFile, "compileClasspath")
-        resolve.prepare()
-
-        when:
-        fails 'a:core:checkDeps', '-Dorg.gradle.dependency.duplicate.project.detection=false'
-
-        then:
-        failure.assertHasDescription """Circular dependency between the following tasks:
-:a:core:compileJava
-\\--- :a:core:compileJava (*)"""
-    }
 }

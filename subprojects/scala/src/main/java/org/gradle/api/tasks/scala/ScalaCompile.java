@@ -15,6 +15,8 @@
  */
 package org.gradle.api.tasks.scala;
 
+import com.google.common.collect.ImmutableList;
+import org.gradle.api.Incubating;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.ClassPathRegistry;
@@ -24,6 +26,7 @@ import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Nested;
 import org.gradle.initialization.ClassLoaderRegistry;
+import org.gradle.internal.classloader.ClasspathHasher;
 import org.gradle.language.scala.tasks.AbstractScalaCompile;
 import org.gradle.process.internal.JavaForkOptionsFactory;
 import org.gradle.process.internal.worker.child.WorkerDirectoryProvider;
@@ -40,6 +43,7 @@ public class ScalaCompile extends AbstractScalaCompile {
 
     private FileCollection scalaClasspath;
     private FileCollection zincClasspath;
+    private FileCollection scalaCompilerPlugins;
 
     private org.gradle.language.base.internal.compile.Compiler<ScalaJavaJointCompileSpec> compiler;
 
@@ -64,6 +68,37 @@ public class ScalaCompile extends AbstractScalaCompile {
 
     public void setScalaClasspath(FileCollection scalaClasspath) {
         this.scalaClasspath = scalaClasspath;
+    }
+
+    /**
+     * Returns the Scala compiler plugins to use.
+     *
+     * @since 6.4
+     */
+    @Classpath
+    @Incubating
+    public FileCollection getScalaCompilerPlugins() {
+        return scalaCompilerPlugins;
+    }
+
+    /**
+     * Sets the Scala compiler plugins to use.
+     *
+     * @param scalaCompilerPlugins Collection of Scala compiler plugins.
+     * @since 6.4
+     */
+    @Incubating
+    public void setScalaCompilerPlugins(FileCollection scalaCompilerPlugins) {
+        this.scalaCompilerPlugins = scalaCompilerPlugins;
+    }
+
+    @Override
+    protected ScalaJavaJointCompileSpec createSpec() {
+        ScalaJavaJointCompileSpec spec = super.createSpec();
+        if (getScalaCompilerPlugins() != null) {
+            spec.setScalaCompilerPlugins(ImmutableList.copyOf(getScalaCompilerPlugins()));
+        }
+        return spec;
     }
 
     /**
@@ -96,7 +131,8 @@ public class ScalaCompile extends AbstractScalaCompile {
             ActionExecutionSpecFactory actionExecutionSpecFactory = getServices().get(ActionExecutionSpecFactory.class);
             ScalaCompilerFactory scalaCompilerFactory = new ScalaCompilerFactory(
                 getServices().get(WorkerDirectoryProvider.class).getWorkingDirectory(), workerDaemonFactory, getScalaClasspath(),
-                getZincClasspath(), forkOptionsFactory, classPathRegistry, classLoaderRegistry, actionExecutionSpecFactory);
+                getZincClasspath(), forkOptionsFactory, classPathRegistry, classLoaderRegistry, actionExecutionSpecFactory,
+                getServices().get(ClasspathHasher.class));
             compiler = scalaCompilerFactory.newCompiler(spec);
         }
         return compiler;

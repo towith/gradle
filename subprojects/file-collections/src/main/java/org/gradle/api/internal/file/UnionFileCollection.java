@@ -15,23 +15,26 @@
  */
 package org.gradle.api.internal.file;
 
+import com.google.common.collect.ImmutableSet;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.internal.file.collections.FileCollectionResolveContext;
-import org.gradle.util.GUtil;
+import org.gradle.internal.logging.text.TreeFormatter;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
+/**
+ * An immutable sequence of file collections.
+ */
 public class UnionFileCollection extends CompositeFileCollection {
-    private final Set<FileCollection> source;
+    private final ImmutableSet<FileCollectionInternal> source;
 
-    public UnionFileCollection(FileCollection... source) {
-        this(Arrays.asList(source));
+    public UnionFileCollection(FileCollectionInternal... source) {
+        this.source = ImmutableSet.copyOf(source);
     }
 
-    public UnionFileCollection(Iterable<? extends FileCollection> source) {
-        this.source = GUtil.addToCollection(new LinkedHashSet<FileCollection>(), source);
+    public UnionFileCollection(Iterable<? extends FileCollectionInternal> source) {
+        this.source = ImmutableSet.copyOf(source);
     }
 
     @Override
@@ -39,16 +42,40 @@ public class UnionFileCollection extends CompositeFileCollection {
         return "file collection";
     }
 
-    public Set<FileCollection> getSources() {
+    @Override
+    protected void appendContents(TreeFormatter formatter) {
+        formatter.node("source");
+        formatter.startChildren();
+        for (FileCollectionInternal files : source) {
+            files.describeContents(formatter);
+        }
+        formatter.endChildren();
+    }
+
+    public Set<? extends FileCollection> getSources() {
         return source;
     }
 
-    public void addToUnion(FileCollection collection) {
-        source.add(collection);
+    @Override
+    public FileCollectionInternal replace(FileCollectionInternal original, Supplier<FileCollectionInternal> supplier) {
+        ImmutableSet.Builder<FileCollectionInternal> newSource = ImmutableSet.builderWithExpectedSize(source.size());
+        boolean hasChanges = false;
+        for (FileCollectionInternal candidate : source) {
+            FileCollectionInternal newCollection = candidate.replace(original, supplier);
+            hasChanges |= newCollection != candidate;
+            newSource.add(newCollection);
+        }
+        if (hasChanges) {
+            return new UnionFileCollection(newSource.build());
+        } else {
+            return this;
+        }
     }
 
     @Override
-    public void visitContents(FileCollectionResolveContext context) {
-        context.addAll(source);
+    protected void visitChildren(Consumer<FileCollectionInternal> visitor) {
+        for (FileCollectionInternal fileCollection : source) {
+            visitor.accept(fileCollection);
+        }
     }
 }

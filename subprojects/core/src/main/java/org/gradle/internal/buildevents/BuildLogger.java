@@ -24,6 +24,7 @@ import org.gradle.api.internal.SettingsInternal;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.invocation.Gradle;
 import org.gradle.api.logging.Logger;
+import org.gradle.execution.taskgraph.TaskExecutionGraphInternal;
 import org.gradle.initialization.BuildRequestMetaData;
 import org.gradle.internal.InternalBuildListener;
 import org.gradle.internal.logging.format.TersePrettyDurationFormatter;
@@ -46,6 +47,7 @@ public class BuildLogger implements InternalBuildListener, TaskExecutionGraphLis
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void buildStarted(Gradle gradle) {
         StartParameter startParameter = gradle.getStartParameter();
         logger.info("Starting Build");
@@ -85,6 +87,7 @@ public class BuildLogger implements InternalBuildListener, TaskExecutionGraphLis
     public void graphPopulated(TaskExecutionGraph graph) {
         if (logger.isInfoEnabled()) {
             logger.info("Tasks to be executed: {}", graph.getAllTasks());
+            logger.info("Tasks that were excluded: {}", ((TaskExecutionGraphInternal)graph).getFilteredTasks());
         }
     }
 

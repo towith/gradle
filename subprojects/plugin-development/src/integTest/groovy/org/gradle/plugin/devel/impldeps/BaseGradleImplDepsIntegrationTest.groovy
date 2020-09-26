@@ -21,7 +21,7 @@ import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 abstract class BaseGradleImplDepsIntegrationTest extends AbstractIntegrationSpec {
 
     def setup() {
-        executer.requireGradleDistribution()
+        executer.requireOwnGradleUserHomeDir()
     }
 
     static String applyJavaPlugin() {
@@ -59,7 +59,7 @@ abstract class BaseGradleImplDepsIntegrationTest extends AbstractIntegrationSpec
     static String junitDependency() {
         """
             dependencies {
-                testImplementation 'junit:junit:4.12'
+                testImplementation 'junit:junit:4.13'
             }
         """
     }

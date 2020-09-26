@@ -30,12 +30,12 @@ import org.junit.Test
 import static org.gradle.api.tasks.TaskDependencyMatchers.dependsOn
 import static org.gradle.util.WrapUtil.toLinkedSet
 import static org.hamcrest.CoreMatchers.*
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 import static org.junit.Assert.assertTrue
 
 class ScalaPluginTest {
     @Rule
-    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider()
+    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass())
 
     private final Project project = TestUtil.create(temporaryFolder).rootProject()
     private final ScalaPlugin scalaPlugin = new ScalaPlugin()

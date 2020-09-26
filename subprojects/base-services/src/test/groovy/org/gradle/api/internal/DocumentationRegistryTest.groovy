@@ -22,7 +22,7 @@ import org.junit.Rule
 import spock.lang.Specification
 
 class DocumentationRegistryTest extends Specification {
-    @Rule TestNameTestDirectoryProvider tmpDir
+    @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     final GradleVersion gradleVersion = GradleVersion.current()
     final DocumentationRegistry registry = new DocumentationRegistry()
 
@@ -39,16 +39,6 @@ class DocumentationRegistryTest extends Specification {
     def "points users at the gradle dsl web site for specific property"() {
         expect:
         registry.getDslRefForProperty(org.gradle.api.Action.class, 'execute') == "https://docs.gradle.org/${gradleVersion.version}/dsl/org.gradle.api.Action.html#org.gradle.api.Action:execute"
-    }
-
-    def "points users at the gradle guides"() {
-        expect:
-        registry.getGuideFor("creating-new-gradle-builds") == "https://guides.gradle.org/creating-new-gradle-builds"
-    }
-
-    def "points users at the gradle guides for topic"() {
-        expect:
-        registry.getTopicGuidesFor("Native") == "https://guides.gradle.org?q=Native"
     }
 
 }

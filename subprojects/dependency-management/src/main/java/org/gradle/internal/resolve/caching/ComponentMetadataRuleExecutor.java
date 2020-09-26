@@ -22,17 +22,26 @@ import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.ResolvedModuleVersion;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ModuleDescriptorHashModuleSource;
 import org.gradle.cache.CacheRepository;
+import org.gradle.cache.internal.InMemoryCacheController;
 import org.gradle.cache.internal.InMemoryCacheDecoratorFactory;
 import org.gradle.internal.component.external.model.ModuleComponentResolveMetadata;
 import org.gradle.internal.serialize.Serializer;
 import org.gradle.internal.snapshot.ValueSnapshotter;
 import org.gradle.util.BuildCommencedTimeProvider;
 
+import java.time.Duration;
+
 public class ComponentMetadataRuleExecutor extends CrossBuildCachingRuleExecutor<ModuleComponentResolveMetadata, ComponentMetadataContext, ModuleComponentResolveMetadata> {
+
+    private static final String CACHE_ID = "md-rule";
+
+    public static boolean isMetadataRuleExecutorCache(InMemoryCacheController controller) {
+        return CACHE_ID.equals(controller.getCacheId());
+    }
 
     private static Transformer<Object, ModuleComponentResolveMetadata> getKeyToSnapshotableTransformer() {
         return moduleMetadata -> moduleMetadata.getSources().withSource(ModuleDescriptorHashModuleSource.class, source -> {
-            return source.map(metadataFileSource -> metadataFileSource.getDescriptorHash().toString())
+            return source.map(metadataFileSource -> metadataFileSource.getDescriptorHash().toString() + moduleMetadata.getVariantDerivationStrategy().getClass().getName())
                 .orElseThrow(() -> new RuntimeException("Cannot find original content hash"));
         });
     }
@@ -44,7 +53,7 @@ public class ComponentMetadataRuleExecutor extends CrossBuildCachingRuleExecutor
                                          ValueSnapshotter snapshotter,
                                          BuildCommencedTimeProvider timeProvider,
                                          Serializer<ModuleComponentResolveMetadata> componentMetadataContextSerializer) {
-        super("md-rule", cacheRepository, cacheDecoratorFactory, snapshotter, timeProvider, createValidator(timeProvider), getKeyToSnapshotableTransformer(), componentMetadataContextSerializer);
+        super(CACHE_ID, cacheRepository, cacheDecoratorFactory, snapshotter, timeProvider, createValidator(timeProvider), getKeyToSnapshotableTransformer(), componentMetadataContextSerializer);
         this.componentMetadataContextSerializer = componentMetadataContextSerializer;
     }
 
@@ -54,10 +63,9 @@ public class ComponentMetadataRuleExecutor extends CrossBuildCachingRuleExecutor
 
     private static EntryValidator<ModuleComponentResolveMetadata> createValidator(final BuildCommencedTimeProvider timeProvider) {
         return (policy, entry) -> {
-            long age = timeProvider.getCurrentTime() - entry.getTimestamp();
+            Duration age = Duration.ofMillis(timeProvider.getCurrentTime() - entry.getTimestamp());
             final ModuleComponentResolveMetadata result = entry.getResult();
-            boolean mustRefreshModule = policy.mustRefreshModule(new SimpleResolvedModuleVersion(result.getModuleVersionId()), age, result.isChanging());
-            return !mustRefreshModule;
+            return !policy.moduleExpiry(new SimpleResolvedModuleVersion(result.getModuleVersionId()), age, result.isChanging()).isMustCheck();
         };
     }
 

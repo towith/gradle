@@ -17,6 +17,7 @@
 package org.gradle.integtests.resolve.capabilities
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class CapabilitiesLocalComponentIntegrationTest extends AbstractIntegrationSpec {
 
@@ -28,7 +29,7 @@ class CapabilitiesLocalComponentIntegrationTest extends AbstractIntegrationSpec 
         """
         buildFile << """
             apply plugin: 'java-library'
-            
+
             configurations.api.outgoing {
                 capability 'org:capability:1.0'
             }
@@ -36,11 +37,11 @@ class CapabilitiesLocalComponentIntegrationTest extends AbstractIntegrationSpec 
             dependencies {
                 api project(":b")
             }
-            
+
         """
         file('b/build.gradle') << """
             apply plugin: 'java-library'
-            
+
             configurations.api.outgoing {
                 capability 'test:b:unspecified'
                 capability group:'org', name:'capability', version:'1.0'
@@ -55,14 +56,15 @@ class CapabilitiesLocalComponentIntegrationTest extends AbstractIntegrationSpec 
    Cannot select module with conflict on capability 'org:capability:1.0' also provided by [:test:unspecified(compileClasspath)]""")
     }
 
+    @ToBeFixedForConfigurationCache(because = "broken file collection")
     def 'fails to resolve undeclared test fixture'() {
         buildFile << """
             apply plugin: 'java-library'
-            
+
             dependencies {
                 implementation(testFixtures(project(':')))
             }
-            
+
             task resolve {
                 doLast {
                     println configurations.compileClasspath.incoming.files.files

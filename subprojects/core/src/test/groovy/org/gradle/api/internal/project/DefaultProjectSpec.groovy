@@ -42,7 +42,7 @@ import spock.lang.Specification
 @UsesNativeServices
 class DefaultProjectSpec extends Specification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     def "can create file collection configured with an Action"() {
         given:
@@ -96,10 +96,12 @@ class DefaultProjectSpec extends Specification {
 
     def "has useful toString and displayName and paths"() {
         def rootBuild = Stub(GradleInternal)
+        rootBuild.isRootBuild() >> true
         rootBuild.parent >> null
         rootBuild.identityPath >> Path.ROOT
 
         def nestedBuild = Stub(GradleInternal)
+        rootBuild.isRootBuild() >> false
         nestedBuild.parent >> rootBuild
         nestedBuild.identityPath >> Path.path(":nested")
 

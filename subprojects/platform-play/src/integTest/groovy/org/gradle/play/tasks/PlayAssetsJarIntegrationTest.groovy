@@ -17,13 +17,10 @@
 package org.gradle.play.tasks
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.play.integtest.fixtures.app.BasicPlayApp
 import org.gradle.test.fixtures.archive.JarTestFixture
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 
-@Requires(TestPrecondition.JDK8_OR_LATER)
 class PlayAssetsJarIntegrationTest extends AbstractIntegrationSpec {
     def setup() {
         executer.noDeprecationChecks()
@@ -42,7 +39,7 @@ class PlayAssetsJarIntegrationTest extends AbstractIntegrationSpec {
         executer.noDeprecationChecks()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "does not rebuild when public assets remain unchanged" () {
         when:
         succeeds "assemble"
@@ -51,7 +48,7 @@ class PlayAssetsJarIntegrationTest extends AbstractIntegrationSpec {
         skipped ":createPlayBinaryJar", ":createPlayBinaryAssetsJar"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "rebuilds when public assets change" () {
         when:
         file("public/stylesheets/main.css") << "\n"
@@ -65,7 +62,7 @@ class PlayAssetsJarIntegrationTest extends AbstractIntegrationSpec {
         jar("build/playBinary/lib/play-app-assets.jar").assertFileContent("public/stylesheets/main.css", file("public/stylesheets/main.css").text)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "rebuilds when public assets are removed" () {
         when:
         file("public/stylesheets/main.css").delete()

@@ -15,13 +15,13 @@
  */
 package org.gradle.plugins.ide.eclipse
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.junit.Test
 
 class EclipseTestSourcesIntegrationTest extends AbstractEclipseIntegrationTest {
 
     @Test
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     void "All test source folders and test dependencies are marked with test attribute"() {
         //when
         file('src/main/java').mkdirs()
@@ -34,14 +34,14 @@ repositories.jcenter()
 
 dependencies {
      implementation "com.google.guava:guava:21.0"
-     testImplementation "junit:junit:4.12"
+     testImplementation "junit:junit:4.13"
 }
 
 """
 
         //then
         classpath.lib("guava-21.0.jar").assertHasNoAttribute("test", "true")
-        classpath.lib("junit-4.12.jar").assertHasAttribute("test", "true")
+        classpath.lib("junit-4.13.jar").assertHasAttribute("test", "true")
         classpath.sourceDir("src/main/java").assertHasNoAttribute("test", "true")
         classpath.sourceDir("src/test/java").assertHasAttribute("test", "true")
     }

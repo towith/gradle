@@ -19,6 +19,7 @@ package org.gradle.api.internal.file.copy;
 import org.gradle.api.file.CopySpec;
 import org.gradle.internal.file.PathToFileResolver;
 
+import javax.inject.Inject;
 import java.io.File;
 
 public class DestinationRootCopySpec extends DelegatingCopySpecInternal {
@@ -28,6 +29,7 @@ public class DestinationRootCopySpec extends DelegatingCopySpecInternal {
 
     private Object destinationDir;
 
+    @Inject
     public DestinationRootCopySpec(PathToFileResolver fileResolver, CopySpecInternal delegate) {
         this.fileResolver = fileResolver;
         this.delegate = delegate;
@@ -48,7 +50,7 @@ public class DestinationRootCopySpec extends DelegatingCopySpecInternal {
         return destinationDir == null ? null : fileResolver.resolve(destinationDir);
     }
 
-    // TODO:instant-execution - remove this
+    // TODO:configuration-cache - remove this
     public CopySpecInternal getDelegate() {
         return delegate;
     }

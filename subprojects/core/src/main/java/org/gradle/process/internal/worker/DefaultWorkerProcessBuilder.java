@@ -19,6 +19,7 @@ package org.gradle.process.internal.worker;
 import org.gradle.api.Action;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.internal.id.IdGenerator;
+import org.gradle.internal.jvm.Jvm;
 import org.gradle.internal.logging.events.OutputEventListener;
 import org.gradle.internal.remote.Address;
 import org.gradle.internal.remote.ConnectionAcceptor;
@@ -50,12 +51,14 @@ import java.util.concurrent.TimeUnit;
 public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultWorkerProcessBuilder.class);
     private final MessagingServer server;
-    private final IdGenerator<?> idGenerator;
+    private final IdGenerator<Long> idGenerator;
     private final ApplicationClassesInSystemClassLoaderWorkerImplementationFactory workerImplementationFactory;
     private final OutputEventListener outputEventListener;
     private final JavaExecHandleBuilder javaCommand;
-    private final Set<String> packages = new HashSet<String>();
-    private final Set<File> applicationClasspath = new LinkedHashSet<File>();
+    private final Set<String> packages = new HashSet<>();
+    private final Set<File> applicationClasspath = new LinkedHashSet<>();
+    private final Set<File> applicationModulePath = new LinkedHashSet<>();
+
     private final MemoryManager memoryManager;
     private Action<? super WorkerProcessContext> action;
     private LogLevel logLevel = LogLevel.LIFECYCLE;
@@ -63,10 +66,12 @@ public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
     private File gradleUserHomeDir;
     private int connectTimeoutSeconds;
     private List<URL> implementationClassPath;
+    private List<URL> implementationModulePath;
     private boolean shouldPublishJvmMemoryInfo;
 
-    DefaultWorkerProcessBuilder(JavaExecHandleFactory execHandleFactory, MessagingServer server, IdGenerator<?> idGenerator, ApplicationClassesInSystemClassLoaderWorkerImplementationFactory workerImplementationFactory, OutputEventListener outputEventListener, MemoryManager memoryManager) {
+    DefaultWorkerProcessBuilder(JavaExecHandleFactory execHandleFactory, MessagingServer server, IdGenerator<Long> idGenerator, ApplicationClassesInSystemClassLoaderWorkerImplementationFactory workerImplementationFactory, OutputEventListener outputEventListener, MemoryManager memoryManager) {
         this.javaCommand = execHandleFactory.newJavaExec();
+        this.javaCommand.setExecutable(Jvm.current().getJavaExecutable());
         this.server = server;
         this.idGenerator = idGenerator;
         this.workerImplementationFactory = workerImplementationFactory;
@@ -109,6 +114,17 @@ public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
     @Override
     public Set<File> getApplicationClasspath() {
         return applicationClasspath;
+    }
+
+    @Override
+    public WorkerProcessBuilder applicationModulePath(Iterable<File> files) {
+        GUtil.addToCollection(applicationModulePath, files);
+        return this;
+    }
+
+    @Override
+    public Set<File> getApplicationModulePath() {
+        return applicationModulePath;
     }
 
     @Override
@@ -167,8 +183,9 @@ public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
         this.implementationClassPath = implementationClassPath;
     }
 
-    public List<URL> getImplementationClassPath() {
-        return implementationClassPath;
+    @Override
+    public void setImplementationModulePath(List<URL> implementationModulePath) {
+        this.implementationModulePath = implementationModulePath;
     }
 
     @Override
@@ -201,17 +218,19 @@ public class DefaultWorkerProcessBuilder implements WorkerProcessBuilder {
         Address localAddress = acceptor.getAddress();
 
         // Build configuration for GradleWorkerMain
-        Object id = idGenerator.generateId();
+        long id = idGenerator.generateId();
         String displayName = getBaseName() + " " + id;
 
         LOGGER.debug("Creating {}", displayName);
         LOGGER.debug("Using application classpath {}", applicationClasspath);
+        LOGGER.debug("Using application module path {}", applicationModulePath);
         LOGGER.debug("Using implementation classpath {}", implementationClassPath);
+        LOGGER.debug("Using implementation module path {}", implementationModulePath);
 
         JavaExecHandleBuilder javaCommand = getJavaCommand();
         javaCommand.setDisplayName(displayName);
 
-        workerImplementationFactory.prepareJavaCommand(id, displayName, this, implementationClassPath, localAddress, javaCommand, shouldPublishJvmMemoryInfo);
+        workerImplementationFactory.prepareJavaCommand(id, displayName, this, implementationClassPath, implementationModulePath, localAddress, javaCommand, shouldPublishJvmMemoryInfo);
 
         javaCommand.args("'" + displayName + "'");
         if (javaCommand.getMaxHeapSize() == null) {

@@ -40,19 +40,27 @@ public class DefaultMutableMavenModuleResolveMetadata extends AbstractMutableMod
     private String packaging = "jar";
     private boolean relocated;
     private String snapshotTimestamp;
-    private ImmutableList<MavenDependencyDescriptor> dependencies;
-    private ImmutableMap<String, Configuration> configurationDefinitions;
+    private final ImmutableList<MavenDependencyDescriptor> dependencies;
+    private final ImmutableMap<String, Configuration> configurationDefinitions;
 
-    public DefaultMutableMavenModuleResolveMetadata(ModuleVersionIdentifier id, ModuleComponentIdentifier componentIdentifier, Collection<MavenDependencyDescriptor> dependencies,
-                                                    ImmutableAttributesFactory attributesFactory, NamedObjectInstantiator objectInstantiator, AttributesSchemaInternal schema) {
+    public DefaultMutableMavenModuleResolveMetadata(ModuleVersionIdentifier id,
+                                                    ModuleComponentIdentifier componentIdentifier,
+                                                    Collection<MavenDependencyDescriptor> dependencies,
+                                                    ImmutableAttributesFactory attributesFactory,
+                                                    NamedObjectInstantiator objectInstantiator,
+                                                    AttributesSchemaInternal schema) {
         super(attributesFactory, id, componentIdentifier, schema);
         this.dependencies = ImmutableList.copyOf(dependencies);
         this.objectInstantiator = objectInstantiator;
         this.configurationDefinitions = GradlePomModuleDescriptorBuilder.MAVEN2_CONFIGURATIONS;
     }
 
-    public DefaultMutableMavenModuleResolveMetadata(ModuleVersionIdentifier id, ModuleComponentIdentifier componentIdentifier, Collection<MavenDependencyDescriptor> dependencies,
-                                                    ImmutableAttributesFactory attributesFactory, NamedObjectInstantiator objectInstantiator, AttributesSchemaInternal schema,
+    public DefaultMutableMavenModuleResolveMetadata(ModuleVersionIdentifier id,
+                                                    ModuleComponentIdentifier componentIdentifier,
+                                                    Collection<MavenDependencyDescriptor> dependencies,
+                                                    ImmutableAttributesFactory attributesFactory,
+                                                    NamedObjectInstantiator objectInstantiator,
+                                                    AttributesSchemaInternal schema,
                                                     ImmutableMap<String, Configuration> configurationDefinitions) {
         super(attributesFactory, id, componentIdentifier, schema);
         this.dependencies = ImmutableList.copyOf(dependencies);

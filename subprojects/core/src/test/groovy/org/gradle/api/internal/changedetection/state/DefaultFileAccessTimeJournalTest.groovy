@@ -19,7 +19,7 @@ package org.gradle.api.internal.changedetection.state
 import org.gradle.cache.CacheDecorator
 import org.gradle.cache.internal.DefaultCacheRepository
 import org.gradle.cache.internal.DefaultCacheScopeMapping
-import org.gradle.cache.internal.InMemoryCacheDecoratorFactory
+import org.gradle.cache.internal.DefaultInMemoryCacheDecoratorFactory
 import org.gradle.internal.file.FileAccessTimeJournal
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
@@ -37,12 +37,12 @@ import static org.gradle.util.GUtil.loadProperties
 
 class DefaultFileAccessTimeJournalTest extends Specification {
 
-    @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     def userHome = tmpDir.createDir("user-home")
     def cacheScopeMapping = new DefaultCacheScopeMapping(userHome, null, GradleVersion.current())
     def cacheRepository = new DefaultCacheRepository(cacheScopeMapping, new InMemoryCacheFactory())
-    def cacheDecoratorFactory = Stub(InMemoryCacheDecoratorFactory) {
+    def cacheDecoratorFactory = Stub(DefaultInMemoryCacheDecoratorFactory) {
         decorator(_, _) >> Stub(CacheDecorator) {
             decorate(_, _, _, _, _) >> { cacheId, cacheName, persistentCache, crossProcessCacheAccess, asyncCacheAccess ->
                 persistentCache

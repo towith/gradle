@@ -16,13 +16,12 @@
 
 package org.gradle.internal.execution.steps;
 
+import com.google.common.collect.ImmutableList;
 import org.gradle.internal.execution.Context;
 import org.gradle.internal.execution.OutputChangeListener;
 import org.gradle.internal.execution.Result;
 import org.gradle.internal.execution.Step;
 import org.gradle.internal.execution.UnitOfWork;
-
-import java.util.Optional;
 
 public class BroadcastChangingOutputsStep<C extends Context, R extends Result> implements Step<C, R> {
 
@@ -40,12 +39,11 @@ public class BroadcastChangingOutputsStep<C extends Context, R extends Result> i
     @Override
     public R execute(C context) {
         UnitOfWork work = context.getWork();
-
-        Optional<? extends Iterable<String>> changingOutputs = work.getChangingOutputs();
-        changingOutputs.ifPresent(outputChangeListener::beforeOutputChange);
-        if (!changingOutputs.isPresent()) {
-            outputChangeListener.beforeOutputChange();
-        }
+        ImmutableList.Builder<String> builder = ImmutableList.builder();
+        work.visitOutputProperties((propertyName, type, root, contents) -> builder.add(root.getAbsolutePath()));
+        work.visitDestroyableRoots(file -> builder.add(file.getAbsolutePath()));
+        work.visitLocalState(file -> builder.add(file.getAbsolutePath()));
+        outputChangeListener.beforeOutputChange(builder.build());
         return delegate.execute(context);
     }
 }

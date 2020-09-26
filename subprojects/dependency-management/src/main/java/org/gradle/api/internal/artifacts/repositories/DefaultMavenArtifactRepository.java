@@ -27,12 +27,12 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.repositories.AuthenticationContainer;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenRepositoryContentDescriptor;
+import org.gradle.api.internal.FeaturePreviews;
 import org.gradle.api.internal.artifacts.ModuleVersionPublisher;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ComponentResolvers;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ConfiguredModuleComponentRepository;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.GradleModuleMetadataParser;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MetaDataParser;
-import org.gradle.internal.hash.ChecksumService;
 import org.gradle.api.internal.artifacts.repositories.descriptor.MavenRepositoryDescriptor;
 import org.gradle.api.internal.artifacts.repositories.descriptor.RepositoryDescriptor;
 import org.gradle.api.internal.artifacts.repositories.maven.MavenMetadataLoader;
@@ -53,6 +53,7 @@ import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransp
 import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransportFactory;
 import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.model.ObjectFactory;
+import org.gradle.api.provider.ProviderFactory;
 import org.gradle.internal.Cast;
 import org.gradle.internal.action.InstantiatingAction;
 import org.gradle.internal.component.external.model.ModuleComponentArtifactIdentifier;
@@ -61,6 +62,7 @@ import org.gradle.internal.component.external.model.ModuleDependencyMetadata;
 import org.gradle.internal.component.external.model.MutableModuleComponentResolveMetadata;
 import org.gradle.internal.component.external.model.maven.MutableMavenModuleResolveMetadata;
 import org.gradle.internal.component.model.ComponentOverrideMetadata;
+import org.gradle.internal.hash.ChecksumService;
 import org.gradle.internal.hash.Hasher;
 import org.gradle.internal.instantiation.InstantiatorFactory;
 import org.gradle.internal.isolation.IsolatableFactory;
@@ -86,7 +88,7 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
     private final FileResolver fileResolver;
     private final RepositoryTransportFactory transportFactory;
     private final DefaultUrlArtifactRepository urlArtifactRepository;
-    private List<Object> additionalUrls = new ArrayList<Object>();
+    private List<Object> additionalUrls = new ArrayList<>();
     private final LocallyAvailableResourceFinder<ModuleComponentArtifactMetadata> locallyAvailableResourceFinder;
     private final FileStore<ModuleComponentArtifactIdentifier> artifactFileStore;
     private final MetaDataParser<MutableMavenModuleResolveMetadata> pomParser;
@@ -98,8 +100,10 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
     private final ChecksumService checksumService;
     private final MavenMetadataSources metadataSources = new MavenMetadataSources();
     private final InstantiatorFactory instantiatorFactory;
+    private final FeaturePreviews featurePreviews;
 
-    public DefaultMavenArtifactRepository(FileResolver fileResolver, RepositoryTransportFactory transportFactory,
+    public DefaultMavenArtifactRepository(FileResolver fileResolver,
+                                          RepositoryTransportFactory transportFactory,
                                           LocallyAvailableResourceFinder<ModuleComponentArtifactMetadata> locallyAvailableResourceFinder,
                                           InstantiatorFactory instantiatorFactory,
                                           FileStore<ModuleComponentArtifactIdentifier> artifactFileStore,
@@ -112,14 +116,17 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
                                           IsolatableFactory isolatableFactory,
                                           ObjectFactory objectFactory,
                                           DefaultUrlArtifactRepository.Factory urlArtifactRepositoryFactory,
-                                          ChecksumService checksumService) {
+                                          ChecksumService checksumService,
+                                          ProviderFactory providerFactory,
+                                          FeaturePreviews featurePreviews) {
         this(new DefaultDescriber(), fileResolver, transportFactory, locallyAvailableResourceFinder, instantiatorFactory,
             artifactFileStore, pomParser, metadataParser, authenticationContainer,
-            resourcesFileStore, fileResourceRepository, metadataFactory, isolatableFactory, objectFactory, urlArtifactRepositoryFactory, checksumService);
+            resourcesFileStore, fileResourceRepository, metadataFactory, isolatableFactory, objectFactory, urlArtifactRepositoryFactory, checksumService, providerFactory, featurePreviews);
     }
 
     public DefaultMavenArtifactRepository(Transformer<String, MavenArtifactRepository> describer,
-                                          FileResolver fileResolver, RepositoryTransportFactory transportFactory,
+                                          FileResolver fileResolver,
+                                          RepositoryTransportFactory transportFactory,
                                           LocallyAvailableResourceFinder<ModuleComponentArtifactMetadata> locallyAvailableResourceFinder,
                                           InstantiatorFactory instantiatorFactory,
                                           FileStore<ModuleComponentArtifactIdentifier> artifactFileStore,
@@ -132,8 +139,10 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
                                           IsolatableFactory isolatableFactory,
                                           ObjectFactory objectFactory,
                                           DefaultUrlArtifactRepository.Factory urlArtifactRepositoryFactory,
-                                          ChecksumService checksumService) {
-        super(instantiatorFactory.decorateLenient(), authenticationContainer, objectFactory);
+                                          ChecksumService checksumService,
+                                          ProviderFactory providerFactory,
+                                          FeaturePreviews featurePreviews) {
+        super(instantiatorFactory.decorateLenient(), authenticationContainer, objectFactory, providerFactory, featurePreviews);
         this.describer = describer;
         this.fileResolver = fileResolver;
         this.urlArtifactRepository = urlArtifactRepositoryFactory.create("Maven", this::getDisplayName);
@@ -149,6 +158,7 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
         this.checksumService = checksumService;
         this.metadataSources.setDefaults();
         this.instantiatorFactory = instantiatorFactory;
+        this.featurePreviews = featurePreviews;
     }
 
     @Override
@@ -186,7 +196,7 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
 
     @Override
     public Set<URI> getArtifactUrls() {
-        Set<URI> result = new LinkedHashSet<URI>();
+        Set<URI> result = new LinkedHashSet<>();
         for (Object additionalUrl : additionalUrls) {
             result.add(fileResolver.resolveUri(additionalUrl));
         }
@@ -225,7 +235,7 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
     protected RepositoryDescriptor createDescriptor() {
         URI rootUri = validateUrl();
         return new MavenRepositoryDescriptor.Builder(getName(), rootUri)
-            .setAuthenticated(getConfiguredCredentials() != null)
+            .setAuthenticated(usesCredentials())
             .setAuthenticationSchemes(getAuthenticationSchemes())
             .setMetadataSources(metadataSources.asList())
             .setArtifactUrls(Sets.newHashSet(getArtifactUrls()))
@@ -274,6 +284,11 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
         invalidateDescriptor();
         metadataSources.reset();
         configureAction.execute(metadataSources);
+    }
+
+    @Override
+    public MetadataSources getMetadataSources() {
+        return metadataSources;
     }
 
     @Override
@@ -343,8 +358,8 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
     }
 
     @Override
-    protected RepositoryContentDescriptorInternal createRepositoryDescriptor() {
-        return new DefaultMavenRepositoryContentDescriptor();
+    public RepositoryContentDescriptorInternal createRepositoryDescriptor() {
+        return new DefaultMavenRepositoryContentDescriptor(this::getDisplayName, featurePreviews);
     }
 
     private static class DefaultDescriber implements Transformer<String, MavenArtifactRepository> {
@@ -383,7 +398,7 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
          * @return a list of implemented metadata sources, as strings.
          */
         List<String> asList() {
-            List<String> list = new ArrayList<String>();
+            List<String> list = new ArrayList<>();
             if (gradleMetadata) {
                 list.add("gradleMetadata");
             }
@@ -417,6 +432,26 @@ public class DefaultMavenArtifactRepository extends AbstractAuthenticationSuppor
         @Override
         public void ignoreGradleMetadataRedirection() {
             ignoreGradleMetadataRedirection = true;
+        }
+
+        @Override
+        public boolean isGradleMetadataEnabled() {
+            return gradleMetadata;
+        }
+
+        @Override
+        public boolean isMavenPomEnabled() {
+            return mavenPom;
+        }
+
+        @Override
+        public boolean isArtifactEnabled() {
+            return artifact;
+        }
+
+        @Override
+        public boolean isIgnoreGradleMetadataRedirectionEnabled() {
+            return ignoreGradleMetadataRedirection;
         }
     }
 

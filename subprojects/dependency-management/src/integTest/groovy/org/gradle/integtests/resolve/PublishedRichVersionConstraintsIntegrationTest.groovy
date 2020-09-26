@@ -18,14 +18,13 @@ package org.gradle.integtests.resolve
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import spock.lang.Issue
 import spock.lang.Unroll
 
-@RequiredFeatures(
-    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
-)
+@RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
 class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDependencyResolveTest {
+    @ToBeFixedForConfigurationCache
     def "should not downgrade dependency version when an external transitive dependency has strict version"() {
         given:
         repository {
@@ -221,6 +220,7 @@ class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDepen
 
     }
 
+    @ToBeFixedForConfigurationCache
     def "should fail during conflict resolution transitive dependency rejects"() {
         given:
         repository {
@@ -258,6 +258,7 @@ class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDepen
     }
 
     @Unroll
+    @ToBeFixedForConfigurationCache
     void "honors multiple rejections #rejects using dynamic versions using dependency notation #notation"() {
         given:
         repository {
@@ -301,6 +302,7 @@ class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDepen
 
     }
 
+    @ToBeFixedForConfigurationCache
     def "should fail if required module is rejected"() {
         given:
         repository {
@@ -336,6 +338,7 @@ class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDepen
 
     }
 
+    @ToBeFixedForConfigurationCache
     def "shows only one path to dependency when node is already visited"() {
         given:
         repository {
@@ -394,6 +397,7 @@ class PublishedRichVersionConstraintsIntegrationTest extends AbstractModuleDepen
         failure.assertHasNoCause("Dependency path ':test:unspecified' --> 'org:d:1.0' --> 'org:c:1.0' --> 'org:b:1.1'")
     }
 
+    @ToBeFixedForConfigurationCache
     def "handles dependency cycles"() {
         given:
         repository {

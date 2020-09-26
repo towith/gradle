@@ -15,12 +15,15 @@
  */
 package org.gradle.api.internal.artifacts.repositories
 
+import org.gradle.api.Action
 import org.gradle.api.InvalidUserDataException
 import org.gradle.api.artifacts.ComponentMetadataListerDetails
 import org.gradle.api.artifacts.ComponentMetadataSupplier
 import org.gradle.api.artifacts.ComponentMetadataSupplierDetails
 import org.gradle.api.artifacts.ComponentMetadataVersionLister
 import org.gradle.api.artifacts.repositories.AuthenticationContainer
+import org.gradle.api.artifacts.repositories.IvyArtifactRepository
+import org.gradle.api.internal.FeaturePreviews
 import org.gradle.api.internal.artifacts.DependencyManagementTestUtil
 import org.gradle.api.internal.artifacts.ImmutableModuleIdentifierFactory
 import org.gradle.api.internal.artifacts.ivyservice.IvyContextManager
@@ -33,7 +36,7 @@ import org.gradle.api.internal.attributes.ImmutableAttributesFactory
 import org.gradle.api.internal.file.FileResolver
 import org.gradle.api.internal.filestore.DefaultArtifactIdentifierFileStore
 import org.gradle.api.internal.model.NamedObjectInstantiator
-import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.ProviderFactory
 import org.gradle.internal.resource.ExternalResourceRepository
 import org.gradle.internal.resource.cached.DefaultExternalResourceFileStore
 import org.gradle.internal.resource.local.FileResourceRepository
@@ -58,12 +61,14 @@ class DefaultIvyArtifactRepositoryTest extends Specification {
     final GradleModuleMetadataParser moduleMetadataParser = new GradleModuleMetadataParser(Mock(ImmutableAttributesFactory), moduleIdentifierFactory, Mock(NamedObjectInstantiator))
     final IvyMutableModuleMetadataFactory metadataFactory = DependencyManagementTestUtil.ivyMetadataFactory()
     final DefaultUrlArtifactRepository.Factory urlArtifactRepositoryFactory = new DefaultUrlArtifactRepository.Factory(fileResolver)
+    final ProviderFactory providerFactory = Mock()
+    final FeaturePreviews featurePreviews = new FeaturePreviews()
 
     final DefaultIvyArtifactRepository repository = instantiator.newInstance(DefaultIvyArtifactRepository.class, fileResolver, transportFactory, locallyAvailableResourceFinder,
         artifactIdentifierFileStore, externalResourceFileStore, authenticationContainer, ivyContextManager,
         moduleIdentifierFactory, TestUtil.instantiatorFactory(), Mock(FileResourceRepository), moduleMetadataParser,
-        metadataFactory, SnapshotTestUtil.valueSnapshotter(), Mock(ObjectFactory), urlArtifactRepositoryFactory,
-        TestUtil.checksumService
+        metadataFactory, SnapshotTestUtil.valueSnapshotter(), TestUtil.objectFactory(), urlArtifactRepositoryFactory,
+        TestUtil.checksumService, providerFactory, featurePreviews
     )
 
     def "default values"() {
@@ -362,6 +367,33 @@ class DefaultIvyArtifactRepositoryTest extends Specification {
         then:
         lister.rules.configurableRules[0].ruleClass == CustomVersionListerWithParams
         lister.rules.configurableRules[0].ruleParams.isolate() == ["a", 12, [1,2,3]] as Object[]
+    }
+
+    def "can retrieve metadataSources"() {
+        repository.name = 'name'
+        repository.url = 'http://host'
+        fileResolver.resolveUri('http://host') >> new URI('http://host/')
+        standardMockHttpTransport()
+
+        given:
+        repository.metadataSources(new Action<IvyArtifactRepository.MetadataSources>() {
+            @Override
+            void execute(IvyArtifactRepository.MetadataSources metadataSources) {
+                metadataSources.ivyDescriptor()
+                metadataSources.artifact()
+                metadataSources.gradleMetadata()
+                metadataSources.ignoreGradleMetadataRedirection()
+            }
+        })
+
+        when:
+        IvyArtifactRepository.MetadataSources metadataSources = repository.getMetadataSources()
+
+        then:
+        metadataSources.isIvyDescriptorEnabled()
+        metadataSources.isArtifactEnabled()
+        metadataSources.isGradleMetadataEnabled()
+        metadataSources.isIgnoreGradleMetadataRedirectionEnabled()
     }
 
     private void standardMockFileTransport() {

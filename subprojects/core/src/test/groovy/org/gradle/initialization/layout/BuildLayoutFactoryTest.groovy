@@ -30,7 +30,7 @@ class BuildLayoutFactoryTest extends Specification {
     ]
 
     @Rule
-    public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     @Unroll
     def "returns current directory when it contains a #settingsFilename file when script languages #extensions"() {
@@ -84,6 +84,25 @@ class BuildLayoutFactoryTest extends Specification {
 
         expect:
         def layout = locator.getLayoutFor(currentDir, true)
+        layout.rootDirectory == masterDir.parentFile
+        layout.settingsDir == masterDir
+        refersTo(layout, settingsFile)
+
+        where:
+        settingsFilename << TEST_CASES
+    }
+
+    @Unroll
+    def "looks for child directory called 'master' that it contains a #settingsFilename file"() {
+        given:
+        def locator = buildLayoutFactoryFor()
+
+        and:
+        def masterDir = tmpDir.createDir("master")
+        def settingsFile = masterDir.createFile(settingsFilename)
+
+        expect:
+        def layout = locator.getLayoutFor(tmpDir.testDirectory, true)
         layout.rootDirectory == masterDir.parentFile
         layout.settingsDir == masterDir
         refersTo(layout, settingsFile)
@@ -184,6 +203,29 @@ class BuildLayoutFactoryTest extends Specification {
         def currentDir = tmpDir.createDir("sub/current")
         def masterDir = tmpDir.createDir("sub/master")
         def settingsFile = masterDir.createFile(settingsFilename)
+        tmpDir.createFile(settingsFilename)
+
+        expect:
+        def layout = locator.getLayoutFor(currentDir, true)
+        layout.rootDirectory == masterDir.parentFile
+        layout.settingsDir == masterDir
+        refersTo(layout, settingsFile)
+
+        where:
+        settingsFilename << TEST_CASES
+    }
+
+    @Unroll
+    def "prefers the child 'master' directory over an ancestor directory with 'master' or a #settingsFilename file"() {
+        given:
+        def locator = buildLayoutFactoryFor()
+
+        and:
+        def currentDir = tmpDir.createDir("project")
+        def masterDir = currentDir.createDir("master")
+        def settingsFile = masterDir.createFile(settingsFilename)
+        def ancestorMasterDir = tmpDir.createDir("master")
+        ancestorMasterDir.createFile(settingsFilename)
         tmpDir.createFile(settingsFilename)
 
         expect:

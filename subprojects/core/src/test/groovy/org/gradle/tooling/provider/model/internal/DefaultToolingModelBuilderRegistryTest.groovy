@@ -18,19 +18,18 @@ package org.gradle.tooling.provider.model.internal
 
 import org.gradle.api.internal.project.ProjectInternal
 import org.gradle.api.internal.project.ProjectStateRegistry
+import org.gradle.internal.Factory
 import org.gradle.internal.operations.TestBuildOperationExecutor
-import org.gradle.tooling.provider.model.ToolingModelBuilder
 import org.gradle.tooling.provider.model.ParameterizedToolingModelBuilder
+import org.gradle.tooling.provider.model.ToolingModelBuilder
 import org.gradle.tooling.provider.model.UnknownModelException
 import spock.lang.Specification
 
 class DefaultToolingModelBuilderRegistryTest extends Specification {
-    final def projectStateRegistry = Stub(ProjectStateRegistry) {
-        withLenientState(_) >> { args -> args[0].create() }
-    }
+    final def projectStateRegistry = Stub(ProjectStateRegistry)
     final def registry = new DefaultToolingModelBuilderRegistry(new TestBuildOperationExecutor(), projectStateRegistry)
 
-    def "finds model builder for requested model"() {
+    def "wraps builder for requested model"() {
         def builder1 = Mock(ToolingModelBuilder)
         def builder2 = Mock(ToolingModelBuilder)
 
@@ -44,11 +43,32 @@ class DefaultToolingModelBuilderRegistryTest extends Specification {
 
         expect:
         def actualBuilder = registry.getBuilder("model")
+        actualBuilder instanceof DefaultToolingModelBuilderRegistry.LenientToolingModelBuilder
+        actualBuilder.delegate == builder2
+    }
+
+    def "wraps builder when locating for client operation"() {
+        def builder1 = Mock(ToolingModelBuilder)
+        def builder2 = Mock(ToolingModelBuilder)
+
+        given:
+        registry.register(builder1)
+        registry.register(builder2)
+
+        and:
+        builder1.canBuild("model") >> false
+        builder2.canBuild("model") >> true
+
+        expect:
+        def actualBuilder = registry.locateForClientOperation("model")
         actualBuilder instanceof DefaultToolingModelBuilderRegistry.BuildOperationWrappingToolingModelBuilder
         actualBuilder.delegate == builder2
     }
 
     def "includes a simple implementation for the Void model"() {
+        given:
+        _ * projectStateRegistry.allowUncontrolledAccessToAnyProject(_) >> { Factory factory -> factory.create() }
+
         expect:
         registry.getBuilder(Void.class.name).buildAll(Void.class.name, Mock(ProjectInternal)) == null
     }
@@ -82,7 +102,7 @@ class DefaultToolingModelBuilderRegistryTest extends Specification {
         e.message == "Multiple builders are available to build a model of type 'model'."
     }
 
-    def "can register parameterized model builder"() {
+    def "wraps parameterized model builder"() {
         def builder = Mock(ParameterizedToolingModelBuilder)
 
         given:
@@ -95,9 +115,8 @@ class DefaultToolingModelBuilderRegistryTest extends Specification {
         registry.getBuilder("model")
 
         then:
-        def foundBuilder = registry.getBuilder("model")
-        foundBuilder instanceof DefaultToolingModelBuilderRegistry.ParameterizedBuildOperationWrappingToolingModelBuilder
-        foundBuilder.delegate == builder
-        foundBuilder.delegate instanceof ParameterizedToolingModelBuilder
+        def actualBuilder = registry.locateForClientOperation("model")
+        actualBuilder instanceof DefaultToolingModelBuilderRegistry.ParameterizedBuildOperationWrappingToolingModelBuilder
+        actualBuilder.delegate == builder
     }
 }

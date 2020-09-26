@@ -17,23 +17,19 @@
 package org.gradle.performance.regression.java
 
 import org.gradle.initialization.StartParameterBuildOptions
-import org.gradle.performance.AbstractCrossVersionGradleProfilerPerformanceTest
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
 import org.gradle.profiler.mutations.AbstractCleanupMutator
 import org.gradle.profiler.mutations.ClearBuildCacheMutator
 import spock.lang.Unroll
 
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_JAVA_PROJECT
-
-class JavaUpToDatePerformanceTest extends AbstractCrossVersionGradleProfilerPerformanceTest {
+class JavaUpToDatePerformanceTest extends AbstractCrossVersionPerformanceTest {
 
     @Unroll
-    def "up-to-date assemble on #testProject (parallel #parallel)"() {
+    def "up-to-date assemble (parallel #parallel)"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
+        runner.gradleOpts = runner.projectMemoryOptions
         runner.tasksToRun = ['assemble']
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.7-20200824220048+0000"]
         runner.args += ["-Dorg.gradle.parallel=$parallel"]
 
         when:
@@ -43,22 +39,17 @@ class JavaUpToDatePerformanceTest extends AbstractCrossVersionGradleProfilerPerf
         result.assertCurrentVersionHasNotRegressed()
 
         where:
-        testProject                   | parallel
-        LARGE_MONOLITHIC_JAVA_PROJECT | false
-        LARGE_JAVA_MULTI_PROJECT      | true
-        LARGE_JAVA_MULTI_PROJECT      | false
+        parallel << [true, false]
     }
 
     @Unroll
-    def "up-to-date assemble on #testProject with local build cache enabled (parallel #parallel)"() {
+    def "up-to-date assemble with local build cache enabled (parallel #parallel)"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
+        runner.gradleOpts = runner.projectMemoryOptions
         runner.tasksToRun = ['assemble']
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.7-20200824220048+0000"]
         runner.minimumBaseVersion = "3.5"
         runner.args += ["-Dorg.gradle.parallel=$parallel", "-D${StartParameterBuildOptions.BuildCacheOption.GRADLE_PROPERTY}=true"]
-        def cacheDir = temporaryFolder.file("local-cache")
         runner.addBuildMutator { invocationSettings ->
             new ClearBuildCacheMutator(invocationSettings.getGradleUserHome(), AbstractCleanupMutator.CleanupSchedule.SCENARIO)
         }
@@ -70,9 +61,6 @@ class JavaUpToDatePerformanceTest extends AbstractCrossVersionGradleProfilerPerf
         result.assertCurrentVersionHasNotRegressed()
 
         where:
-        testProject                   | parallel
-        LARGE_MONOLITHIC_JAVA_PROJECT | false
-        LARGE_JAVA_MULTI_PROJECT      | true
-        LARGE_JAVA_MULTI_PROJECT      | false
+        parallel << [true, false]
     }
 }

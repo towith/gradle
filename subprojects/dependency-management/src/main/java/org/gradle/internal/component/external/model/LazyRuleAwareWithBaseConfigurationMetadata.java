@@ -44,24 +44,39 @@ class LazyRuleAwareWithBaseConfigurationMetadata implements ModuleConfigurationM
     private final ModuleConfigurationMetadata base;
     private final ModuleComponentIdentifier componentId;
     private final VariantMetadataRules variantMetadataRules;
+    private final ImmutableList<ExcludeMetadata> excludes;
 
     private List<? extends ModuleDependencyMetadata> computedDependencies;
     private ImmutableAttributes computedAttributes;
     private CapabilitiesMetadata computedCapabilities;
     private ImmutableList<? extends ComponentArtifactMetadata> computedArtifacts;
-    private ImmutableAttributes componentLevelAttributes;
+    private final ImmutableAttributes componentLevelAttributes;
+    private final boolean externalVariant;
 
-    LazyRuleAwareWithBaseConfigurationMetadata(String name, @Nullable ModuleConfigurationMetadata base, ModuleComponentIdentifier componentId, ImmutableAttributes componentLevelAttributes, VariantMetadataRules variantMetadataRules) {
+    LazyRuleAwareWithBaseConfigurationMetadata(String name,
+                                               @Nullable ModuleConfigurationMetadata base,
+                                               ModuleComponentIdentifier componentId,
+                                               ImmutableAttributes componentLevelAttributes,
+                                               VariantMetadataRules variantMetadataRules,
+                                               ImmutableList<ExcludeMetadata> excludes,
+                                               boolean externalVariant) {
         this.name = name;
         this.base = base;
         this.componentId = componentId;
         this.variantMetadataRules = variantMetadataRules;
         this.componentLevelAttributes = componentLevelAttributes;
+        this.excludes = excludes;
+        this.externalVariant = externalVariant;
     }
 
     @Override
     public String getName() {
         return name;
+    }
+
+    @Override
+    public Identifier getIdentifier() {
+        return null;
     }
 
     @Override
@@ -103,7 +118,7 @@ class LazyRuleAwareWithBaseConfigurationMetadata implements ModuleConfigurationM
 
     @Override
     public Set<? extends VariantResolveMetadata> getVariants() {
-        return ImmutableSet.of(new DefaultVariantMetadata(asDescribable(), getAttributes(), getArtifacts(), getCapabilities()));
+        return ImmutableSet.of(new DefaultVariantMetadata(name, null, asDescribable(), getAttributes(), getArtifacts(), getCapabilities()));
     }
 
     @Override
@@ -123,7 +138,7 @@ class LazyRuleAwareWithBaseConfigurationMetadata implements ModuleConfigurationM
 
     @Override
     public ImmutableList<ExcludeMetadata> getExcludes() {
-        return ImmutableList.of();
+        return excludes;
     }
 
     @Override
@@ -149,5 +164,10 @@ class LazyRuleAwareWithBaseConfigurationMetadata implements ModuleConfigurationM
     @Override
     public List<String> getConsumptionAlternatives() {
         return ImmutableList.of();
+    }
+
+    @Override
+    public boolean isExternalVariant() {
+        return externalVariant;
     }
 }

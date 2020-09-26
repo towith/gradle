@@ -141,6 +141,7 @@ public class ModuleMetadataSerializer {
                 writeVariantConstraints(variant.getDependencyConstraints());
                 writeVariantFiles(variant.getFiles());
                 writeVariantCapabilities(variant.getCapabilities().getCapabilities());
+                encoder.writeBoolean(variant.isExternalVariant());
             }
         }
 
@@ -217,6 +218,7 @@ public class ModuleMetadataSerializer {
         private void writeSharedInfo(ModuleComponentResolveMetadata metadata) throws IOException {
             encoder.writeBoolean(metadata.isMissing());
             encoder.writeBoolean(metadata.isChanging());
+            encoder.writeBoolean(metadata.isExternalVariant());
             encoder.writeString(metadata.getStatus());
             writeStringList(metadata.getStatusScheme());
             moduleSourcesSerializer.write(encoder, metadata.getSources());
@@ -432,6 +434,7 @@ public class ModuleMetadataSerializer {
         private void readSharedInfo(MutableModuleComponentResolveMetadata metadata) throws IOException {
             metadata.setMissing(decoder.readBoolean());
             metadata.setChanging(decoder.readBoolean());
+            metadata.setExternalVariant(decoder.readBoolean());
             metadata.setStatus(decoder.readString());
             metadata.setStatusScheme(readStringList());
             metadata.setSources(moduleSourcesSerializer.read(decoder));
@@ -465,6 +468,8 @@ public class ModuleMetadataSerializer {
                 readVariantConstraints(variant);
                 readVariantFiles(variant);
                 readVariantCapabilities(variant);
+                boolean externalVariant = decoder.readBoolean();
+                variant.setAvailableExternally(externalVariant);
             }
         }
 
@@ -494,7 +499,7 @@ public class ModuleMetadataSerializer {
         }
 
         private ImmutableList<ExcludeMetadata> readVariantDependencyExcludes() throws IOException {
-            ImmutableList.Builder<ExcludeMetadata> builder = new ImmutableList.Builder<ExcludeMetadata>();
+            ImmutableList.Builder<ExcludeMetadata> builder = new ImmutableList.Builder<>();
             int len = readCount();
             for (int i = 0; i < len; i++) {
                 String group = readString();
@@ -551,7 +556,7 @@ public class ModuleMetadataSerializer {
 
         private Map<NamespaceId, String> readExtraInfo() throws IOException {
             int len = readCount();
-            Map<NamespaceId, String> result = new LinkedHashMap<NamespaceId, String>(len);
+            Map<NamespaceId, String> result = new LinkedHashMap<>(len);
             for (int i = 0; i < len; i++) {
                 NamespaceId namespaceId = new NamespaceId(readString(), readString());
                 String value = readString();
@@ -562,7 +567,7 @@ public class ModuleMetadataSerializer {
 
         private List<Configuration> readConfigurations() throws IOException {
             int len = readCount();
-            List<Configuration> configurations = new ArrayList<Configuration>(len);
+            List<Configuration> configurations = new ArrayList<>(len);
             for (int i = 0; i < len; i++) {
                 Configuration configuration = readConfiguration();
                 configurations.add(configuration);
@@ -642,7 +647,7 @@ public class ModuleMetadataSerializer {
 
         private List<Exclude> readModuleExcludes() throws IOException {
             int len = readCount();
-            List<Exclude> result = new ArrayList<Exclude>(len);
+            List<Exclude> result = new ArrayList<>(len);
             for (int i = 0; i < len; i++) {
                 result.add(readExcludeRule());
             }

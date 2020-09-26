@@ -16,27 +16,25 @@
 
 package org.gradle.performance.regression.java
 
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
+import org.gradle.performance.generator.JavaTestProject
+import org.gradle.performance.mutator.ApplyAbiChangeToGroovySourceFileMutator
+import org.gradle.profiler.mutations.ApplyAbiChangeToJavaSourceFileMutator
 
-import org.gradle.performance.AbstractCrossVersionGradleInternalPerformanceTest
-import org.gradle.performance.mutator.ApplyAbiChangeToJavaSourceFileMutator
-import spock.lang.Unroll
+class JavaABIChangePerformanceTest extends AbstractCrossVersionPerformanceTest {
 
-import static org.gradle.performance.generator.JavaTestProject.LARGE_GROOVY_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_GROOVY_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_JAVA_PROJECT
-
-class JavaABIChangePerformanceTest extends AbstractCrossVersionGradleInternalPerformanceTest {
-
-    @Unroll
-    def "assemble for abi change on #testProject"() {
+    def "assemble for abi change"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
+        def testProject = JavaTestProject.projectFor(runner.testProject)
+        runner.gradleOpts = runner.projectMemoryOptions
         runner.tasksToRun = ['assemble']
-        runner.addBuildExperimentListener(new ApplyAbiChangeToJavaSourceFileMutator(testProject.config.fileToChangeByScenario['assemble']))
-        runner.targetVersions = ["6.2-20200108160029+0000"]
-        if (testProject.name().contains("GROOVY")) {
+        boolean isGroovyProject = testProject.name().contains("GROOVY")
+        runner.addBuildMutator {
+            def fileToChange = new File(it.projectDir, testProject.config.fileToChangeByScenario['assemble'])
+            return isGroovyProject ? new ApplyAbiChangeToGroovySourceFileMutator(fileToChange) : new ApplyAbiChangeToJavaSourceFileMutator(fileToChange)
+        }
+        runner.targetVersions = ["6.7-20200824220048+0000"]
+        if (isGroovyProject) {
             runner.minimumBaseVersion = '5.0'
         }
 
@@ -45,8 +43,5 @@ class JavaABIChangePerformanceTest extends AbstractCrossVersionGradleInternalPer
 
         then:
         result.assertCurrentVersionHasNotRegressed()
-
-        where:
-        testProject << [LARGE_MONOLITHIC_JAVA_PROJECT, LARGE_JAVA_MULTI_PROJECT, LARGE_MONOLITHIC_GROOVY_PROJECT, LARGE_GROOVY_MULTI_PROJECT]
     }
 }

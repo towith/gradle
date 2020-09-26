@@ -16,6 +16,7 @@
 
 package org.gradle.process.internal.worker.child;
 
+import com.google.common.collect.Lists;
 import org.gradle.api.Action;
 import org.gradle.api.GradleException;
 import org.gradle.api.JavaVersion;
@@ -61,6 +62,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -92,7 +94,9 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider, Closea
             "gradle-files",
             "gradle-file-collections",
             "gradle-hashing",
-            "gradle-snapshots"
+            "gradle-snapshots",
+            "gradle-base-annotations",
+            "gradle-build-operations"
     };
 
     public static final String[] RUNTIME_EXTERNAL_MODULES = new String[] {
@@ -105,6 +109,39 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider, Closea
             "javax.inject",
             "groovy-all",
             "asm"
+    };
+
+    // This list is ordered by the number of classes we load from each jar descending
+    private static final String[] WORKER_OPTIMIZED_LOADING_ORDER = new String[] {
+        "gradle-base-services",
+        "guava",
+        "gradle-messaging",
+        "gradle-model-core",
+        "gradle-logging",
+        "gradle-core-api",
+        "gradle-workers",
+        "native-platform",
+        "gradle-core",
+        "gradle-native",
+        "gradle-file-collections",
+        "gradle-language-java",
+        "gradle-worker-processes",
+        "gradle-process-services",
+        "slf4j-api",
+        "gradle-language-jvm",
+        "gradle-persistent-cache",
+        "gradle-files",
+        "gradle-hashing",
+        "gradle-snapshots",
+        "gradle-worker",
+        "groovy-all",
+        "kryo",
+        "gradle-platform-base",
+        "gradle-cli",
+        "jul-to-slf4j",
+        "javax.inject",
+        "gradle-jvm-services",
+        "asm"
     };
 
     public WorkerProcessClassPathProvider(CacheRepository cacheRepository, ModuleRegistry moduleRegistry) {
@@ -132,7 +169,10 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider, Closea
         if (name.equals("CORE_WORKER_RUNTIME")) {
             ClassPath classpath = ClassPath.EMPTY;
             classpath = classpath.plus(moduleRegistry.getModule("gradle-core").getAllRequiredModulesClasspath());
+            // If a real Gradle installation is used, the following modules will be force-loaded anyway by gradle-core through the getClassPath("GRADLE_EXTENSIONS") call in the DefaultClassLoaderRegistry constructor
+            // See also: DynamicModulesClassPathProvider.GRADLE_EXTENSION_MODULES
             classpath = classpath.plus(moduleRegistry.getModule("gradle-dependency-management").getAllRequiredModulesClasspath());
+            classpath = classpath.plus(moduleRegistry.getModule("gradle-plugin-use").getAllRequiredModulesClasspath());
             classpath = classpath.plus(moduleRegistry.getModule("gradle-workers").getAllRequiredModulesClasspath());
             return classpath;
         }
@@ -146,10 +186,32 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider, Closea
             for (String externalModule : RUNTIME_EXTERNAL_MODULES) {
                 classpath = classpath.plus(moduleRegistry.getExternalModule(externalModule).getImplementationClasspath());
             }
+            classpath = optimizeForClassloading(classpath);
             return classpath;
         }
 
         return null;
+    }
+
+    private static ClassPath optimizeForClassloading(ClassPath classpath) {
+        ClassPath optimizedForLoading = ClassPath.EMPTY;
+        List<File> optimizedFiles = Lists.newArrayListWithCapacity(WORKER_OPTIMIZED_LOADING_ORDER.length);
+        List<File> remainder = Lists.newArrayList(classpath.getAsFiles());
+        for (String module : WORKER_OPTIMIZED_LOADING_ORDER) {
+            Iterator<File> asFiles = remainder.iterator();
+            while (asFiles.hasNext()) {
+                File file = asFiles.next();
+                if (file.getName().startsWith(module)) {
+                    optimizedFiles.add(file);
+                    asFiles.remove();
+                }
+            }
+            if (remainder.isEmpty()) {
+                break;
+            }
+        }
+        classpath = optimizedForLoading.plus(optimizedFiles).plus(remainder);
+        return classpath;
     }
 
     @Override

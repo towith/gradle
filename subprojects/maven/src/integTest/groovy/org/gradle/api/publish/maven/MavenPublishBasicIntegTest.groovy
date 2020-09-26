@@ -16,7 +16,7 @@
 
 package org.gradle.api.publish.maven
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.publish.maven.AbstractMavenPublishIntegTest
 import org.gradle.test.fixtures.maven.MavenLocalRepository
 import org.gradle.util.SetSystemProperties
@@ -58,7 +58,7 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         mavenRepo.module('group', 'root', '1.0').assertNotPublished()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "publishes empty pom when publication has no added component"() {
         given:
         settingsFile << "rootProject.name = 'empty-project'"
@@ -96,7 +96,6 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "can publish simple component"() {
         given:
         using m2
@@ -165,7 +164,6 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "can republish simple component"() {
         given:
         using m2
@@ -218,7 +216,6 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         localModule.rootMetaData.latestVersion == "2.0"
     }
 
-    @ToBeFixedForInstantExecution
     def "can publish to custom maven local repo defined in settings.xml"() {
         given:
         def customLocalRepo = new MavenLocalRepository(file("custom-maven-local"))
@@ -280,7 +277,6 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         failure.assertHasCause("Maven publication 'maven' cannot include multiple components")
     }
 
-    @ToBeFixedForInstantExecution
     def "publishes to all defined repositories"() {
         given:
         def mavenRepo2 = maven("maven-repo-2")
@@ -312,7 +308,6 @@ class MavenPublishBasicIntegTest extends AbstractMavenPublishIntegTest {
         module2.assertPublished()
     }
 
-    @ToBeFixedForInstantExecution
     def "warns when trying to publish a transitive = false variant"() {
         given:
         settingsFile << "rootProject.name = 'root'"

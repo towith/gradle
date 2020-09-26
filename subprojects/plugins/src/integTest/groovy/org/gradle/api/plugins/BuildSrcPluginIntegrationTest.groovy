@@ -17,14 +17,13 @@
 package org.gradle.api.plugins
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.integtests.fixtures.ToBeFixedForVfsRetention
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
+import spock.lang.IgnoreIf
 import spock.lang.Issue
 
 class BuildSrcPluginIntegrationTest extends AbstractIntegrationSpec {
 
     @Issue("GRADLE-2001")
-    @ToBeFixedForInstantExecution
     def "can use plugin from buildSrc that changes"() {
         given:
         executer.requireIsolatedDaemons() // make sure we get the same daemon both times
@@ -93,9 +92,9 @@ class BuildSrcPluginIntegrationTest extends AbstractIntegrationSpec {
         output.contains "hello again"
     }
 
+    @IgnoreIf({ GradleContextualExecuter.embedded }) // In embedded testing mode, the visibility constraints are not enforced
     def "build src plugin cannot access Gradle implementation dependencies"() {
         when:
-        requireGradleDistribution()
         file("buildSrc/src/main/groovy/pkg/BuildSrcPlugin.groovy") << """
             package pkg
             import ${com.google.common.collect.ImmutableList.name}
@@ -111,7 +110,6 @@ class BuildSrcPluginIntegrationTest extends AbstractIntegrationSpec {
 
     def "use of buildSrc does not expose Gradle runtime dependencies to build script"() {
         when:
-        requireGradleDistribution()
         file("buildSrc/src/main/groovy/pkg/BuildSrcPlugin.groovy") << """
             package pkg
             class BuildSrcPlugin {
@@ -128,7 +126,6 @@ class BuildSrcPluginIntegrationTest extends AbstractIntegrationSpec {
         failure.assertHasDescription("Could not compile build file '$buildFile.canonicalPath'.")
     }
 
-    @ToBeFixedForVfsRetention(because = "https://github.com/gradle/gradle/issues/11837")
     def "build uses jar from buildSrc"() {
         writeBuildSrcPlugin("buildSrc", "MyPlugin")
         buildFile << """
@@ -142,7 +139,6 @@ class BuildSrcPluginIntegrationTest extends AbstractIntegrationSpec {
         outputContains("From MyPlugin")
     }
 
-    @ToBeFixedForVfsRetention(because = "https://github.com/gradle/gradle/issues/11837")
     def "build uses jars from multi-project buildSrc"() {
         writeBuildSrcPlugin("buildSrc", "MyPlugin")
         writeBuildSrcPlugin("buildSrc/subproject", "MyPluginSub")

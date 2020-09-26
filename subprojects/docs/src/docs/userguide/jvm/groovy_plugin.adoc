@@ -125,24 +125,24 @@ If Groovy is only used for test code, the Groovy dependency should be added to t
 
 .Configuration of Groovy test dependency
 ====
-include::sample[dir="snippets/userguide/groovy/groovyDependency/groovy",files="build.gradle[tags=groovy-test-dependency]"]
-include::sample[dir="snippets/userguide/groovy/groovyDependency/kotlin",files="build.gradle.kts[tags=groovy-test-dependency]"]
+include::sample[dir="snippets/groovy/groovyDependency/groovy",files="build.gradle[tags=groovy-test-dependency]"]
+include::sample[dir="snippets/groovy/groovyDependency/kotlin",files="build.gradle.kts[tags=groovy-test-dependency]"]
 ====
 
 To use the Groovy library that ships with Gradle, declare a `localGroovy()` dependency. Note that different Gradle versions ship with different Groovy versions; as such, using `localGroovy()` is less safe then declaring a regular Groovy dependency.
 
 .Configuration of bundled Groovy dependency
 ====
-include::sample[dir="snippets/userguide/groovy/groovyDependency/groovy",files="build.gradle[tags=bundled-groovy-dependency]"]
-include::sample[dir="snippets/userguide/groovy/groovyDependency/kotlin",files="build.gradle.kts[tags=bundled-groovy-dependency]"]
+include::sample[dir="snippets/groovy/groovyDependency/groovy",files="build.gradle[tags=bundled-groovy-dependency]"]
+include::sample[dir="snippets/groovy/groovyDependency/kotlin",files="build.gradle.kts[tags=bundled-groovy-dependency]"]
 ====
 
 The Groovy library doesn't necessarily have to come from a remote repository. It could also come from a local `lib` directory, perhaps checked in to source control:
 
 .Configuration of Groovy file dependency
 ====
-include::sample[dir="snippets/userguide/tutorial/groovyWithFlatDir/groovy",files="build.gradle[tags=groovy-dependency]"]
-include::sample[dir="snippets/userguide/tutorial/groovyWithFlatDir/kotlin",files="build.gradle.kts[tags=groovy-dependency]"]
+include::sample[dir="snippets/tutorial/groovyWithFlatDir/groovy",files="build.gradle[tags=groovy-dependency]"]
+include::sample[dir="snippets/tutorial/groovyWithFlatDir/kotlin",files="build.gradle.kts[tags=groovy-dependency]"]
 ====
 
 [[sec:automatic_configuration_of_groovyclasspath]]
@@ -263,8 +263,8 @@ In these cases, these dependencies must be declared separately in a classpath ca
 
 .Declaring AST transformations
 ====
-include::sample[dir="snippets/groovy/compilationAvoidance/groovy", files="build.gradle[tags=groovy-compilation-avoidance]"]
-include::sample[dir="snippets/groovy/compilationAvoidance/kotlin", files="build.gradle.kts[tags=groovy-compilation-avoidance]"]
+include::sample[dir="snippets/groovy/compilationAvoidance/groovy/ast-transformation-consumer", files="build.gradle[tags=groovy-compilation-avoidance]"]
+include::sample[dir="snippets/groovy/compilationAvoidance/kotlin/ast-transformation-consumer", files="build.gradle.kts[tags=groovy-compilation-avoidance]"]
 ====
 
 [[sec:incremental_groovy_compilation]]
@@ -277,8 +277,8 @@ Since 5.6, Gradle introduces an experimental incremental Groovy compiler. To ena
 
 .Enable incremental Groovy compilation
 ====
-include::sample[dir="snippets/groovy/incrementalCompilation/groovy",files="build.gradle[tags=enable-groovy-incremental]"]
-include::sample[dir="snippets/groovy/incrementalCompilation/kotlin",files="build.gradle.kts[tags=enable-groovy-incremental]"]
+include::sample[dir="snippets/groovy/incrementalCompilation/groovy",files="buildSrc/src/main/groovy/myproject.groovy-conventions.gradle[tags=enable-groovy-incremental]"]
+include::sample[dir="snippets/groovy/incrementalCompilation/kotlin",files="buildSrc/src/main/kotlin/myproject.groovy-conventions.gradle.kts[tags=enable-groovy-incremental]"]
 ====
 
 This gives you the following benefits:
@@ -312,7 +312,7 @@ The Groovy compiler will always be executed with the same version of Java that w
 [source]
 .gradle.properties
 ----
-include::{samplesPath}/groovy/crossCompilation/groovy/gradle.properties[]
+include::{snippetsPath}/groovy/crossCompilation/groovy/gradle.properties[]
 ----
 
 ====

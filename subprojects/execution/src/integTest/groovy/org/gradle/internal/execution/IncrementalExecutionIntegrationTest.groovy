@@ -17,11 +17,9 @@
 package org.gradle.internal.execution
 
 import com.google.common.collect.ImmutableList
-import com.google.common.collect.ImmutableSortedMap
 import com.google.common.collect.Iterables
 import com.google.common.collect.Maps
 import org.gradle.api.internal.file.TestFiles
-import org.gradle.caching.internal.CacheableEntity
 import org.gradle.caching.internal.controller.BuildCacheController
 import org.gradle.internal.execution.caching.CachingDisabledReason
 import org.gradle.internal.execution.history.ExecutionHistoryStore
@@ -31,7 +29,6 @@ import org.gradle.internal.execution.history.changes.InputChangesInternal
 import org.gradle.internal.execution.impl.DefaultWorkExecutor
 import org.gradle.internal.execution.steps.BroadcastChangingOutputsStep
 import org.gradle.internal.execution.steps.CaptureStateBeforeExecutionStep
-import org.gradle.internal.execution.steps.CatchExceptionStep
 import org.gradle.internal.execution.steps.CleanupOutputsStep
 import org.gradle.internal.execution.steps.CreateOutputsStep
 import org.gradle.internal.execution.steps.ExecuteStep
@@ -45,11 +42,8 @@ import org.gradle.internal.execution.steps.SnapshotOutputsStep
 import org.gradle.internal.execution.steps.StoreExecutionStateStep
 import org.gradle.internal.execution.steps.ValidateStep
 import org.gradle.internal.file.TreeType
-import org.gradle.internal.fingerprint.CurrentFileCollectionFingerprint
-import org.gradle.internal.fingerprint.FileCollectionFingerprint
 import org.gradle.internal.fingerprint.impl.AbsolutePathFileCollectionFingerprinter
 import org.gradle.internal.fingerprint.impl.DefaultFileCollectionSnapshotter
-import org.gradle.internal.fingerprint.impl.OutputFileCollectionFingerprinter
 import org.gradle.internal.fingerprint.overlap.OverlappingOutputs
 import org.gradle.internal.fingerprint.overlap.impl.DefaultOverlappingOutputDetector
 import org.gradle.internal.hash.ClassLoaderHierarchyHasher
@@ -57,10 +51,9 @@ import org.gradle.internal.hash.HashCode
 import org.gradle.internal.id.UniqueId
 import org.gradle.internal.operations.TestBuildOperationExecutor
 import org.gradle.internal.scopeids.id.BuildInvocationScopeId
-import org.gradle.internal.snapshot.CompositeFileSystemSnapshot
-import org.gradle.internal.snapshot.FileSystemSnapshot
 import org.gradle.internal.snapshot.impl.DefaultValueSnapshotter
 import org.gradle.internal.snapshot.impl.ImplementationSnapshot
+import org.gradle.internal.vfs.VirtualFileSystem
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
@@ -78,22 +71,18 @@ import static org.gradle.internal.reflect.TypeValidationContext.Severity.ERROR
 class IncrementalExecutionIntegrationTest extends Specification {
 
     @Rule
-    final TestNameTestDirectoryProvider temporaryFolder = TestNameTestDirectoryProvider.newInstance()
+    final TestNameTestDirectoryProvider temporaryFolder = TestNameTestDirectoryProvider.newInstance(getClass())
 
     def virtualFileSystem = TestFiles.virtualFileSystem()
-    def snapshotter = new DefaultFileCollectionSnapshotter(virtualFileSystem, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
+    def fileSystemAccess = TestFiles.fileSystemAccess(virtualFileSystem)
+    def snapshotter = new DefaultFileCollectionSnapshotter(fileSystemAccess, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
     def fingerprinter = new AbsolutePathFileCollectionFingerprinter(snapshotter)
-    def outputFingerprinter = new OutputFileCollectionFingerprinter(snapshotter)
     def executionHistoryStore = new TestExecutionHistoryStore()
     def outputChangeListener = new OutputChangeListener() {
-        @Override
-        void beforeOutputChange() {
-            virtualFileSystem.invalidateAll()
-        }
 
         @Override
         void beforeOutputChange(Iterable<String> affectedOutputPaths) {
-            virtualFileSystem.update(affectedOutputPaths) {}
+            fileSystemAccess.write(affectedOutputPaths) {}
         }
     }
     def buildInvocationScopeId = new BuildInvocationScopeId(UniqueId.generate())
@@ -106,6 +95,7 @@ class IncrementalExecutionIntegrationTest extends Specification {
     def outputFilesRepository = Stub(OutputFilesRepository) {
         isGeneratedByGradle() >> true
     }
+    def outputSnapshotter = new DefaultOutputSnapshotter(snapshotter)
     def valueSnapshotter = new DefaultValueSnapshotter(classloaderHierarchyHasher, null)
     def buildCacheController = Mock(BuildCacheController)
     def buildOperationExecutor = new TestBuildOperationExecutor()
@@ -138,20 +128,19 @@ class IncrementalExecutionIntegrationTest extends Specification {
         new DefaultWorkExecutor<>(
             new LoadExecutionStateStep<>(
             new ValidateStep<>(validationWarningReporter,
-            new CaptureStateBeforeExecutionStep<>(buildOperationExecutor, classloaderHierarchyHasher, valueSnapshotter, overlappingOutputDetector,
+            new CaptureStateBeforeExecutionStep<>(buildOperationExecutor, classloaderHierarchyHasher, outputSnapshotter, overlappingOutputDetector, valueSnapshotter,
             new ResolveCachingStateStep<>(buildCacheController, false,
             new ResolveChangesStep<>(changeDetector,
             new SkipUpToDateStep<>(
             new RecordOutputsStep<>(outputFilesRepository,
-            new BroadcastChangingOutputsStep<>(outputChangeListener,
             new StoreExecutionStateStep<>(
-            new SnapshotOutputsStep<>(buildOperationExecutor, buildInvocationScopeId.getId(),
+            new BroadcastChangingOutputsStep<>(outputChangeListener,
+            new SnapshotOutputsStep<>(buildOperationExecutor, buildInvocationScopeId.getId(), outputSnapshotter,
             new CreateOutputsStep<>(
-            new CatchExceptionStep<>(
             new ResolveInputChangesStep<>(
             new CleanupOutputsStep<>(deleter, outputChangeListener,
             new ExecuteStep<>(
-        ))))))))))))))))
+        )))))))))))))))
         // @formatter:on
     }
 
@@ -628,7 +617,7 @@ class IncrementalExecutionIntegrationTest extends Specification {
     }
 
     UpToDateResult execute(UnitOfWork unitOfWork) {
-        virtualFileSystem.invalidateAll()
+        virtualFileSystem.update(VirtualFileSystem.INVALIDATE_ALL)
 
         executor.execute(new ExecutionRequestContext() {
             @Override
@@ -801,18 +790,8 @@ class IncrementalExecutionIntegrationTest extends Specification {
                 @Override
                 void visitOutputProperties(UnitOfWork.OutputPropertyVisitor visitor) {
                     outputs.forEach { name, spec ->
-                        visitor.visitOutputProperty(name, spec.treeType, spec.root)
+                        visitor.visitOutputProperty(name, spec.treeType, spec.root, TestFiles.fixed(spec.root))
                     }
-                }
-
-                @Override
-                ImmutableSortedMap<String, FileSystemSnapshot> snapshotOutputsBeforeExecution() {
-                    snapshotOutputs(outputs)
-                }
-
-                @Override
-                ImmutableSortedMap<String, FileSystemSnapshot> snapshotOutputsAfterExecution() {
-                    snapshotOutputs(outputs)
                 }
 
                 @Override
@@ -831,11 +810,6 @@ class IncrementalExecutionIntegrationTest extends Specification {
                 }
 
                 @Override
-                void visitLocalState(UnitOfWork.LocalStateVisitor visitor) {
-                    throw new UnsupportedOperationException()
-                }
-
-                @Override
                 Optional<CachingDisabledReason> shouldDisableCaching(@Nullable OverlappingOutputs detectedOverlappingOutputs) {
                     throw new UnsupportedOperationException()
                 }
@@ -846,51 +820,15 @@ class IncrementalExecutionIntegrationTest extends Specification {
                 }
 
                 @Override
-                Optional<? extends Iterable<String>> getChangingOutputs() {
-                    Optional.empty()
-                }
-
-                @Override
                 String getIdentity() {
                     "myId"
-                }
-
-                @Override
-                void visitOutputTrees(CacheableEntity.CacheableTreeVisitor visitor) {
-                    throw new UnsupportedOperationException()
                 }
 
                 @Override
                 String getDisplayName() {
                     "Test unit of work"
                 }
-
-                @Override
-                ImmutableSortedMap<String, CurrentFileCollectionFingerprint> fingerprintAndFilterOutputSnapshots(
-                    ImmutableSortedMap<String, FileCollectionFingerprint> afterPreviousExecutionOutputFingerprints,
-                    ImmutableSortedMap<String, FileSystemSnapshot> beforeExecutionOutputSnapshots,
-                    ImmutableSortedMap<String, FileSystemSnapshot> afterExecutionOutputSnapshots,
-                    boolean hasDetectedOverlappingOutputs
-                ) {
-                    fingerprintOutputs(afterExecutionOutputSnapshots)
-                }
             }
-        }
-
-        private ImmutableSortedMap<String, CurrentFileCollectionFingerprint> fingerprintOutputs(ImmutableSortedMap<String, FileSystemSnapshot> outputSnapshots) {
-            def builder = ImmutableSortedMap.<String, CurrentFileCollectionFingerprint>naturalOrder()
-            outputSnapshots.each { propertyName, snapshot ->
-                builder.put(propertyName, outputFingerprinter.fingerprint([snapshot]))
-            }
-            return builder.build()
-        }
-
-        private ImmutableSortedMap<String, FileSystemSnapshot> snapshotOutputs(Map<String, OutputPropertySpec> outputs) {
-            def builder = ImmutableSortedMap.<String, FileSystemSnapshot>naturalOrder()
-            outputs.each { propertyName, spec ->
-                builder.put(propertyName, CompositeFileSystemSnapshot.of(snapshotter.snapshot(TestFiles.fixed(spec.root))))
-            }
-            return builder.build()
         }
     }
 }

@@ -22,11 +22,12 @@ import com.google.common.collect.Lists;
 import groovy.lang.Closure;
 import org.gradle.api.Action;
 import org.gradle.api.GradleException;
+import org.gradle.api.file.DeleteSpec;
 import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.internal.ConventionTask;
 import org.gradle.api.internal.tasks.testing.DefaultTestTaskReports;
 import org.gradle.api.internal.tasks.testing.FailFastTestListenerInternal;
-import org.gradle.api.internal.tasks.testing.NoMatchingTestsReporter;
 import org.gradle.api.internal.tasks.testing.TestExecuter;
 import org.gradle.api.internal.tasks.testing.TestExecutionSpec;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
@@ -63,6 +64,7 @@ import org.gradle.api.tasks.VerificationTask;
 import org.gradle.api.tasks.options.Option;
 import org.gradle.api.tasks.testing.logging.TestLogging;
 import org.gradle.api.tasks.testing.logging.TestLoggingContainer;
+import org.gradle.internal.Cast;
 import org.gradle.internal.concurrent.CompositeStoppable;
 import org.gradle.internal.event.ListenerBroadcast;
 import org.gradle.internal.event.ListenerManager;
@@ -151,6 +153,11 @@ public abstract class AbstractTestTask extends ConventionTask implements Verific
 
     @Inject
     protected ListenerManager getListenerManager() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Inject
+    protected FileSystemOperations getFileSystemOperations() {
         throw new UnsupportedOperationException();
     }
 
@@ -419,12 +426,6 @@ public abstract class AbstractTestTask extends ConventionTask implements Verific
 
     @TaskAction
     public void executeTests() {
-        if (getFilter().isFailOnNoMatchingTests() && (!getFilter().getIncludePatterns().isEmpty()
-            || !filter.getCommandLineIncludePatterns().isEmpty()
-            || !filter.getExcludePatterns().isEmpty())) {
-            addTestListener(new NoMatchingTestsReporter(createNoMatchingTestErrorMessage()));
-        }
-
         LogLevel currentLevel = determineCurrentLogLevel();
         TestLogging levelLogging = getTestLogging().get(currentLevel);
         TestExceptionFormatter exceptionFormatter = getExceptionFormatter(levelLogging);
@@ -434,9 +435,15 @@ public abstract class AbstractTestTask extends ConventionTask implements Verific
 
         TestExecutionSpec executionSpec = createTestExecutionSpec();
 
-        File binaryResultsDir = getBinResultsDir();
-        getProject().delete(binaryResultsDir);
-        getProject().mkdir(binaryResultsDir);
+        final File binaryResultsDir = getBinResultsDir();
+        FileSystemOperations fs = getFileSystemOperations();
+        fs.delete(new Action<DeleteSpec>() {
+            @Override
+            public void execute(DeleteSpec spec) {
+                spec.delete(binaryResultsDir);
+            }
+        });
+        binaryResultsDir.mkdirs();
 
         Map<String, TestClassResult> results = new HashMap<String, TestClassResult>();
         TestOutputStore testOutputStore = new TestOutputStore(binaryResultsDir);
@@ -458,7 +465,7 @@ public abstract class AbstractTestTask extends ConventionTask implements Verific
         TestWorkerProgressListener testWorkerProgressListener = new TestWorkerProgressListener(getProgressLoggerFactory(), parentProgressLogger);
         getTestListenerInternalBroadcaster().add(testWorkerProgressListener);
 
-        TestExecuter testExecuter = createTestExecuter();
+        TestExecuter<TestExecutionSpec> testExecuter = Cast.uncheckedNonnullCast(createTestExecuter());
         TestListenerInternal resultProcessorDelegate = getTestListenerInternalBroadcaster().getSource();
         if (failFast) {
             resultProcessorDelegate = new FailFastTestListenerInternal(testExecuter, resultProcessorDelegate);
@@ -481,9 +488,21 @@ public abstract class AbstractTestTask extends ConventionTask implements Verific
 
         createReporting(results, testOutputStore);
 
+        handleCollectedResults(testCountLogger);
+    }
+
+    private void handleCollectedResults(TestCountLogger testCountLogger) {
         if (testCountLogger.hadFailures()) {
             handleTestFailures();
+        } else if (testCountLogger.getTotalTests() == 0 && shouldFailOnNoMatchingTests()) {
+            throw new TestExecutionException(createNoMatchingTestErrorMessage());
         }
+    }
+
+    private boolean shouldFailOnNoMatchingTests() {
+        return filter.isFailOnNoMatchingTests() && (!filter.getIncludePatterns().isEmpty()
+            || !filter.getCommandLineIncludePatterns().isEmpty()
+            || !filter.getExcludePatterns().isEmpty());
     }
 
     private String createNoMatchingTestErrorMessage() {

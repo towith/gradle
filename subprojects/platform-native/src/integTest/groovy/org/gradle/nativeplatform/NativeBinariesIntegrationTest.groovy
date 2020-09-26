@@ -16,7 +16,7 @@
 package org.gradle.nativeplatform
 
 import org.gradle.api.reporting.model.ModelReportOutput
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.nativeplatform.fixtures.AbstractInstalledToolChainIntegrationSpec
 import org.gradle.nativeplatform.fixtures.NativePlatformsTestFixture
 import org.gradle.nativeplatform.fixtures.app.CHelloWorldApp
@@ -34,7 +34,6 @@ class NativeBinariesIntegrationTest extends AbstractInstalledToolChainIntegratio
         settingsFile << "rootProject.name = 'test'"
     }
 
-    @ToBeFixedForInstantExecution
     def "skips building executable binary with no source"() {
         given:
         buildFile << """
@@ -53,7 +52,7 @@ model {
         executable("build/binaries/mainExecutable/main").assertDoesNotExist()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "assemble task constructs all buildable binaries"() {
         given:
         new CHelloWorldApp().writeSources(file("src/main"))
@@ -92,8 +91,8 @@ model {
         executable("build/exe/main/unknown/main").assertDoesNotExist()
     }
 
-    @ToBeFixedForInstantExecution
-    def "assemble task produces sensible error when there are no buildable binaries" () {
+    @ToBeFixedForConfigurationCache
+    def "assemble task produces sensible error when there are no buildable binaries"() {
         buildFile << """
 apply plugin: 'c'
 
@@ -140,7 +139,7 @@ model {
               - Don't know how to build for platform 'unknown'.""")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "assemble executable from component with multiple language source sets"() {
         given:
         useMixedSources()
@@ -175,7 +174,7 @@ model {
         executable("build/exe/main/main").exec().out == helloWorldApp.englishOutput
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "assemble executable binary directly from language source sets"() {
         given:
         useMixedSources()
@@ -246,14 +245,14 @@ model {
         fails "mainExecutable"
         failure.assertHasCause("Exception thrown while executing model rule: main(org.gradle.nativeplatform.NativeExecutableSpec) { ... } @ build.gradle line 8, column 9");
         failure.assertHasCause("Cannot create a 'org.gradle.language.java.JavaSourceSet' because this type is not known to sourceSets. " +
-                "Known types are: org.gradle.language.c.CSourceSet, org.gradle.language.cpp.CppSourceSet")
+            "Known types are: org.gradle.language.c.CSourceSet, org.gradle.language.cpp.CppSourceSet")
     }
 
     private def useMixedSources() {
         helloWorldApp.writeSources(file("src/test"))
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "build fails when link executable fails"() {
         given:
         buildFile << """
@@ -278,7 +277,7 @@ model {
         failure.assertThatCause(containsText("Linker failed while linking ${exeName}"))
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "build fails when link library fails"() {
         given:
         buildFile << """
@@ -312,7 +311,7 @@ model {
         failure.assertThatCause(containsText("Linker failed while linking ${libName}"))
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "build fails when create static library fails"() {
         given:
         buildFile << """
@@ -347,7 +346,7 @@ model {
     }
 
     @Requires(TestPrecondition.CAN_INSTALL_EXECUTABLE)
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "installed executable receives command-line parameters"() {
         buildFile << """
 apply plugin: 'c'
@@ -383,6 +382,7 @@ int main (int argc, char *argv[]) {
         installation.exec("foo", "bar").out == "[foo] [bar] \n"
     }
 
+    @ToBeFixedForConfigurationCache(because = ":model")
     def "model report should display configured components"() {
         given:
         buildFile << """

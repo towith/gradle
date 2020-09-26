@@ -17,10 +17,10 @@
 package org.gradle.api.internal.tasks.compile;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.tasks.compile.ForkOptions;
+import org.gradle.internal.Cast;
 import org.gradle.util.GUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +29,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class JavaCompilerArgumentsBuilder {
     public static final Logger LOGGER = LoggerFactory.getLogger(JavaCompilerArgumentsBuilder.class);
@@ -75,9 +76,13 @@ public class JavaCompilerArgumentsBuilder {
     }
 
     public List<String> build() {
-        args = new ArrayList<String>();
+        args = new ArrayList<>();
         // Take a deep copy of the compilerArgs because the following methods mutate it.
-        List<String> compArgs = Lists.newArrayList(spec.getCompileOptions().getCompilerArgs());
+        List<Object> compilerArgs = Cast.uncheckedCast(spec.getCompileOptions().getCompilerArgs());
+        List<String> compArgs = compilerArgs
+            .stream()
+            .map(Object::toString)
+            .collect(Collectors.toList());
 
         validateCompilerArgs(compArgs);
 
@@ -106,6 +111,10 @@ public class JavaCompilerArgumentsBuilder {
                 throw new InvalidUserDataException("Cannot specify -J flags via `CompileOptions.compilerArgs`. " +
                     "Use the `CompileOptions.forkOptions.jvmArgs` property instead.");
             }
+
+            if ("--release".equals(arg) && spec.getRelease() != null) {
+                throw new InvalidUserDataException("Cannot specify --release via `CompileOptions.compilerArgs` when using `JavaCompile.release`.");
+            }
         }
     }
 
@@ -130,9 +139,13 @@ public class JavaCompilerArgumentsBuilder {
         if (!includeMainOptions) {
             return;
         }
-
+        Integer release = spec.getRelease();
         final MinimalJavaCompileOptions compileOptions = spec.getCompileOptions();
-        if (!releaseOptionIsSet(compilerArgs)) {
+
+        if (release != null) {
+            args.add("--release");
+            args.add(release.toString());
+        } else if (!releaseOptionIsSet(compilerArgs)) {
             String sourceCompatibility = spec.getSourceCompatibility();
             if (sourceCompatibility != null) {
                 args.add("-source");
@@ -255,8 +268,21 @@ public class JavaCompilerArgumentsBuilder {
         }
 
         List<File> classpath = spec.getCompileClasspath();
-        args.add("-classpath");
-        args.add(classpath == null ? "" : Joiner.on(File.pathSeparatorChar).join(classpath));
+        List<File> modulePath = spec.getModulePath();
+        String moduleVersion = spec.getCompileOptions().getJavaModuleVersion();
+
+        if (!classpath.isEmpty()) {
+            args.add("-classpath");
+            args.add(Joiner.on(File.pathSeparatorChar).join(classpath));
+        }
+        if (!modulePath.isEmpty()) {
+            if (moduleVersion != null) {
+                args.add("--module-version");
+                args.add(moduleVersion);
+            }
+            args.add("--module-path");
+            args.add(Joiner.on(File.pathSeparatorChar).join(modulePath));
+        }
     }
 
     private void addSourceFiles() {

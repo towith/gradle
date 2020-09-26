@@ -146,7 +146,7 @@ public final class BuildOperationRecord {
 
     @Override
     public String toString() {
-        return "BuildOperationRecord{" + displayName + '}';
+        return "BuildOperationRecord{" + id + "->" + displayName + '}';
     }
 
     public static class Progress {
@@ -183,6 +183,11 @@ public final class BuildOperationRecord {
         public boolean hasDetailsOfType(Class<?> clazz) throws ClassNotFoundException {
             Class<?> detailsType = getDetailsType();
             return detailsType != null && clazz.isAssignableFrom(detailsType);
+        }
+
+        @Override
+        public String toString() {
+            return "Progress{details=" + details + ", detailsClassName='" + detailsClassName + '\'' + '}';
         }
     }
 }

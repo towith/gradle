@@ -16,12 +16,15 @@
 
 package org.gradle.integtests
 
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import org.hamcrest.CoreMatchers
+import spock.lang.IgnoreIf
 import spock.lang.Issue
 
 import static org.hamcrest.CoreMatchers.containsString
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 
+@IgnoreIf({ GradleContextualExecuter.embedded }) // wrapperExecuter requires a real distribution
 class WrapperProjectIntegrationTest extends AbstractWrapperIntegrationSpec {
     def setup() {
         file("build.gradle") << """
@@ -32,8 +35,9 @@ class WrapperProjectIntegrationTest extends AbstractWrapperIntegrationSpec {
     }
 
     task echoProperty {
+        def food = providers.gradleProperty('fooD')
         doLast {
-            println "fooD=" + project.properties["fooD"]
+            println "fooD=" + food.get()
         }
     }
 """

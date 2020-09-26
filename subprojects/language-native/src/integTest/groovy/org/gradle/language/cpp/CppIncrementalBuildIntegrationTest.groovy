@@ -17,18 +17,15 @@
 package org.gradle.language.cpp
 
 import org.gradle.integtests.fixtures.CompilationOutputsFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.integtests.fixtures.ToBeFixedForVfsRetention
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.executer.GradleExecuter
 import org.gradle.nativeplatform.fixtures.AbstractInstalledToolChainIntegrationSpec
+import org.gradle.nativeplatform.fixtures.AvailableToolChains
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.TestPrecondition
 import spock.lang.Unroll
 
-@ToBeFixedForVfsRetention(
-    because = "https://github.com/gradle/gradle/issues/12162",
-    failsOnlyIf = TestPrecondition.WINDOWS
-)
+import static org.junit.Assume.assumeFalse
+
 class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainIntegrationSpec implements CppTaskNames {
 
     private static final String LIBRARY = ':library'
@@ -51,6 +48,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
     def installApp = appDebug.install
 
     def setup() {
+        assumeFalse(toolChain.family == AvailableToolChains.ToolFamily.CYGWIN_GCC) // [test setup issue] fails with - greet.cpp:2:22: fatal error: app.hpp: No such file or directory
         buildFile << """
             project(':library') {
                 apply plugin: 'cpp-library'
@@ -147,7 +145,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         """
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "rebuilds executable with single source file change"() {
         given:
         run installApp
@@ -182,7 +180,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles library and relinks executable after single library source file change"() {
         given:
         run installApp
@@ -222,7 +220,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles binary and does not relink when public header file changes in a way that does not affect the object files"() {
         given:
         run installApp
@@ -259,7 +257,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles binary when implementation header file changes"() {
         given:
         run installApp
@@ -296,7 +294,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles only those source files affected by a header file change"() {
         given:
         def greetingHeader = file("app/src/main/headers/greeting.hpp")
@@ -348,7 +346,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         appObjects.noneRecompiled()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "considers only those headers that are reachable from source files as inputs"() {
         given:
         def unused = file("app/src/main/headers/ignore1.h") << "broken!"
@@ -395,7 +393,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         libObjects.recompiledFiles(librarySourceFile, libraryOtherSourceFile)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "header file referenced using relative path is considered an input"() {
         given:
         def unused = file("app/src/main/headers/ignore1.h") << "broken!"
@@ -456,7 +454,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "header file referenced using macro #macro is considered an input"() {
         when:
         def unused = file("app/src/main/headers/ignore1.h") << "broken!"
@@ -560,7 +558,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "header file referenced using external macro #macro is considered an input"() {
         when:
         def unused = file("app/src/main/headers/ignore1.h") << "broken!"
@@ -639,7 +637,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "considers all header files as input to source file with complex macro include #include"() {
         when:
         appSourceFile.text = """
@@ -779,7 +777,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         '''
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "does not consider all header files as inputs if complex macro include is found in dependency and special flag is active"() {
         when:
 
@@ -856,7 +854,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         return executer
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can have a cycle between header files"() {
         def header1 = file("app/src/main/headers/hello.h")
         def header2 = file("app/src/main/headers/other.h")
@@ -918,7 +916,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can reference a missing header file"() {
         def header = file("app/src/main/headers/hello.h")
 
@@ -974,7 +972,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "source file can reference multiple header files using the same macro"() {
         def header1 = file("app/src/main/headers/hello1.h")
         def header2 = file("app/src/main/headers/hello2.h")
@@ -1099,7 +1097,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "changes to the included header graph are reflected in the inputs"() {
         def header = file("app/src/main/headers/hello.h")
         def header1 = file("app/src/main/headers/hello1.h")
@@ -1165,7 +1163,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         allSkipped()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "shared header can reference project specific header"() {
         when:
         appSourceFile.replace("log(msg)", "log_info(msg)")
@@ -1236,7 +1234,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         libObjects.noneRecompiled()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "shared header can reference source file specific header using macro include"() {
         when:
         libraryHeaderFile << """
@@ -1319,7 +1317,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         libObjects.noneRecompiled()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "project specific header can shadow shared header"() {
         when:
         appSourceFile.insertBefore('#include <lib.h>', '#include "common.h"')
@@ -1443,7 +1441,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         libObjects.noneRecompiled()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles when include path changes resolve different headers"() {
         when:
         appSourceFile.insertBefore('#include <lib.h>', '#include <common.h>')
@@ -1531,7 +1529,7 @@ class CppIncrementalBuildIntegrationTest extends AbstractInstalledToolChainInteg
         libObjects.noneRecompiled()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "recompiles when system headers change"() {
         when:
         appSourceFile.insertBefore('#include <lib.h>', '#include <common.h>')

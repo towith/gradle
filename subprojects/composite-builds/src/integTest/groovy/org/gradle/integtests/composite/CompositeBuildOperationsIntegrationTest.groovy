@@ -20,7 +20,7 @@ import org.gradle.api.internal.tasks.execution.ExecuteTaskBuildOperationType
 import org.gradle.execution.taskgraph.NotifyTaskGraphWhenReadyBuildOperationType
 import org.gradle.initialization.ConfigureBuildBuildOperationType
 import org.gradle.initialization.LoadBuildBuildOperationType
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.build.BuildTestFile
 import org.gradle.internal.operations.trace.BuildOperationRecord
 import org.gradle.internal.taskgraph.CalculateTaskGraphBuildOperationType
@@ -43,7 +43,7 @@ class CompositeBuildOperationsIntegrationTest extends AbstractCompositeBuildInte
         includedBuilds << buildB
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "generates build operations for tasks in included builds"() {
         given:
         dependency 'org.test:buildB:1.0'
@@ -66,7 +66,7 @@ class CompositeBuildOperationsIntegrationTest extends AbstractCompositeBuildInte
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "generates build lifecycle operations for included builds with #display"() {
         given:
         dependency "org.test:${dependencyName}:1.0"
@@ -120,10 +120,10 @@ class CompositeBuildOperationsIntegrationTest extends AbstractCompositeBuildInte
         graphNotifyOps.size() == 2
         graphNotifyOps[0].displayName == 'Notify task graph whenReady listeners'
         graphNotifyOps[0].details.buildPath == ':'
-        graphNotifyOps[0].parentId == runTasksOps[0].id
+        graphNotifyOps[0].parentId == taskGraphOps[0].id
         graphNotifyOps[1].displayName == "Notify task graph whenReady listeners (:${buildName})"
         graphNotifyOps[1].details.buildPath == ":${buildName}"
-        graphNotifyOps[1].parentId == runTasksOps[1].id
+        graphNotifyOps[1].parentId == taskGraphOps[1].id
 
         where:
         settings                     | buildName | dependencyName | display
@@ -131,7 +131,7 @@ class CompositeBuildOperationsIntegrationTest extends AbstractCompositeBuildInte
         "rootProject.name='someLib'" | "buildB"  | "someLib"      | "configured root project name"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "generates build lifecycle operations for included build used as buildscript and production dependency"() {
         given:
         buildA.buildFile.text = """
@@ -198,10 +198,10 @@ class CompositeBuildOperationsIntegrationTest extends AbstractCompositeBuildInte
         graphNotifyOps.size() == 2
         graphNotifyOps[0].displayName == 'Notify task graph whenReady listeners (:buildB)'
         graphNotifyOps[0].details.buildPath == ':buildB'
-        graphNotifyOps[0].parentId == runTasksOps[0].id
+        graphNotifyOps[0].parentId == taskGraphOps[0].id
         graphNotifyOps[1].displayName == "Notify task graph whenReady listeners"
         graphNotifyOps[1].details.buildPath == ":"
-        graphNotifyOps[1].parentId == runTasksOps[1].id
+        graphNotifyOps[1].parentId == taskGraphOps[1].id
     }
 
     def assertChildrenNotIn(BuildOperationRecord origin, BuildOperationRecord op, List<BuildOperationRecord> allOps) {

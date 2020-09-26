@@ -22,6 +22,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.gradle.api.Action;
 import org.gradle.internal.ErroringAction;
 import org.gradle.internal.work.WorkerLeaseService;
+import org.gradle.test.fixtures.ResettableExpectations;
 import org.hamcrest.Matcher;
 import org.junit.rules.ExternalResource;
 
@@ -41,12 +42,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * An HTTP server that allows a test to synchronize and make assertions about concurrent activities that happen in another process.
  * For example, can be used to that certain tasks do or do not execute in parallel.
  */
-public class BlockingHttpServer extends ExternalResource {
+public class BlockingHttpServer extends ExternalResource implements ResettableExpectations {
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
     private final Lock lock = new ReentrantLock();
@@ -114,7 +118,7 @@ public class BlockingHttpServer extends ExternalResource {
      */
     public String callFromBuild(String resource) {
         return callFromBuildUsingExpression("\"" + resource + "\"");
-     }
+    }
 
     /**
      * Returns Java statements to get the given resource, using the given expression to calculate the resource to get.
@@ -364,6 +368,11 @@ public class BlockingHttpServer extends ExternalResource {
         });
     }
 
+    @Override
+    public void resetExpectations() {
+        handler.resetExpectations();
+    }
+
     /**
      * For testing this fixture only.
      */
@@ -381,6 +390,17 @@ public class BlockingHttpServer extends ExternalResource {
             throw new IllegalStateException("Cannot get HTTP port as server is not running.");
         }
         return server.getAddress().getPort();
+    }
+
+    /**
+     * To help with debugging the underlying {@link com.sun.net.httpserver.HttpServer}.
+     */
+    public static void enableServerLogging() {
+        final ConsoleHandler handler = new ConsoleHandler();
+        handler.setLevel(Level.ALL);
+        final Logger logger = Logger.getLogger("com.sun.net.httpserver");
+        logger.setLevel(Level.ALL);
+        logger.addHandler(handler);
     }
 
     static String normalizePath(String path) {

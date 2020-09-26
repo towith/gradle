@@ -48,6 +48,7 @@ public class DefaultArtifactHandler implements ArtifactHandler, MethodMixIn {
         dynamicMethods = new DynamicMethods();
     }
 
+    @SuppressWarnings("rawtypes")
     private PublishArtifact pushArtifact(org.gradle.api.artifacts.Configuration configuration, Object notation, Closure configureClosure) {
         Action<Object> configureAction = ConfigureUtil.configureUsing(configureClosure);
         return pushArtifact(configuration, notation, configureAction);
@@ -65,6 +66,7 @@ public class DefaultArtifactHandler implements ArtifactHandler, MethodMixIn {
         if (configuration.isFullyDeprecated()) {
             DeprecationLogger.deprecateConfiguration(configuration.getName()).forArtifactDeclaration()
                 .replaceWith(GUtil.flattenElements(configuration.getDeclarationAlternatives(), configuration.getConsumptionAlternatives()))
+                .willBecomeAnErrorInGradle7()
                 .withUpgradeGuideSection(5, "dependencies_should_no_longer_be_declared_using_the_compile_and_runtime_configurations")
                 .nagUser();
         }
@@ -81,6 +83,7 @@ public class DefaultArtifactHandler implements ArtifactHandler, MethodMixIn {
     }
 
     @Override
+    @SuppressWarnings("rawtypes")
     public PublishArtifact add(String configurationName, Object artifactNotation, Closure configureClosure) {
         return pushArtifact(configurationContainer.getByName(configurationName), artifactNotation, configureClosure);
     }

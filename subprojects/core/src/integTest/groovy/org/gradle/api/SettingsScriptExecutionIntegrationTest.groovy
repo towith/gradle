@@ -17,7 +17,6 @@ package org.gradle.api
 
 import org.gradle.api.internal.FeaturePreviewsActivationFixture
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.executer.ArtifactBuilder
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.test.fixtures.file.TestFile
@@ -85,7 +84,6 @@ class SettingsScriptExecutionIntegrationTest extends AbstractIntegrationSpec {
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "notices changes to settings scripts that do not change the file length"() {
         settingsFile.text = "println 'counter: __'"
         long before = settingsFile.length()
@@ -116,7 +114,7 @@ println 'quiet message'
 logging.captureStandardOutput(LogLevel.ERROR)
 println 'error message'
 assert settings != null
-// TODO:instant-execution consider restoring assertion on the relationship
+// TODO:configuration-cache consider restoring assertion on the relationship
 //  between buildscript.classLoader and getClas().classLoader
 assert getClass().classLoader.parent == Thread.currentThread().contextClassLoader
 Gradle.class.classLoader.loadClass('${implClassName}')

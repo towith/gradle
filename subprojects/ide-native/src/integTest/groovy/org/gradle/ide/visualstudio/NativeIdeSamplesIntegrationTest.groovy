@@ -16,7 +16,7 @@
 package org.gradle.ide.visualstudio
 
 import org.gradle.ide.visualstudio.fixtures.AbstractVisualStudioIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.Sample
 import org.gradle.test.fixtures.file.TestDirectoryProvider
 import org.gradle.util.Requires
@@ -28,10 +28,10 @@ class NativeIdeSamplesIntegrationTest extends AbstractVisualStudioIntegrationSpe
     @Rule public final Sample visualStudio = sample(temporaryFolder, 'visual-studio')
 
     private static Sample sample(TestDirectoryProvider testDirectoryProvider, String name) {
-        return new Sample(testDirectoryProvider, "native-binaries/${name}", name)
+        return new Sample(testDirectoryProvider, "native-binaries/${name}/groovy", name)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "visual studio"() {
         given:
         sample visualStudio
@@ -53,7 +53,7 @@ class NativeIdeSamplesIntegrationTest extends AbstractVisualStudioIntegrationSpe
     }
 
     @Requires(TestPrecondition.MSBUILD)
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "build generated visual studio solution"() {
         useMsbuildTool()
 

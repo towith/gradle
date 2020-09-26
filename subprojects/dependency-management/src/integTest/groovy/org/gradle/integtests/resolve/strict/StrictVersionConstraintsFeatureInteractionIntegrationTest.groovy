@@ -17,7 +17,7 @@ package org.gradle.integtests.resolve.strict
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.resolve.AbstractModuleDependencyResolveTest
 
 class StrictVersionConstraintsFeatureInteractionIntegrationTest extends AbstractModuleDependencyResolveTest {
@@ -87,9 +87,7 @@ class StrictVersionConstraintsFeatureInteractionIntegrationTest extends Abstract
         }
     }
 
-    @RequiredFeatures(
-        @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value="true")
-    )
+    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value="true")
     def "can turn strict constraint into normal constraint by using a component metadata rule"() {
         given:
         repository {
@@ -200,6 +198,7 @@ class StrictVersionConstraintsFeatureInteractionIntegrationTest extends Abstract
         }
     }
 
+    @ToBeFixedForConfigurationCache
     def "cannot force a version over an ancestor provided version"() {
         given:
         repository {
@@ -350,8 +349,9 @@ class StrictVersionConstraintsFeatureInteractionIntegrationTest extends Abstract
 
         buildFile << """
             import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.*
+            import org.gradle.api.internal.*
 
-            def VERSIONED_COMPARATOR = new DefaultVersionComparator()
+            def VERSIONED_COMPARATOR = new DefaultVersionComparator(new FeaturePreviews())
             def VERSION_SCHEME = new DefaultVersionSelectorScheme(VERSIONED_COMPARATOR, new VersionParser())
 
             configurations.all {

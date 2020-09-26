@@ -17,7 +17,9 @@
 package org.gradle.api.reporting.model
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class ModelReportIntegrationTest extends AbstractIntegrationSpec {
 
     def "displays basic structure of an empty project"() {

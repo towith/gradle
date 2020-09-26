@@ -45,6 +45,7 @@ import static org.junit.platform.engine.TestExecutionResult.Status.ABORTED;
 import static org.junit.platform.engine.TestExecutionResult.Status.FAILED;
 
 public class JUnitPlatformTestExecutionListener implements TestExecutionListener {
+
     private final ConcurrentMap<String, TestDescriptorInternal> descriptorsByUniqueId = new ConcurrentHashMap<>();
     private final TestResultProcessor resultProcessor;
     private final Clock clock;
@@ -80,7 +81,7 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
 
     @Override
     public void executionStarted(TestIdentifier testIdentifier) {
-        if (testIdentifier.isTest() || isClass(testIdentifier)) {
+        if (testIdentifier.isTest() || hasClassSource(testIdentifier)) {
             reportStartedUnlessAlreadyStarted(testIdentifier);
         }
     }
@@ -120,10 +121,10 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
     private void reportSkipped(TestIdentifier testIdentifier) {
         currentTestPlan.getChildren(testIdentifier).stream()
             .filter(child -> !wasStarted(child))
-            .forEach(child -> executionSkipped(child));
+            .forEach(this::executionSkipped);
         if (testIdentifier.isTest()) {
             resultProcessor.completed(getId(testIdentifier), completeEvent(SKIPPED));
-        } else if (isClass(testIdentifier)) {
+        } else if (hasClassSource(testIdentifier)) {
             resultProcessor.completed(getId(testIdentifier), completeEvent());
         }
     }
@@ -159,8 +160,8 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
         MutableBoolean wasCreated = new MutableBoolean(false);
         descriptorsByUniqueId.computeIfAbsent(node.getUniqueId(), uniqueId -> {
             wasCreated.set(true);
-            if (node.getType() == CONTAINER || isClass(node) && !hasSameSourceAsAncestor(node)) {
-                TestIdentifier classIdentifier = findClassSource(node);
+            if (node.getType() == CONTAINER || isTestClassIdentifier(node)) {
+                TestIdentifier classIdentifier = findTestClassIdentifier(node);
                 String className = className(classIdentifier);
                 String classDisplayName = classDisplayName(classIdentifier);
                 return new DefaultTestClassDescriptor(idGenerator.generateId(), className, classDisplayName);
@@ -172,12 +173,12 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
 
     private TestDescriptorInternal createSyntheticTestDescriptorForContainer(TestIdentifier node) {
         boolean testsStarted = currentTestPlan.getDescendants(node).stream().anyMatch(this::wasStarted);
-        String name = testsStarted ? "executionError": "initializationError";
+        String name = testsStarted ? "executionError" : "initializationError";
         return createTestDescriptor(node, name, name);
     }
 
     private TestDescriptorInternal createTestDescriptor(TestIdentifier test, String name, String displayName) {
-        TestIdentifier classIdentifier = findClassSource(test);
+        TestIdentifier classIdentifier = findTestClassIdentifier(test);
         String className = className(classIdentifier);
         String classDisplayName = classDisplayName(classIdentifier);
         return new DefaultTestDescriptor(idGenerator.generateId(), className, name, classDisplayName, displayName);
@@ -198,28 +199,13 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
         return result;
     }
 
-    private boolean isClass(TestIdentifier test) {
-        return test.getSource().isPresent() && test.getSource().get() instanceof ClassSource;
-    }
-
-    private boolean hasSameSourceAsAncestor(TestIdentifier node) {
-        Optional<TestIdentifier> parent = currentTestPlan.getParent(node);
-        while (parent.isPresent()) {
-            if (Objects.equals(parent.get().getSource(), node.getSource())) {
-                return true;
-            }
-            parent = currentTestPlan.getParent(parent.get());
-        }
-        return false;
-    }
-
-    private TestIdentifier findClassSource(TestIdentifier testIdentifier) {
+    private TestIdentifier findTestClassIdentifier(TestIdentifier testIdentifier) {
         // For tests in default method of interface,
         // we might not be able to get the implementation class directly.
         // In this case, we need to retrieve test plan to get the real implementation class.
         TestIdentifier current = testIdentifier;
         while (current != null) {
-            if (isClass(current)) {
+            if (isTestClassIdentifier(current)) {
                 return current;
             }
             current = current.getParentId().map(currentTestPlan::getTestIdentifier).orElse(null);
@@ -227,20 +213,46 @@ public class JUnitPlatformTestExecutionListener implements TestExecutionListener
         return null;
     }
 
+    private boolean isTestClassIdentifier(TestIdentifier testIdentifier) {
+        return hasClassSource(testIdentifier) && hasDifferentSourceThanAncestor(testIdentifier);
+    }
+
     private String className(TestIdentifier testClassIdentifier) {
-        if (testClassIdentifier != null && isClass(testClassIdentifier)) {
-            return ((ClassSource) testClassIdentifier.getSource().get()).getClassName();
-        } else {
-            return "UnknownClass";
+        if (testClassIdentifier != null) {
+            Optional<ClassSource> classSource = getClassSource(testClassIdentifier);
+            if (classSource.isPresent()) {
+                return classSource.get().getClassName();
+            }
         }
+        return "UnknownClass";
     }
 
     private String classDisplayName(TestIdentifier testClassIdentifier) {
         if (testClassIdentifier != null) {
             return testClassIdentifier.getDisplayName();
-        } else {
-            return "UnknownClass";
         }
+        return "UnknownClass";
+    }
+
+    private static boolean hasClassSource(TestIdentifier testIdentifier) {
+        return getClassSource(testIdentifier).isPresent();
+    }
+
+    private static Optional<ClassSource> getClassSource(TestIdentifier testIdentifier) {
+        return testIdentifier.getSource()
+            .filter(source -> source instanceof ClassSource)
+            .map(source -> (ClassSource) source);
+    }
+
+    private boolean hasDifferentSourceThanAncestor(TestIdentifier testIdentifier) {
+        Optional<TestIdentifier> parent = currentTestPlan.getParent(testIdentifier);
+        while (parent.isPresent()) {
+            if (Objects.equals(parent.get().getSource(), testIdentifier.getSource())) {
+                return false;
+            }
+            parent = currentTestPlan.getParent(parent.get());
+        }
+        return true;
     }
 
 }

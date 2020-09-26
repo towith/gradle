@@ -18,15 +18,14 @@ package org.gradle.integtests.resolve.capabilities
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.resolve.AbstractModuleDependencyResolveTest
 import spock.lang.Unroll
 
-@RequiredFeatures(
-    [@RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")]
-)
+@RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
 class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResolveTest {
 
+    @ToBeFixedForConfigurationCache
     def "can consume published capabilities"() {
         given:
         repository {
@@ -82,7 +81,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
                conf "cglib:cglib-nodep:3.2.4"
                conf "cglib:cglib:3.2.5"
             }
-            
+
             configurations.conf.resolutionStrategy.capabilitiesResolution.$rule
         """
 
@@ -115,6 +114,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
 
     }
 
+    @ToBeFixedForConfigurationCache
     def "can detect conflict between local project and capability from external dependency"() {
         given:
         repository {
@@ -128,7 +128,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
 
         buildFile << """
             apply plugin: 'java-library'
-            
+
             configurations.api.outgoing {
                 capability 'org:capability:1.0'
             }
@@ -136,7 +136,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
             dependencies {
                 conf 'org:test:1.0'
             }
-            
+
             configurations {
                 conf.extendsFrom(api)
             }
@@ -159,6 +159,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
      * This test illustrates that published modules can declare capabilities, which are then discovered
      * as we visit the graph. And if no published module declares a preference, then build should fail.
      */
+    @ToBeFixedForConfigurationCache
     def "fails with reasonable error message if no module express preference for conflict of modules that publish the same capability"() {
         given:
         repository {
@@ -237,7 +238,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
                 conf 'org:testC:1.0'
                 conf 'org:testD:1.0'
             }
-            
+
             configurations.conf.resolutionStrategy.capabilitiesResolution.all { selectHighestVersion() }
         """
 
@@ -317,7 +318,7 @@ class PublishedCapabilitiesIntegrationTest extends AbstractModuleDependencyResol
                 conf 'org:testC:1.0'
                 conf 'org:testD:1.0'
             }
-            
+
             configurations.conf.resolutionStrategy.capabilitiesResolution.withCapability('org:cap') {
                 select candidates.find { it.id.module == "$expected" }
                 because "prefers module ${expected}"

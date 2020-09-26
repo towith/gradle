@@ -19,7 +19,7 @@ package org.gradle.initialization
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.BuildOperationNotificationsFixture
 import org.gradle.integtests.fixtures.BuildOperationsFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.internal.operations.trace.BuildOperationRecord
 import org.gradle.internal.taskgraph.CalculateTaskGraphBuildOperationType
 
@@ -36,7 +36,7 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
             include "b"
             include "a:c"
         """
-        
+
         buildFile << """
             allprojects {
                 task otherTask
@@ -109,7 +109,7 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
         operation().failure.contains("Task 'someNonexistent' not found in root project")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "composite builds")
     def "build path for calculated task graph is exposed"() {
         settingsFile << """
             includeBuild "b"
@@ -147,7 +147,7 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
         taskGraphCalculations[2].result.requestedTaskPaths == [":compileJava", ":jar"]
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "composite builds")
     def "exposes task plan details"() {
         file("included-build").mkdir()
         file("included-build/settings.gradle")
@@ -206,7 +206,6 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "exposes plan details with nested artifact transforms"() {
         file('producer/src/main/java/artifact/transform/sample/producer/Producer.java') << """
             package artifact.transform.sample.producer;
@@ -273,7 +272,7 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
 
             application {
                 // Define the main class for the application.
-                mainClassName = 'artifact.transform.sample.App'
+                mainClass = 'artifact.transform.sample.App'
             }
 
             abstract class SomeTransform implements TransformAction<TransformParameters.None> {
@@ -313,7 +312,7 @@ class CalculateTaskGraphBuildOperationIntegrationTest extends AbstractIntegratio
         then:
         with(operations()[0].result.taskPlan) {
             task.taskPath == [":producer:compileJava", ":producer:processResources", ":producer:classes", ":producer:jar", ":compileJava", ":processResources", ":classes", ":jar", ":startScripts", ":distZip"]
-            dependencies.taskPath.collect { it.sort() } == [[], [], [":producer:compileJava", ":producer:processResources"], [":producer:classes"], [":producer:compileJava"], [], [":compileJava", ":processResources"], [":classes"], [], [":jar", ":producer:jar", ":startScripts"]]
+            dependencies.taskPath.collect { it.sort() } == [[], [], [":producer:compileJava", ":producer:processResources"], [":producer:classes"], [":producer:compileJava"], [], [":compileJava", ":processResources"], [":classes"], [":jar", ":producer:jar"], [":jar", ":producer:jar", ":startScripts"]]
         }
     }
 

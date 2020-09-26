@@ -16,7 +16,6 @@
 package org.gradle.api.plugins
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.executer.ExecutionResult
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.util.Requires
@@ -33,7 +32,7 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
         }
     }
 
-    public static boolean   shellAvailable(String shellCommand) {
+    static boolean shellAvailable(String shellCommand) {
         return TestPrecondition.UNIX_DERIVATIVE.isFulfilled() && (
             new File("/bin/$shellCommand").exists()
                 || new File("/usr/bin/$shellCommand").exists()
@@ -41,7 +40,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("bash") })
-    @ToBeFixedForInstantExecution
     def "can execute generated Unix start script in Bash"() {
         given:
         succeeds('installDist')
@@ -54,7 +52,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("dash") })
-    @ToBeFixedForInstantExecution
     def "can execute generated Unix start script in Dash"() {
         given:
         succeeds('installDist')
@@ -67,7 +64,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("static-sh") })
-    @ToBeFixedForInstantExecution
     def "can execute generated Unix start script in BusyBox"() {
         given:
         succeeds('installDist')
@@ -80,7 +76,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("bash") })
-    @ToBeFixedForInstantExecution
     def "can use APP_HOME in DEFAULT_JVM_OPTS with custom start script in Bash"() {
         given:
         extendBuildFileWithAppHomeProperty()
@@ -94,7 +89,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("dash") })
-    @ToBeFixedForInstantExecution
     def "can use APP_HOME in DEFAULT_JVM_OPTS with custom start script in Dash"() {
         given:
         extendBuildFileWithAppHomeProperty()
@@ -108,7 +102,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("static-sh") })
-    @ToBeFixedForInstantExecution
     def "can use APP_HOME in DEFAULT_JVM_OPTS with custom start script in BusyBox"() {
         given:
         extendBuildFileWithAppHomeProperty()
@@ -122,7 +115,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("bash") })
-    @ToBeFixedForInstantExecution
     def "can pass argument to App with custom start script in Bash"() {
         given:
         succeeds('installDist')
@@ -138,7 +130,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("dash") })
-    @ToBeFixedForInstantExecution
     def "can pass argument to App with custom start script in Dash"() {
         given:
         succeeds('installDist')
@@ -154,7 +145,6 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
     }
 
     @Requires(adhoc = { ApplicationPluginUnixShellsIntegrationTest.shellAvailable("static-sh") })
-    @ToBeFixedForInstantExecution
     def "can pass argument to App with custom start script in BusyBox"() {
         given:
         succeeds('installDist')
@@ -167,6 +157,45 @@ class ApplicationPluginUnixShellsIntegrationTest extends AbstractIntegrationSpec
         outputContains('Arg: some arg 2')
         outputContains('Arg: -DFOO="bar < baz"')
         outputContains('Arg: -DGOO=\'car < caz\'')
+    }
+
+    @Requires(adhoc = { TestPrecondition.JDK9_OR_LATER.fulfilled && ApplicationPluginUnixShellsIntegrationTest.shellAvailable("bash") })
+    def "can execute generated Unix start script for Java module in Bash"() {
+        given:
+        turnSampleProjectIntoModule()
+        succeeds('installDist')
+
+        when:
+        runViaUnixStartScript("bash")
+
+        then:
+        outputContains('Hello World!')
+    }
+
+    @Requires(adhoc = { TestPrecondition.JDK9_OR_LATER.fulfilled && ApplicationPluginUnixShellsIntegrationTest.shellAvailable("dash") })
+    def "can execute generated Unix start script for Java module in Dash"() {
+        given:
+        turnSampleProjectIntoModule()
+        succeeds('installDist')
+
+        when:
+        runViaUnixStartScript("dash")
+
+        then:
+        outputContains('Hello World!')
+    }
+
+    @Requires(adhoc = { TestPrecondition.JDK9_OR_LATER.fulfilled && ApplicationPluginUnixShellsIntegrationTest.shellAvailable("static-sh") })
+    def "can execute generated Unix start script for Java module in BusyBox"() {
+        given:
+        turnSampleProjectIntoModule()
+        succeeds('installDist')
+
+        when:
+        runViaUnixStartScript("static-sh")
+
+        then:
+        outputContains('Hello World!')
     }
 
     ExecutionResult runViaUnixStartScript(String shCommand, String... args) {
@@ -211,6 +240,21 @@ task execStartScript(type: Exec) {
         populateSettingsFile()
     }
 
+    private void turnSampleProjectIntoModule() {
+        createModuleInfo()
+        buildFile << """
+application {
+    mainModule.set('main.test')
+}
+compileJava {
+    modularity.inferModulePath.set(true)
+}
+startScripts {
+    modularity.inferModulePath.set(true)
+}
+"""
+    }
+
     private void extendBuildFileWithAppHomeProperty() {
         buildFile << """
 applicationDefaultJvmArgs = ["-DappHomeSystemProp=REPLACE_THIS_WITH_APP_HOME"]
@@ -239,11 +283,17 @@ public class Main {
 """
     }
 
+    private void createModuleInfo() {
+        file('src/main/java/module-info.java') << "module main.test {}"
+    }
+
     private void populateBuildFile() {
         buildFile << """
 apply plugin: 'application'
 
-mainClassName = 'org.gradle.test.Main'
+application {
+    mainClass.set('org.gradle.test.Main')
+}
 """
     }
 

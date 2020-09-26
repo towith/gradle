@@ -257,21 +257,12 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
     @Issue("https://github.com/gradle/gradle-native/issues/707")
     def "task is created and configured eagerly when referenced using all { action }"() {
         buildFile << """
-            def configureCount = 0
             tasks.register("task1", SomeTask) {
-                configureCount++
-                println "Configure \${path} " + configureCount
+                println "Configure \${path}"
             }
-            
-            def tasksAllCount = 0
+
             tasks.all {
-                tasksAllCount++
-                println "Action " + path + " " + tasksAllCount
-            }
-            
-            gradle.buildFinished {
-                assert configureCount == 1
-                assert tasksAllCount == 15 // built in tasks + task1
+                println "Action " + path
             }
         """
 
@@ -279,7 +270,9 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
         succeeds("help")
         result.output.count("Create :task1") == 1
         result.output.count("Configure :task1") == 1
+        result.output.count("Configure :") == 1
         result.output.count("Action :task1") == 1
+        result.output.count("Action :") == 13 || 15 // built in tasks + task1 (reduced distribution has only 12 built in tasks)
     }
 
     def "build logic can configure each task of a given type only when required"() {
@@ -384,7 +377,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             tasks.register("task1", SomeTask) {
                 println "Configure ${path}"
             }
-            
+
             tasks.create("other") {
                 dependsOn tasks.withType(SomeTask).getByName("task1")
             }
@@ -402,7 +395,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             tasks.register("task1", SomeTask) {
                 println "Configure ${path}"
             }
-            
+
             tasks.create("other") {
                 dependsOn tasks.withType(SomeOtherTask).getByName("task1")
             }
@@ -422,7 +415,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             tasks.register("task1", SomeTask) {
                 println "Configure ${path}"
             }
-            
+
             tasks.create("other") {
                 dependsOn tasks.matching { it.name.contains("foo") }.getByName("task1")
             }
@@ -649,7 +642,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             }
 
             def myTask = tasks.register("myTask", SomeTask)
-            
+
             tasks.create(name: "myTask", type: SomeTask, overwrite: true) {
                println "Configure ${path}"
             }
@@ -1053,12 +1046,12 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             def baz = tasks.create("baz", SomeTask)
             def fizz = tasks.create("fizz", SomeTask)
             def fuzz = tasks.create("fuzz", SomeTask)
-           
+
             tasks.withType(SomeTask).configureEach { task ->
                 println "Configuring " + task.name
                 bar.get()
             }
-            
+
             task some { dependsOn tasks.withType(SomeTask) }
         """
 
@@ -1083,13 +1076,13 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
                 }
             }
             tasks.register("notByRule")
-            
+
             task foo {
                 dependsOn tasks.named("bar")
                 dependsOn tasks.named("baz")
                 dependsOn "notByRule"
             }
-            
+
         """
         expect:
         succeeds("foo")
@@ -1141,7 +1134,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
                     }
                 }
             }
-            
+
             allprojects {
                 (1..10).each {
                     def mytask = tasks.register("mytask" + it, MyTask)
@@ -1160,7 +1153,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
                 String message
                 @Internal
                 int number
-                
+
                 @TaskAction
                 void print() {
                     println message + " " + number
@@ -1168,7 +1161,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             }
             task foo(type: CustomTask)
             tasks.register("bar", CustomTask)
-            
+
             tasks.named("foo", CustomTask).configure {
                 message = "foo named(String, Class)"
             }
@@ -1200,7 +1193,7 @@ class DeferredTaskDefinitionIntegrationTest extends AbstractIntegrationSpec {
             }
 
             tasks.${api}("foo", CustomTask)
-            
+
             tasks.named("foo", AnotherTask) // should fail
         """
         expect:

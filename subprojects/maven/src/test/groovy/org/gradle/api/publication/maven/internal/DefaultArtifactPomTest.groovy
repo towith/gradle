@@ -34,7 +34,7 @@ import spock.lang.Specification
 import static com.google.common.collect.Lists.newArrayList
 import static org.hamcrest.CoreMatchers.equalTo
 import static org.hamcrest.CoreMatchers.startsWith
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 import static org.junit.Assert.fail
 
 class DefaultArtifactPomTest extends Specification {
@@ -42,8 +42,8 @@ class DefaultArtifactPomTest extends Specification {
     private MavenPom testPom
 
     @Rule
-    public TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
-    
+    public TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
+
     def setup() {
         testPom = new DefaultMavenPom(Mock(ConfigurationContainer), Mock(Conf2ScopeMappingContainer),
                 Mock(PomDependenciesConverter), Mock(FileResolver))
@@ -79,7 +79,7 @@ class DefaultArtifactPomTest extends Specification {
 
         artifactPom.addArtifact(mainArtifact, mainFile)
         artifactPom.addArtifact(classifierArtifact, classifierFile)
-        
+
         then:
         artifactPom.getArtifact().getName() == "someName"
         artifactPom.getArtifact().getExtension() == "mainPackaging"

@@ -18,6 +18,7 @@ package org.gradle.api.internal.plugins
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.BuildOperationsFixture
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
 
@@ -40,16 +41,18 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
         def pluginIdByClass = plugins.details.collectEntries ( { [it.pluginClass, it.pluginId ] })
         def expectedPlugins = [
             "org.gradle.api.plugins.HelpTasksPlugin": "org.gradle.help-tasks",
-            "org.gradle.buildinit.plugins.BuildInitPlugin": "org.gradle.build-init",
-            "org.gradle.buildinit.plugins.WrapperPlugin": "org.gradle.wrapper",
+            // This tests runs in :core using a reduced distribution
+            // "org.gradle.buildinit.plugins.BuildInitPlugin": "org.gradle.build-init",
+            // "org.gradle.buildinit.plugins.WrapperPlugin": "org.gradle.wrapper",
             "org.gradle.api.plugins.JavaPlugin": "org.gradle.java",
             "org.gradle.api.plugins.JavaBasePlugin": null,
+            "org.gradle.api.plugins.JvmEcosystemPlugin": null,
             "org.gradle.api.plugins.BasePlugin": null,
             "org.gradle.language.base.plugins.LifecycleBasePlugin": null,
             "org.gradle.api.plugins.ReportingBasePlugin": null,
         ]
 
-        pluginIdByClass.size() == expectedPlugins.size()
+        pluginIdByClass.size() == expectedPlugins.size() || pluginIdByClass.size() == expectedPlugins.size() + 2 // +2 if we run against the full distribution
         pluginIdByClass.entrySet().containsAll(expectedPlugins.entrySet())
     }
 
@@ -59,7 +62,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
             class MyPlugin implements Plugin {
                 void apply(t) {}
             }
-            
+
             apply plugin: MyPlugin
         """
 
@@ -83,7 +86,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
             class MyPlugin implements Plugin {
                 void apply(t) {}
             }
-            
+
             apply plugin: MyPlugin
         """
 
@@ -115,7 +118,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
             }
             class Plugin2 implements Plugin {
                 void apply(project) {
-                    
+
                 }
             }
 
@@ -140,6 +143,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
         p2.details.pluginClass == "Plugin2"
     }
 
+    @ToBeFixedForConfigurationCache(because = "composite builds")
     def "associates target to correct build"() {
         when:
         settingsFile << """
@@ -151,7 +155,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
         file("a/build.gradle") << """
             class PluginA implements Plugin {
                 void apply(project) {
-                    
+
                 }
             }
             apply plugin: PluginA
@@ -159,7 +163,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
         file("b/build.gradle") << """
             class PluginB implements Plugin {
                 void apply(project) {
-                    
+
                 }
             }
             apply plugin: PluginB
@@ -167,7 +171,7 @@ class ApplyPluginBuildOperationIntegrationTest extends AbstractIntegrationSpec {
         buildFile << """
             class PluginRoot implements Plugin {
                 void apply(project) {
-                    
+
                 }
             }
 

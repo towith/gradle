@@ -19,6 +19,7 @@ package org.gradle.internal.resource.transfer;
 import com.google.common.io.Files;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.UncheckedIOException;
+import org.gradle.api.internal.artifacts.ivyservice.ArtifactCacheLockingManager;
 import org.gradle.api.internal.artifacts.ivyservice.resolutionstrategy.ExternalResourceCachePolicy;
 import org.gradle.api.internal.file.TemporaryFileProvider;
 import org.gradle.cache.internal.ProducerGuard;
@@ -48,6 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExternalResourceAccessor {
 
@@ -57,23 +59,18 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
     private final CachedExternalResourceIndex<String> cachedExternalResourceIndex;
     private final BuildCommencedTimeProvider timeProvider;
     private final TemporaryFileProvider temporaryFileProvider;
+    private final ArtifactCacheLockingManager artifactCacheLockingManager;
     private final ExternalResourceCachePolicy externalResourceCachePolicy;
     private final ProducerGuard<ExternalResourceName> producerGuard;
     private final FileResourceRepository fileResourceRepository;
     private final ChecksumService checksumService;
 
-    public DefaultCacheAwareExternalResourceAccessor(ExternalResourceRepository delegate,
-                                                     CachedExternalResourceIndex<String> cachedExternalResourceIndex,
-                                                     BuildCommencedTimeProvider timeProvider,
-                                                     TemporaryFileProvider temporaryFileProvider,
-                                                     ExternalResourceCachePolicy externalResourceCachePolicy,
-                                                     ProducerGuard<ExternalResourceName> producerGuard,
-                                                     FileResourceRepository fileResourceRepository,
-                                                     ChecksumService checksumService) {
+    public DefaultCacheAwareExternalResourceAccessor(ExternalResourceRepository delegate, CachedExternalResourceIndex<String> cachedExternalResourceIndex, BuildCommencedTimeProvider timeProvider, TemporaryFileProvider temporaryFileProvider, ArtifactCacheLockingManager artifactCacheLockingManager, ExternalResourceCachePolicy externalResourceCachePolicy, ProducerGuard<ExternalResourceName> producerGuard, FileResourceRepository fileResourceRepository, ChecksumService checksumService) {
         this.delegate = delegate;
         this.cachedExternalResourceIndex = cachedExternalResourceIndex;
         this.timeProvider = timeProvider;
         this.temporaryFileProvider = temporaryFileProvider;
+        this.artifactCacheLockingManager = artifactCacheLockingManager;
         this.externalResourceCachePolicy = externalResourceCachePolicy;
         this.producerGuard = producerGuard;
         this.fileResourceRepository = fileResourceRepository;
@@ -154,13 +151,14 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
         });
     }
 
+    @Nullable
     private HashCode getResourceSha1(ExternalResourceName location, boolean revalidate) {
         try {
             ExternalResourceName sha1Location = location.append(".sha1");
             ExternalResource resource = delegate.resource(sha1Location, revalidate);
             ExternalResourceReadResult<HashCode> result = resource.withContentIfPresent(inputStream -> {
                 try {
-                    String sha = IOUtils.toString(inputStream, "us-ascii");
+                    String sha = IOUtils.toString(inputStream, StandardCharsets.US_ASCII);
                     if (sha.length() < 40) {
                         // servers may return sha-1 with leading 0 stripped, which is not
                         // supported by HashCode.fromString
@@ -178,6 +176,7 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
         }
     }
 
+    @Nullable
     private LocallyAvailableExternalResource copyCandidateToCache(ExternalResourceName source, ResourceFileStore fileStore, ExternalResourceMetaData remoteMetaData, HashCode remoteChecksum, LocallyAvailableResource local) throws IOException {
         final File destination = temporaryFileProvider.createTemporaryFile("gradle_download", "bin");
         try {
@@ -192,6 +191,7 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
         }
     }
 
+    @Nullable
     private LocallyAvailableExternalResource copyToCache(final ExternalResourceName source, final ResourceFileStore fileStore, final ExternalResource resource) {
         // Download to temporary location
         DownloadAction downloadAction = new DownloadAction(source);
@@ -213,10 +213,12 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
     }
 
     private LocallyAvailableExternalResource moveIntoCache(final ExternalResourceName source, final File destination, final ResourceFileStore fileStore, final ExternalResourceMetaData metaData) {
-        LocallyAvailableResource cachedResource = fileStore.moveIntoCache(destination);
-        File fileInFileStore = cachedResource.getFile();
-        cachedExternalResourceIndex.store(source.toString(), fileInFileStore, metaData);
-        return fileResourceRepository.resource(fileInFileStore, source.getUri(), metaData);
+        return artifactCacheLockingManager.useCache(() -> {
+            LocallyAvailableResource cachedResource = fileStore.moveIntoCache(destination);
+            File fileInFileStore = cachedResource.getFile();
+            cachedExternalResourceIndex.store(source.toString(), fileInFileStore, metaData);
+            return fileResourceRepository.resource(fileInFileStore, source.getUri(), metaData);
+        });
     }
 
     private long getAgeMillis(BuildCommencedTimeProvider timeProvider, CachedExternalResource cached) {
@@ -240,11 +242,8 @@ public class DefaultCacheAwareExternalResourceAccessor implements CacheAwareExte
             if (destination.getParentFile() != null) {
                 GFileUtils.mkdirs(destination.getParentFile());
             }
-            FileOutputStream outputStream = new FileOutputStream(destination);
-            try {
+            try (FileOutputStream outputStream = new FileOutputStream(destination)) {
                 IOUtils.copyLarge(inputStream, outputStream);
-            } finally {
-                outputStream.close();
             }
             return null;
         }

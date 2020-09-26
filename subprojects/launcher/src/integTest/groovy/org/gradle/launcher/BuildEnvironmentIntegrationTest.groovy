@@ -16,9 +16,11 @@
 
 package org.gradle.launcher
 
+import groovy.transform.NotYetImplemented
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.executer.ExecutionResult
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
+import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Unroll
 
@@ -48,10 +50,10 @@ task check {
     }
 
     @Issue("https://issues.gradle.org/browse/GRADLE-3145")
+    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "locale props given on the command line are respected"() {
         given:
         def nonDefaultLocale = getNonDefaultLocale()
-        executer.requireGradleDistribution()
         executer.withArguments("-Duser.language=$nonDefaultLocale.language", "-Duser.country=$nonDefaultLocale.country")
 
         and:
@@ -67,10 +69,10 @@ task check {
         succeeds 'check'
     }
 
+    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "locale props given in gradle.properties are respected"() {
         given:
         def nonDefaultLocale = getNonDefaultLocale()
-        executer.requireGradleDistribution()
         file("gradle.properties") << "org.gradle.jvmargs=-Duser.language=$nonDefaultLocale.language -Duser.country=$nonDefaultLocale.country"
 
         and:
@@ -86,11 +88,11 @@ task check {
         succeeds 'check'
     }
 
+    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "default file encoding set in gradle.properties is respected"() {
         given:
         def nonDefaultEncoding = ["UTF-8", "US-ASCII"].collect { Charset.forName(it) }.find { it != Charset.defaultCharset() }
 
-        executer.requireGradleDistribution()
         file("gradle.properties") << "org.gradle.jvmargs=-Dfile.encoding=${nonDefaultEncoding.name()}"
 
         and:
@@ -107,11 +109,11 @@ task check {
     }
 
     @Issue("https://issues.gradle.org/browse/GRADLE-3145")
+    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "default file encoding set on command line is respected"() {
         given:
         def nonDefaultEncoding = ["UTF-8", "US-ASCII"].collect { Charset.forName(it) }.find { it != Charset.defaultCharset() }
 
-        executer.requireGradleDistribution()
         executer.withArgument("-Dfile.encoding=${nonDefaultEncoding.name()}")
 
         and:
@@ -169,7 +171,6 @@ task check {
     }
 
     @Unroll("forked java processes inherit default encoding - input = #inputEncoding, expectedEncoding: #expectedEncoding")
-    @ToBeFixedForInstantExecution
     def "forked java processes inherit default encoding"() {
         given:
         executerEncoding inputEncoding
@@ -226,6 +227,8 @@ task check {
     }
 
     @Issue("https://github.com/gradle/gradle/issues/1001")
+    @IgnoreIf({ GradleContextualExecuter.embedded })
+    @NotYetImplemented
     def "system properties from gradle.properties are available to init scripts for buildSrc"() {
         given:
         executer.requireOwnGradleUserHomeDir()
@@ -239,7 +242,6 @@ task check {
             assert System.getProperty('foo') == 'bar'
             rootProject.name = 'myBuildSrc'
         """
-        executer.requireGradleDistribution()
 
         expect:
         succeeds 'help'

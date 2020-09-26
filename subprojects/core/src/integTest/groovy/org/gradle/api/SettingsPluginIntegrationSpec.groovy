@@ -17,7 +17,6 @@
 package org.gradle.api
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.plugin.PluginBuilder
 import org.gradle.test.fixtures.server.http.MavenHttpPluginRepository
@@ -32,14 +31,16 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
     MavenHttpPluginRepository mavenHttpRepo = new MavenHttpPluginRepository(mavenRepo)
 
     def setup(){
-        executer.usingSettingsFile(settingsFile)
-        settingsFile << "rootProject.projectDir = file('..')\n"
+        // Stop traversing to parent directory; otherwise embedded test execution will
+        // find and load the `gradle.properties` file in the root of the source repository
+        settingsFile.createFile()
+        executer.usingSettingsFile(relocatedSettingsFile)
+        relocatedSettingsFile << "rootProject.projectDir = file('..')\n"
     }
 
-    @ToBeFixedForInstantExecution
     def "can apply plugin class from settings.gradle"() {
         when:
-        settingsFile << """
+        relocatedSettingsFile << """
         apply plugin: SimpleSettingsPlugin
 
         class SimpleSettingsPlugin implements Plugin<Settings> {
@@ -50,23 +51,21 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
         """
 
         then:
-        succeeds(':moduleA:dependencies')
+        succeeds(':moduleA:help')
     }
 
-    @ToBeFixedForInstantExecution
     def "can apply script with relative path"() {
         setup:
         testDirectory.createFile("settings/somePath/settingsPlugin.gradle") << "apply from: 'path2/settings.gradle'";
         testDirectory.createFile("settings/somePath/path2/settings.gradle") << "include 'moduleA'";
 
         when:
-        settingsFile << "apply from: 'somePath/settingsPlugin.gradle'"
+        relocatedSettingsFile << "apply from: 'somePath/settingsPlugin.gradle'"
 
         then:
-        succeeds(':moduleA:dependencies')
+        succeeds(':moduleA:help')
     }
 
-    @ToBeFixedForInstantExecution
     def "can use plugins block"() {
         given:
         def pluginBuilder = new PluginBuilder(file("plugin"))
@@ -75,12 +74,12 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
         pluginBuilder.publishAs("g", "a", "1.0", pluginPortal, createExecuter()).allowAll()
 
         when:
-        settingsFile.text = """
+        relocatedSettingsFile.text = """
             plugins {
-                id "test-settings-plugin" version "1.0"   
+                id "test-settings-plugin" version "1.0"
             }
-            
-            $settingsFile.text
+
+            $relocatedSettingsFile.text
         """
 
         then:
@@ -90,7 +89,6 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
         outputContains(message)
     }
 
-    @ToBeFixedForInstantExecution
     def "can use plugins block with plugin management block"() {
         given:
         def pluginBuilder = new PluginBuilder(file("plugin"))
@@ -99,17 +97,17 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
         pluginBuilder.publishAs("g", "a", "1.0", mavenHttpRepo, createExecuter()).allowAll()
 
         when:
-        settingsFile.text = """
+        relocatedSettingsFile.text = """
             pluginManagement {
                 repositories {
                     maven { url "$mavenHttpRepo.uri" }
                 }
-            }   
-            plugins {
-                id "test-settings-plugin" version "1.0"   
             }
-            
-            $settingsFile.text
+            plugins {
+                id "test-settings-plugin" version "1.0"
+            }
+
+            $relocatedSettingsFile.text
         """
 
         then:
@@ -119,7 +117,7 @@ class SettingsPluginIntegrationSpec extends AbstractIntegrationSpec {
         outputContains(message)
     }
 
-    protected TestFile getSettingsFile() {
+    protected TestFile getRelocatedSettingsFile() {
         testDirectory.file('settings/settings.gradle')
     }
 }

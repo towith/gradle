@@ -17,15 +17,13 @@
 package org.gradle.integtests
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.Requires
 import org.gradle.util.TestPrecondition
 import spock.lang.Unroll
 
-import static org.gradle.integtests.fixtures.RepoScriptBlockUtil.*
+import static org.gradle.integtests.fixtures.RepoScriptBlockUtil.gradlePluginRepositoryDefinition
+import static org.gradle.integtests.fixtures.RepoScriptBlockUtil.jcenterRepository
 
-@Requires(TestPrecondition.JDK8_OR_LATER)
 class IsolatedAntBuilderMemoryLeakIntegrationTest extends AbstractIntegrationSpec {
 
     private void goodCode(String groovyVersion, TestFile root = testDirectory) {
@@ -87,7 +85,6 @@ class IsolatedAntBuilderMemoryLeakIntegrationTest extends AbstractIntegrationSpe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     void 'CodeNarc does not fail with PermGen space error, Groovy #groovyVersion'() {
         given:
         withCodenarc(groovyVersion)
@@ -113,13 +110,13 @@ class IsolatedAntBuilderMemoryLeakIntegrationTest extends AbstractIntegrationSpe
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     void "does not fail with a PermGen space error or a missing method exception"() {
         given:
+        initGitDir()
         buildFile << """
 buildscript {
   repositories {
-    ${gradlePluginRepositoryDefinition()} 
+    ${gradlePluginRepositoryDefinition()}
   }
 
   dependencies {

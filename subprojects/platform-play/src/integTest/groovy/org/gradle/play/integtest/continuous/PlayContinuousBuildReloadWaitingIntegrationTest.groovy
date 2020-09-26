@@ -16,8 +16,7 @@
 
 package org.gradle.play.integtest.continuous
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.integtests.fixtures.ToBeFixedForVfsRetention
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 /**
  * Test that app requests block while a build is in progress when using `--continuous`.
@@ -29,7 +28,7 @@ class PlayContinuousBuildReloadWaitingIntegrationTest extends AbstractPlayReload
         addPendingChangesHook()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(skip = ToBeFixedForConfigurationCache.Skip.FAILS_TO_CLEANUP)
     def "wait for changes to be built when a request comes in during a build"() {
         file('hooks.gradle') << """
             gradle.projectsLoaded {
@@ -49,7 +48,7 @@ class PlayContinuousBuildReloadWaitingIntegrationTest extends AbstractPlayReload
         appIsRunningAndDeployed()
 
         when:
-        def block = server.expectAndBlock( "buildStarted")
+        def block = server.expectAndBlock("buildStarted")
         addNewRoute("hello")
         block.waitForAllPendingCalls()
         block.releaseAll()
@@ -59,7 +58,7 @@ class PlayContinuousBuildReloadWaitingIntegrationTest extends AbstractPlayReload
         checkRoute 'hello'
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(skip = ToBeFixedForConfigurationCache.Skip.FAILS_TO_CLEANUP)
     def "wait for pending changes to be built if a request comes in during a build and there are pending changes"() {
         when:
         succeeds("runPlayBinary")
@@ -83,9 +82,9 @@ class PlayContinuousBuildReloadWaitingIntegrationTest extends AbstractPlayReload
         // goodbye route is added by second change, so if it's available, we know we've blocked
         checkRoute 'goodbye'
         checkRoute 'hello'
-     }
+    }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(skip = ToBeFixedForConfigurationCache.Skip.FAILS_TO_CLEANUP)
     def "wait for pending changes to be built if a request comes in during a failing build and there are pending changes"() {
         when:
         succeeds("runPlayBinary")
@@ -109,8 +108,7 @@ class PlayContinuousBuildReloadWaitingIntegrationTest extends AbstractPlayReload
         checkRoute 'hello'
     }
 
-    @ToBeFixedForInstantExecution
-    @ToBeFixedForVfsRetention(because = "https://github.com/gradle/gradle/issues/11837")
+    @ToBeFixedForConfigurationCache(skip = ToBeFixedForConfigurationCache.Skip.LONG_TIMEOUT)
     def "wait for changes to be built when a request comes in during initial app startup and there are pending changes"() {
         given:
         // prebuild so the build doesn't timeout waiting for rebuild signal

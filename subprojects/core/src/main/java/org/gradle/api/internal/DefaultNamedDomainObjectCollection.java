@@ -26,6 +26,7 @@ import org.gradle.api.NamedDomainObjectCollection;
 import org.gradle.api.NamedDomainObjectCollectionSchema;
 import org.gradle.api.NamedDomainObjectProvider;
 import org.gradle.api.Namer;
+import org.gradle.api.NonExtensible;
 import org.gradle.api.Rule;
 import org.gradle.api.UnknownDomainObjectException;
 import org.gradle.api.internal.collections.CollectionEventRegister;
@@ -222,7 +223,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
 
     @Override
     public Namer<T> getNamer() {
-        return (Namer) this.namer;
+        return Cast.uncheckedNonnullCast(this.namer);
     }
 
     protected Instantiator getInstantiator() {
@@ -238,7 +239,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
      */
     @Override
     protected <S extends T> DefaultNamedDomainObjectCollection<S> filtered(CollectionFilter<S> filter) {
-        return instantiator.newInstance(DefaultNamedDomainObjectCollection.class, this, filter, instantiator, namer);
+        return Cast.uncheckedNonnullCast(instantiator.newInstance(DefaultNamedDomainObjectCollection.class, this, filter, instantiator, namer));
     }
 
     public String getDisplayName() {
@@ -691,7 +692,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         public ProviderInternal<? extends T> getPending(String name) {
             ProviderInternal<?> provider = delegate.getPending(name);
             if (provider != null && provider.getType() != null && filter.getType().isAssignableFrom(provider.getType())) {
-                return (ProviderInternal<? extends T>) provider;
+                return Cast.uncheckedNonnullCast(provider);
             } else {
                 return null;
             }
@@ -735,11 +736,11 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
 
     private static class ObjectBackedElementInfo<T> implements ElementInfo<T> {
         private final String name;
-        private final T o;
+        private final T obj;
 
-        ObjectBackedElementInfo(String name, T o) {
+        ObjectBackedElementInfo(String name, T obj) {
             this.name = name;
-            this.o = o;
+            this.obj = obj;
         }
 
         @Override
@@ -749,7 +750,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
 
         @Override
         public Class<?> getType() {
-            return new DslObject(o).getDeclaredType();
+            return new DslObject(obj).getDeclaredType();
         }
     }
 
@@ -808,6 +809,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         return Cast.uncheckedCast(getInstantiator().newInstance(ExistingNamedDomainObjectProvider.class, this, name, new DslObject(object).getDeclaredType()));
     }
 
+    @NonExtensible
     protected abstract class AbstractNamedDomainObjectProvider<I extends T> extends AbstractMinimalProvider<I> implements Named, NamedDomainObjectProvider<I> {
         private final String name;
         private final Class<I> type;
@@ -829,19 +831,19 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
 
         @Override
-        public boolean isPresent() {
+        public boolean calculatePresence(ValueConsumer consumer) {
             return findDomainObject(getName()) != null;
         }
 
         @Override
         public String toString() {
-            return String.format("provider(%s %s, %s)", getTypeDisplayName(), getName(), getType());
+            return String.format("provider(%s '%s', %s)", getTypeDisplayName(), getName(), getType());
         }
     }
 
     protected class ExistingNamedDomainObjectProvider<I extends T> extends AbstractNamedDomainObjectProvider<I> {
 
-        public ExistingNamedDomainObjectProvider(String name, Class type) {
+        public ExistingNamedDomainObjectProvider(String name, Class<I> type) {
             super(name, type);
         }
 
@@ -852,7 +854,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
 
         @Override
-        public boolean isPresent() {
+        public boolean calculatePresence(ValueConsumer consumer) {
             return getOrNull() != null;
         }
 
@@ -865,7 +867,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
 
         @Override
-        protected Value<I> calculateOwnValue() {
+        protected Value<I> calculateOwnValue(ValueConsumer consumer) {
             return Value.ofNullable(Cast.uncheckedCast(findByNameWithoutRules(getName())));
         }
     }
@@ -886,7 +888,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
 
         @Override
-        public boolean isPresent() {
+        public boolean calculatePresence(ValueConsumer consumer) {
             return findDomainObject(getName()) != null;
         }
 
@@ -914,7 +916,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
         }
 
         @Override
-        protected Value<? extends I> calculateOwnValue() {
+        protected Value<? extends I> calculateOwnValue(ValueConsumer consumer) {
             if (wasElementRemoved()) {
                 return Value.missing();
             }

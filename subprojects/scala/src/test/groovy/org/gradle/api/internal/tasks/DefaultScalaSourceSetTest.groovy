@@ -29,10 +29,10 @@ import static org.gradle.util.Matchers.isEmpty
 import static org.hamcrest.CoreMatchers.equalTo
 import static org.hamcrest.CoreMatchers.hasItem
 import static org.hamcrest.CoreMatchers.instanceOf
-import static org.junit.Assert.assertThat
+import static org.hamcrest.MatcherAssert.assertThat
 
 class DefaultScalaSourceSetTest {
-    public @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    public @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     private final DefaultScalaSourceSet sourceSet = new DefaultScalaSourceSet("<set-display-name>", TestUtil.objectFactory(tmpDir.testDirectory))
 

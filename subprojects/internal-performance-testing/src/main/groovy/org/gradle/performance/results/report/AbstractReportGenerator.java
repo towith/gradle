@@ -18,28 +18,36 @@ package org.gradle.performance.results.report;
 
 import org.apache.commons.lang.StringUtils;
 import org.gradle.performance.results.FileRenderer;
+import org.gradle.performance.results.NoResultsStore;
+import org.gradle.performance.results.PerformanceDatabase;
 import org.gradle.performance.results.PerformanceTestHistory;
 import org.gradle.performance.results.ResultsStore;
 import org.gradle.performance.results.ResultsStoreHelper;
+import org.gradle.performance.results.ScenarioBuildResultData;
 import org.gradle.util.GFileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.gradle.performance.results.report.PerformanceFlakinessDataProvider.EmptyPerformanceFlakinessDataProvider;
 
 public abstract class AbstractReportGenerator<R extends ResultsStore> {
     protected void generateReport(String... args) {
         File outputDirectory = new File(args[0]);
-        File resultJson = new File(args[1]);
-        String projectName = args[2];
-
+        String projectName = args[1];
+        List<File> resultJsons = new ArrayList<>();
+        for (int i = 2; i < args.length; i++) {
+            resultJsons.add(new File(args[i]));
+        }
 
         try (ResultsStore store = getResultsStore()) {
-            PerformanceExecutionDataProvider executionDataProvider = getExecutionDataProvider(store, resultJson);
+            PerformanceExecutionDataProvider executionDataProvider = getExecutionDataProvider(store, resultJsons);
             PerformanceFlakinessDataProvider flakinessDataProvider = getFlakinessDataProvider();
             generateReport(store, flakinessDataProvider, executionDataProvider, outputDirectory, projectName);
             checkResult(flakinessDataProvider, executionDataProvider);
@@ -52,19 +60,22 @@ public abstract class AbstractReportGenerator<R extends ResultsStore> {
         return EmptyPerformanceFlakinessDataProvider.INSTANCE;
     }
 
-    protected PerformanceExecutionDataProvider getExecutionDataProvider(ResultsStore store, File resultJson) {
-        return new DefaultPerformanceExecutionDataProvider(store, resultJson);
+    protected PerformanceExecutionDataProvider getExecutionDataProvider(ResultsStore store, List<File> resultJsons) {
+        return new DefaultPerformanceExecutionDataProvider(store, resultJsons);
     }
 
     protected void generateReport(ResultsStore store, PerformanceFlakinessDataProvider flakinessDataProvider, PerformanceExecutionDataProvider executionDataProvider, File outputDirectory, String projectName) throws IOException {
         renderIndexPage(flakinessDataProvider, executionDataProvider, new File(outputDirectory, "index.html"));
 
-        for (String testName : store.getTestNames()) {
-            PerformanceTestHistory testResults = store.getTestResults(testName, 500, 90, ResultsStoreHelper.determineChannel());
-            renderScenarioPage(projectName, outputDirectory, testResults);
-        }
+        executionDataProvider.getScenarioExecutionData().stream()
+            .map(ScenarioBuildResultData::getPerformanceExperiment)
+            .distinct()
+            .forEach(experiment -> {
+                PerformanceTestHistory testResults = store.getTestResults(experiment, 500, 90, ResultsStoreHelper.determineChannel());
+                renderScenarioPage(projectName, outputDirectory, testResults);
+            });
 
-        copyResource("jquery.min-1.11.0.js", outputDirectory);
+        copyResource("jquery.min-3.5.1.js", outputDirectory);
         copyResource("flot-0.8.1-min.js", outputDirectory);
         copyResource("flot.selection.min.js", outputDirectory);
         copyResource("style.css", outputDirectory);
@@ -80,15 +91,22 @@ public abstract class AbstractReportGenerator<R extends ResultsStore> {
     protected void checkResult(PerformanceFlakinessDataProvider flakinessDataProvider, PerformanceExecutionDataProvider executionDataProvider) {
     }
 
-    protected void renderScenarioPage(String projectName, File outputDirectory, PerformanceTestHistory testResults) throws IOException {
+    protected void renderScenarioPage(String projectName, File outputDirectory, PerformanceTestHistory testResults) {
         FileRenderer fileRenderer = new FileRenderer();
         TestPageGenerator testHtmlRenderer = new TestPageGenerator(projectName);
         TestDataGenerator testDataRenderer = new TestDataGenerator();
-        fileRenderer.render(testResults, testHtmlRenderer, new File(outputDirectory, "tests/" + testResults.getId() + ".html"));
-        fileRenderer.render(testResults, testDataRenderer, new File(outputDirectory, "tests/" + testResults.getId() + ".json"));
+        try {
+            fileRenderer.render(testResults, testHtmlRenderer, new File(outputDirectory, "tests/" + testResults.getId() + ".html"));
+            fileRenderer.render(testResults, testDataRenderer, new File(outputDirectory, "tests/" + testResults.getId() + ".json"));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     protected ResultsStore getResultsStore() throws ReflectiveOperationException {
+        if (!PerformanceDatabase.isAvailable()) {
+            return NoResultsStore.getInstance();
+        }
         Type superClass = getClass().getGenericSuperclass();
         Class<? extends ResultsStore> resultsStoreClass = (Class<R>) ((ParameterizedType) superClass).getActualTypeArguments()[0];
         return resultsStoreClass.getConstructor().newInstance();

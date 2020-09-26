@@ -16,15 +16,11 @@
 
 package org.gradle.api.publish.ivy
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.Requires
 
 import javax.xml.namespace.QName
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
-
-@Requires([KOTLIN_SCRIPT])
 class IvyPublishDescriptorCustomizationKotlinDslIntegTest extends AbstractIvyPublishIntegTest {
 
     @Override
@@ -41,7 +37,7 @@ class IvyPublishDescriptorCustomizationKotlinDslIntegTest extends AbstractIvyPub
         requireOwnGradleUserHomeDir() // Isolate Kotlin DSL extensions API jar
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can customize Ivy descriptor using Kotlin DSL"() {
         given:
         settingsFile << 'rootProject.name = "customizeIvy"'

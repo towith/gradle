@@ -17,35 +17,34 @@
 
 package org.gradle.integtests.publish.ivy
 
+
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.executer.ProgressLoggingFixture
-import org.gradle.internal.jvm.Jvm
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.server.http.AuthScheme
 import org.gradle.test.fixtures.server.http.HttpServer
 import org.gradle.test.fixtures.server.http.IvyHttpModule
 import org.gradle.test.fixtures.server.http.IvyHttpRepository
 import org.gradle.util.GradleVersion
-import org.gradle.util.Requires
 import org.hamcrest.CoreMatchers
 import org.junit.Rule
-import spock.lang.Issue
 import spock.lang.Unroll
 
 import static org.gradle.test.matchers.UserAgentMatcher.matchesNameAndVersion
 import static org.gradle.util.Matchers.matchesRegexp
-import static org.gradle.util.TestPrecondition.FIX_TO_WORK_ON_JAVA9
 
-public class IvyHttpPublishIntegrationTest extends AbstractIntegrationSpec {
+class IvyHttpPublishIntegrationTest extends AbstractIntegrationSpec {
     private static final String BAD_CREDENTIALS = '''
-credentials {
-    username 'testuser'
-    password 'bad'
-}
-'''
-    @Rule ProgressLoggingFixture progressLogging = new ProgressLoggingFixture(executer, temporaryFolder)
-    @Rule HttpServer server = new HttpServer()
+        credentials {
+            username 'testuser'
+            password 'bad'
+        }
+        '''
+    @Rule
+    ProgressLoggingFixture progressLogging = new ProgressLoggingFixture(executer, temporaryFolder)
+    @Rule
+    HttpServer server = new HttpServer()
 
     private IvyHttpModule module
     private IvyHttpRepository ivyHttpRepo
@@ -54,31 +53,31 @@ credentials {
         ivyHttpRepo = new IvyHttpRepository(server, ivyRepo)
         module = ivyHttpRepo.module("org.gradle", "publish", "2")
         server.expectUserAgent(matchesNameAndVersion("Gradle", GradleVersion.current().getVersion()))
-    }
-
-    @Unroll
-    @ToBeFixedForInstantExecution
-    def "can publish to authenticated repository using #authScheme auth"() {
-        given:
         server.start()
 
         settingsFile << 'rootProject.name = "publish"'
-        buildFile << """
-apply plugin: 'java'
-version = '2'
-group = 'org.gradle'
-uploadArchives {
-    repositories {
-        ivy {
-            credentials {
-                username 'testuser'
-                password 'password'
-            }
-            url "${ivyHttpRepo.uri}"
-        }
     }
-}
-"""
+
+    @Unroll
+    @ToBeFixedForConfigurationCache
+    def "can publish to authenticated repository using #authScheme auth"() {
+        given:
+        buildFile << """
+        apply plugin: 'java'
+        version = '2'
+        group = 'org.gradle'
+        uploadArchives {
+            repositories {
+                ivy {
+                    credentials {
+                        username 'testuser'
+                        password 'password'
+                    }
+                    url "${ivyHttpRepo.uri}"
+                }
+            }
+        }
+        """
 
         and:
         server.authenticationScheme = authScheme
@@ -108,26 +107,22 @@ uploadArchives {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "reports failure publishing with #credsName credentials to authenticated repository using #authScheme auth"() {
         given:
-        server.start()
-
-        and:
-        settingsFile << 'rootProject.name = "publish"'
         buildFile << """
-apply plugin: 'java'
-version = '2'
-group = 'org.gradle'
-uploadArchives {
-    repositories {
-        ivy {
-            $creds
-            url "${ivyHttpRepo.uri}"
+        apply plugin: 'java'
+        version = '2'
+        group = 'org.gradle'
+        uploadArchives {
+            repositories {
+                ivy {
+                    $creds
+                    url "${ivyHttpRepo.uri}"
+                }
+            }
         }
-    }
-}
-"""
+        """
 
         and:
         server.authenticationScheme = authScheme
@@ -152,22 +147,21 @@ uploadArchives {
         AuthScheme.NTLM   | 'bad'     | BAD_CREDENTIALS
     }
 
-    @ToBeFixedForInstantExecution
-    public void reportsFailedPublishToHttpRepository() {
+    @ToBeFixedForConfigurationCache
+    void reportsFailedPublishToHttpRepository() {
         given:
-        server.start()
         def repositoryPort = server.port
 
         buildFile << """
-apply plugin: 'java'
-uploadArchives {
-    repositories {
-        ivy {
-            url "${ivyHttpRepo.uri}"
+        apply plugin: 'java'
+        uploadArchives {
+            repositories {
+                ivy {
+                    url "${ivyHttpRepo.uri}"
+                }
+            }
         }
-    }
-}
-"""
+        """
 
         when:
         server.addBroken("/")
@@ -194,27 +188,24 @@ uploadArchives {
         failure.assertThatCause(matchesRegexp(".*?Connect to 127.0.0.1:${repositoryPort} (\\[.*\\])? failed: Connection refused.*"))
     }
 
-    @ToBeFixedForInstantExecution
-    public void usesFirstConfiguredPatternForPublication() {
+    @ToBeFixedForConfigurationCache
+    void usesFirstConfiguredPatternForPublication() {
         given:
-        server.start()
-
-        settingsFile << 'rootProject.name = "publish"'
         buildFile << """
-    apply plugin: 'java'
-    version = '2'
-    group = 'org.gradle'
-    uploadArchives {
-        repositories {
-            ivy {
-                artifactPattern "${ivyHttpRepo.artifactPattern}"
-                artifactPattern "http://localhost:${server.port}/alternative/[module]/[artifact]-[revision].[ext]"
-                ivyPattern "${ivyHttpRepo.ivyPattern}"
-                ivyPattern "http://localhost:${server.port}/secondary-ivy/[module]/ivy-[revision].xml"
+        apply plugin: 'java'
+        version = '2'
+        group = 'org.gradle'
+        uploadArchives {
+            repositories {
+                ivy {
+                    artifactPattern "${ivyHttpRepo.artifactPattern}"
+                    artifactPattern "http://localhost:${server.port}/alternative/[module]/[artifact]-[revision].[ext]"
+                    ivyPattern "${ivyHttpRepo.ivyPattern}"
+                    ivyPattern "http://localhost:${server.port}/secondary-ivy/[module]/ivy-[revision].xml"
+                }
             }
         }
-    }
-    """
+        """
 
         and:
         module.jar.expectPut()
@@ -235,41 +226,40 @@ uploadArchives {
         module.jarFile.assertIsCopyOf(file('build/libs/publish-2.jar'))
     }
 
-    @Requires(FIX_TO_WORK_ON_JAVA9)
-    @Issue('provide a different large jar')
-    @ToBeFixedForInstantExecution
-    public void "can publish large artifact (tools.jar) to authenticated repository"() {
+    @ToBeFixedForConfigurationCache
+    void "can publish large artifact to authenticated repository"() {
         given:
-        server.start()
-        def toolsJar = Jvm.current().toolsJar
-
-        settingsFile << 'rootProject.name = "publish"'
-        buildFile << """
-apply plugin: 'base'
-version = '2'
-group = 'org.gradle'
-
-configurations {
-    tools
-}
-artifacts {
-    tools(file('${toolsJar.toURI()}')) {
-        name 'publish'
-    }
-}
-
-uploadTools {
-    repositories {
-        ivy {
-            credentials {
-                username 'testuser'
-                password 'password'
-            }
-            url "${ivyHttpRepo.uri}"
+        def largeJar = file("large.jar")
+        new RandomAccessFile(largeJar, "rw").withCloseable {
+            it.length = 1024 * 1024 * 10 // 10 mb
         }
-    }
-}
-"""
+
+        buildFile << """
+        apply plugin: 'base'
+        version = '2'
+        group = 'org.gradle'
+
+        configurations {
+            tools
+        }
+        artifacts {
+            tools(file('${largeJar.toURI()}')) {
+                name 'publish'
+            }
+        }
+
+        uploadTools {
+            repositories {
+                ivy {
+                    credentials {
+                        username 'testuser'
+                        password 'password'
+                    }
+                    url "${ivyHttpRepo.uri}"
+                }
+            }
+        }
+        """
 
         and:
         module.jar.expectPut('testuser', 'password')
@@ -286,6 +276,7 @@ uploadTools {
 
         then:
         module.assertIvyAndJarFilePublished()
-        module.jarFile.assertIsCopyOf(new TestFile(toolsJar))
+        module.jarFile.assertIsCopyOf(new TestFile(largeJar))
     }
+
 }

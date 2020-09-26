@@ -16,13 +16,14 @@
 
 package org.gradle.smoketests
 
-import org.gradle.integtests.fixtures.UnsupportedWithInstantExecution
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.integtests.fixtures.android.AndroidHome
 import org.gradle.testkit.runner.TaskOutcome
 import org.gradle.util.Requires
 import org.gradle.util.TestPrecondition
 import org.gradle.util.VersionNumber
 import spock.lang.Unroll
+
 
 /**
  * For these tests to run you need to set ANDROID_HOME to your Android SDK directory
@@ -41,8 +42,14 @@ class AndroidPluginsSmokeTest extends AbstractSmokeTest {
         AndroidHome.assertIsSet()
     }
 
+    // TODO:configuration-cache remove once fixed upstream
+    @Override
+    protected int maxConfigurationCacheProblems() {
+        return 100
+    }
+
     @Unroll
-    @UnsupportedWithInstantExecution(iterationMatchers = AGP_3_ITERATION_MATCHER)
+    @UnsupportedWithConfigurationCache(iterationMatchers = [AGP_3_ITERATION_MATCHER, AGP_4_0_ITERATION_MATCHER])
     def "android library and application APK assembly (agp=#agpVersion, ide=#ide)"(
         String agpVersion, boolean ide
     ) {
@@ -77,7 +84,7 @@ class AndroidPluginsSmokeTest extends AbstractSmokeTest {
         }
 
         and:
-        assertInstantExecutionStateStored()
+        assertConfigurationCacheStateStored()
 
         when: 'up-to-date build'
         result = runner.build()
@@ -88,7 +95,7 @@ class AndroidPluginsSmokeTest extends AbstractSmokeTest {
         result.task(':app:assembleDebug').outcome == TaskOutcome.UP_TO_DATE
 
         and:
-        assertInstantExecutionStateLoaded()
+        assertConfigurationCacheStateLoaded()
 
         when: 'abi change on library'
         abiChange.run()
@@ -101,7 +108,7 @@ class AndroidPluginsSmokeTest extends AbstractSmokeTest {
         result.task(':app:assembleDebug').outcome == TaskOutcome.SUCCESS
 
         and:
-        assertInstantExecutionStateLoaded()
+        assertConfigurationCacheStateLoaded()
 
         when: 'clean re-build'
         useAgpVersion(agpVersion, this.runner('clean')).build()
@@ -113,7 +120,7 @@ class AndroidPluginsSmokeTest extends AbstractSmokeTest {
         result.task(':app:assembleDebug').outcome == TaskOutcome.SUCCESS
 
         and:
-        assertInstantExecutionStateLoaded()
+        assertConfigurationCacheStateLoaded()
 
         where:
         [agpVersion, ide] << [

@@ -15,8 +15,6 @@
  */
 package org.gradle.api.plugins.quality.pmd
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.util.TestPrecondition
 import org.gradle.util.VersionNumber
 import org.hamcrest.Matcher
 import org.junit.Assume
@@ -40,7 +38,7 @@ class PmdPluginAuxclasspathIntegrationTest extends AbstractPmdPluginVersionInteg
 
                 apply plugin: 'java'
 
-                ${!TestPrecondition.FIX_TO_WORK_ON_JAVA9.fulfilled ? "sourceCompatibility = 1.7" : ""}
+                ${requiredSourceCompatibility()}
             }
 
             project("pmd-rule") {
@@ -60,6 +58,7 @@ class PmdPluginAuxclasspathIntegrationTest extends AbstractPmdPluginVersionInteg
 
                 pmd {
                     ruleSets = ["java-auxclasspath"]
+                    ${supportIncrementalAnalysis() ? "" : "incrementalAnalysis = false"}
                 }
             }
         """.stripIndent()
@@ -70,7 +69,6 @@ class PmdPluginAuxclasspathIntegrationTest extends AbstractPmdPluginVersionInteg
         file("rule-using/src/main/java/org/gradle/ruleusing/Class1.java") << analyzedCode()
     }
 
-    @ToBeFixedForInstantExecution
     def "auxclasspath configured for rule-using project"() {
         Assume.assumeTrue(supportsAuxclasspath() && fileLockingIssuesSolved())
 
@@ -82,7 +80,6 @@ class PmdPluginAuxclasspathIntegrationTest extends AbstractPmdPluginVersionInteg
             assertContents(containsText("auxclasspath configured"))
     }
 
-    @ToBeFixedForInstantExecution
     def "auxclasspath not configured properly for rule-using project"() {
         Assume.assumeTrue(supportsAuxclasspath() && fileLockingIssuesSolved())
 

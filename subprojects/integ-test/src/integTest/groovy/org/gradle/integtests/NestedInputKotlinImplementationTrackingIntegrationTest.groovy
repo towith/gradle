@@ -19,14 +19,11 @@ package org.gradle.integtests
 import org.gradle.integtests.fixtures.AbstractPluginIntegrationTest
 import org.gradle.integtests.fixtures.DirectoryBuildCacheFixture
 import org.gradle.integtests.fixtures.KotlinDslTestUtil
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.test.fixtures.file.LeaksFileHandles
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 import spock.lang.Issue
 
-@Requires([TestPrecondition.KOTLIN_SCRIPT])
 @LeaksFileHandles
 class NestedInputKotlinImplementationTrackingIntegrationTest extends AbstractPluginIntegrationTest implements DirectoryBuildCacheFixture {
 
@@ -35,7 +32,7 @@ class NestedInputKotlinImplementationTrackingIntegrationTest extends AbstractPlu
         return 'build.gradle.kts'
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
     def "implementations in nested Action property in Kotlin build script is tracked"() {
         setupTaskWithNestedAction('org.gradle.api.Action<File>', '.execute')
         buildFile << """
@@ -69,7 +66,7 @@ class NestedInputKotlinImplementationTrackingIntegrationTest extends AbstractPlu
         output.contains "Implementation of input property 'action' has changed for task ':myTask'"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
     def "implementations in nested lambda property in Kotlin build script is tracked"() {
         setupTaskWithNestedAction('(File) -> Unit', '')
         buildFile << """
@@ -104,6 +101,7 @@ class NestedInputKotlinImplementationTrackingIntegrationTest extends AbstractPlu
     }
 
     @Issue("https://github.com/gradle/gradle/issues/11703")
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
     def "nested bean from closure can be used with the build cache"() {
         def project1 = file("project1").createDir()
         def project2 = file("project2").createDir()

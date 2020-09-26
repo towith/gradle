@@ -17,6 +17,7 @@ package org.gradle.api.internal.artifacts.repositories
 
 import groovy.transform.CompileStatic
 import org.gradle.api.artifacts.repositories.AuthenticationContainer
+import org.gradle.api.internal.FeaturePreviews
 import org.gradle.api.internal.artifacts.DependencyManagementTestUtil
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.GradleModuleMetadataParser
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MetaDataParser
@@ -25,7 +26,6 @@ import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransp
 import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransportFactory
 import org.gradle.api.internal.file.FileResolver
 import org.gradle.api.internal.filestore.DefaultArtifactIdentifierFileStore
-import org.gradle.api.model.ObjectFactory
 import org.gradle.internal.component.external.model.ModuleComponentArtifactMetadata
 import org.gradle.internal.component.external.model.maven.MutableMavenModuleResolveMetadata
 import org.gradle.internal.isolation.IsolatableFactory
@@ -47,7 +47,6 @@ class DefaultMavenLocalRepositoryTest extends Specification {
     final AuthenticationContainer authenticationContainer = Stub()
     final FileResourceRepository fileResourceRepository = Mock()
     final MavenMutableModuleMetadataFactory mavenMetadataFactory = DependencyManagementTestUtil.mavenMetadataFactory()
-    final ObjectFactory objectFactory = Mock()
     final DefaultUrlArtifactRepository.Factory urlArtifactRepositoryFactory = new DefaultUrlArtifactRepository.Factory(resolver)
 
     final DefaultMavenArtifactRepository repository = createRepository()
@@ -66,9 +65,10 @@ class DefaultMavenLocalRepositoryTest extends Specification {
             fileResourceRepository,
             mavenMetadataFactory,
             (IsolatableFactory) SnapshotTestUtil.valueSnapshotter(),
-            objectFactory,
+            TestUtil.objectFactory(),
             urlArtifactRepositoryFactory,
-            TestUtil.checksumService
+            TestUtil.checksumService,
+            new FeaturePreviews()
         )
     }
 

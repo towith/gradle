@@ -17,8 +17,10 @@
 package org.gradle.invocation
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import spock.lang.Unroll
 
+@UnsupportedWithConfigurationCache
 class BuildStartedDeprecatedIntegrationTest extends AbstractIntegrationSpec {
     private static final String INIT_FILE_NAME = "init.gradle"
 

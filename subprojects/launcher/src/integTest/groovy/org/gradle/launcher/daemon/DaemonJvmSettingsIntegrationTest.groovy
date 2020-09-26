@@ -18,11 +18,10 @@ package org.gradle.launcher.daemon
 
 import org.gradle.api.JavaVersion
 import org.gradle.integtests.fixtures.daemon.DaemonIntegrationSpec
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
+import spock.lang.IgnoreIf
 import spock.lang.Unroll
 
-@Requires(TestPrecondition.NOT_UNKNOWN_OS)
 class DaemonJvmSettingsIntegrationTest extends DaemonIntegrationSpec {
     def "uses current JVM and default JVM args when none specified"() {
         file('build.gradle') << """
@@ -37,6 +36,7 @@ assert java.lang.management.ManagementFactory.runtimeMXBean.inputArguments.conta
         succeeds()
     }
 
+    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "JVM args from gradle.properties packaged in distribution override defaults"() {
         setup:
         requireIsolatedGradleDistribution()
@@ -60,13 +60,13 @@ assert java.lang.management.ManagementFactory.runtimeMXBean.inputArguments.conta
     @Unroll
     def "uses defaults for max/min heap size when JAVA_TOOL_OPTIONS is set (#javaToolOptions)"() {
         setup:
-        executer.requireGradleDistribution()
+        executer.requireDaemon().requireIsolatedDaemons()
         boolean java9orAbove = JavaVersion.current().java9Compatible
 
         buildScript """
             import java.lang.management.ManagementFactory
             import java.lang.management.MemoryMXBean
-            
+
             println "GRADLE_VERSION: " + gradle.gradleVersion
 
             task verify {
@@ -74,7 +74,7 @@ assert java.lang.management.ManagementFactory.runtimeMXBean.inputArguments.conta
                     MemoryMXBean memBean = ManagementFactory.getMemoryMXBean()
                     println "Initial Heap: " + memBean.heapMemoryUsage.init
                     assert memBean.heapMemoryUsage.init == 256 * 1024 * 1024
-                    println "    Max Heap: " + memBean.heapMemoryUsage.max 
+                    println "    Max Heap: " + memBean.heapMemoryUsage.max
 
                     // Java 8 does not report max heap size exactly matching the command line setting
                     if ($java9orAbove) {
@@ -98,5 +98,19 @@ assert java.lang.management.ManagementFactory.runtimeMXBean.inputArguments.conta
 
         where:
         javaToolOptions << ["-Xms513m", "-Xmx255m", "-Xms128m -Xmx256m"]
+    }
+
+    def 'can start the daemon with ClassLoading tracing enabled'() {
+        given:
+        file('build.gradle') << """
+println 'Started'
+"""
+        executer.useOnlyRequestedJvmOpts()
+
+        when:
+        file('gradle.properties') << 'org.gradle.jvmargs=-XX:+TraceClassLoading'
+
+        then:
+        succeeds()
     }
 }

@@ -42,7 +42,7 @@ enum JavaTestProject {
         .withSourceFiles(100)
         .withSubProjects(500)
         .withDaemonMemory('1536m')
-        .withCompilerMemory('256m')
+        .withCompilerMemory('512m')
         .assembleChangeFile()
         .testChangeFile(450, 2250, 45000).create()),
     LARGE_MONOLITHIC_GROOVY_PROJECT(new TestProjectGeneratorConfigurationBuilder("largeMonolithicGroovyProject", Language.GROOVY)
@@ -130,13 +130,21 @@ enum JavaTestProject {
         .withCompilerMemory("64m")
         .assembleChangeFile()
         .create()),
-    SMALL_JAVA_MULTI_PROJECT_NO_BUILD_SRC(new TestProjectGeneratorConfigurationBuilder('smallJavaMultiProject')
+    SMALL_JAVA_MULTI_PROJECT_NO_BUILD_SRC(new TestProjectGeneratorConfigurationBuilder('smallJavaMultiProjectNoBuildSrc')
         .withSourceFiles(50)
         .withSubProjects(10)
         .withDaemonMemory("256m")
         .withCompilerMemory("64m")
         .assembleChangeFile()
         .withBuildSrc(false).create())
+
+    static JavaTestProject projectFor(String testProject) {
+        def javaTestProject = values().find { it.projectName == testProject }
+        if (javaTestProject == null) {
+            throw new IllegalArgumentException("Cannot find Java test project for ${testProject}")
+        }
+        return javaTestProject
+    }
 
     private TestProjectGeneratorConfiguration config
 

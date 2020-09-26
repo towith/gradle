@@ -27,7 +27,11 @@ import org.gradle.tooling.internal.provider.BuildModelAction
 import org.gradle.tooling.internal.provider.ClientProvidedBuildAction
 import org.gradle.tooling.internal.provider.TestExecutionRequestAction
 import org.gradle.tooling.internal.provider.serialization.SerializedPayload
+import spock.lang.Unroll
 
+import java.beans.Introspector
+
+@Unroll
 class BuildActionSerializerTest extends SerializerSpec {
     def "serializes ExecuteBuildAction with all defaults"() {
         def action = new ExecuteBuildAction(new StartParameterInternal())
@@ -40,18 +44,34 @@ class BuildActionSerializerTest extends SerializerSpec {
     def "serializes ExecuteBuildAction with non-defaults"() {
         def startParameter = new StartParameterInternal()
         startParameter.taskNames = ['a', 'b']
-        startParameter.addDeprecation('warning 1')
-        startParameter.addDeprecation('warning 2')
         def action = new ExecuteBuildAction(startParameter)
 
         expect:
         def result = serialize(action, BuildActionSerializer.create())
         result instanceof ExecuteBuildAction
         result.startParameter.taskNames == ['a', 'b']
-        result.startParameter.deprecations == ['warning 1', 'warning 2'] as Set
     }
 
-    def "serializes other actions"() {
+    def "serializes #buildOptionName boolean build option"() {
+        def startParameter = new StartParameterInternal()
+        boolean expectedValue = !startParameter."${buildOptionName}"
+        startParameter."${buildOptionName}" = expectedValue
+        def action = new ExecuteBuildAction(startParameter)
+
+        expect:
+        def result = serialize(action, BuildActionSerializer.create())
+        result instanceof ExecuteBuildAction
+        result.startParameter."${buildOptionName}" == expectedValue
+
+        where:
+        // Check all mutable boolean properties (must manually check for setters as many of them return StartParameter)
+        buildOptionName << Introspector.getBeanInfo(StartParameterInternal).propertyDescriptors
+            .findAll { it.propertyType == boolean }
+            .findAll { StartParameterInternal.methods*.name.contains("set" + it.name.capitalize()) }
+            .collect { it.name }
+    }
+
+    def "serializes other actions #action.class"() {
         expect:
         def result = serialize(action, BuildActionSerializer.create())
         result.class == action.class

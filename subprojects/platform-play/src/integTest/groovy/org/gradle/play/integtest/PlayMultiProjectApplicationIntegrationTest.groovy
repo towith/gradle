@@ -17,7 +17,7 @@
 package org.gradle.play.integtest
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.executer.GradleHandle
 import org.gradle.play.integtest.fixtures.DistributionTestExecHandleBuilder
 import org.gradle.play.integtest.fixtures.MultiProjectRunningPlayApp
@@ -28,12 +28,11 @@ import org.gradle.process.internal.ExecHandle
 import org.gradle.process.internal.ExecHandleBuilder
 import org.gradle.test.fixtures.archive.JarTestFixture
 import org.gradle.test.fixtures.archive.ZipTestFixture
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
+
+import java.util.concurrent.TimeUnit
 
 import static org.gradle.play.integtest.fixtures.PlayMultiVersionRunApplicationIntegrationTest.java9AddJavaSqlModuleArgs
 
-@Requires(TestPrecondition.JDK8_OR_LATER)
 class PlayMultiProjectApplicationIntegrationTest extends AbstractIntegrationSpec {
     PlayApp playApp = new PlayMultiProject()
     RunningPlayApp runningApp = new MultiProjectRunningPlayApp(testDirectory)
@@ -43,7 +42,7 @@ class PlayMultiProjectApplicationIntegrationTest extends AbstractIntegrationSpec
         playApp.writeSources(testDirectory)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can build play app binary"() {
         when:
         succeeds(":primary:assemble")
@@ -99,7 +98,7 @@ class PlayMultiProjectApplicationIntegrationTest extends AbstractIntegrationSpec
         )
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can run play app"() {
         setup:
         file("primary/build.gradle") << """
@@ -125,13 +124,13 @@ class PlayMultiProjectApplicationIntegrationTest extends AbstractIntegrationSpec
 
         when: "stopping gradle"
         build.cancelWithEOT().waitForFinish()
+        TimeUnit.SECONDS.sleep(10)
 
         then: "play server is stopped too"
         runningApp.verifyStopped()
     }
 
-    @Requires(TestPrecondition.NOT_UNKNOWN_OS)
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can run play distribution"() {
         println file(".")
 

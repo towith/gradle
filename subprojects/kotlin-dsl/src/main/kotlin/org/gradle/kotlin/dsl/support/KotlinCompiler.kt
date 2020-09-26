@@ -16,9 +16,11 @@
 
 package org.gradle.kotlin.dsl.support
 
+import org.gradle.internal.SystemProperties
 import org.gradle.internal.io.NullOutputStream
 
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
+import org.jetbrains.kotlin.cli.common.KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY
 
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
@@ -45,7 +47,6 @@ import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.config.JVMConfigurationKeys.JVM_TARGET
 import org.jetbrains.kotlin.config.JVMConfigurationKeys.OUTPUT_DIRECTORY
 import org.jetbrains.kotlin.config.JVMConfigurationKeys.RETAIN_OUTPUT_IN_MEMORY
@@ -167,6 +168,7 @@ fun compileKotlinScriptModuleTo(
                 scriptFiles.forEach { addKotlinSourceRoot(it) }
                 classPath.forEach { addJvmClasspathRoot(it) }
             }
+
             val environment = kotlinCoreEnvironmentFor(configuration).apply {
                 HasImplicitReceiverCompilerPlugin.apply(project)
             }
@@ -328,7 +330,6 @@ private
 fun compilerConfigurationFor(messageCollector: MessageCollector): CompilerConfiguration =
     CompilerConfiguration().apply {
         put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
-        put(JVMConfigurationKeys.USE_FAST_CLASS_FILES_READING, true)
         put(JVM_TARGET, JVM_1_8)
         put(CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS, gradleKotlinDslLanguageVersionSettings)
     }
@@ -341,7 +342,8 @@ val gradleKotlinDslLanguageVersionSettings = LanguageVersionSettingsImpl(
     specificFeatures = mapOf(
         LanguageFeature.NewInference to LanguageFeature.State.ENABLED,
         LanguageFeature.SamConversionForKotlinFunctions to LanguageFeature.State.ENABLED,
-        LanguageFeature.SamConversionPerArgument to LanguageFeature.State.ENABLED
+        LanguageFeature.SamConversionPerArgument to LanguageFeature.State.ENABLED,
+        LanguageFeature.ReferencesToSyntheticJavaProperties to LanguageFeature.State.ENABLED
     ),
     analysisFlags = mapOf(
         AnalysisFlags.skipMetadataVersionCheck to true
@@ -373,7 +375,16 @@ fun CompilerConfiguration.addScriptDefinition(scriptDef: ScriptDefinition) {
 private
 fun Disposable.kotlinCoreEnvironmentFor(configuration: CompilerConfiguration): KotlinCoreEnvironment {
     org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback()
-    return KotlinCoreEnvironment.createForProduction(this, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
+    return SystemProperties.getInstance().withSystemProperty(
+        KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY,
+        "true"
+    ) {
+        KotlinCoreEnvironment.createForProduction(
+            this,
+            configuration,
+            EnvironmentConfigFiles.JVM_CONFIG_FILES
+        )
+    }
 }
 
 

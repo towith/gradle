@@ -17,7 +17,7 @@
 package org.gradle.integtests.resolve.locking
 
 import org.gradle.api.artifacts.dsl.LockMode
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class DependencyLockingStrictModeIntegrationTest extends AbstractValidatingLockingIntegrationTest {
 
@@ -26,7 +26,7 @@ class DependencyLockingStrictModeIntegrationTest extends AbstractValidatingLocki
         LockMode.STRICT
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def 'fails without lock file present and does not create one'() {
         mavenRepo.module('org', 'foo', '1.0').publish()
 
@@ -55,11 +55,11 @@ dependencies {
         fails 'dependencies'
 
         then:
-        failureHasCause("Locking strict mode: Configuration ':lockedConf' is locked but does not have a lockfile.")
-        lockfileFixture.expectMissing('unlockedConf')
+        failureHasCause("Locking strict mode: Configuration ':lockedConf' is locked but does not have lock state.")
+        lockfileFixture.expectLockStateMissing('unlockedConf', false)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def 'fails if update done without lockfile present'() {
         mavenRepo.module('org', 'foo', '1.0').publish()
         mavenRepo.module('org', 'foo', '1.1').publish()
@@ -92,11 +92,11 @@ dependencies {
         fails 'dependencies', '--update-locks', 'org:foo'
 
         then:
-        failureHasCause("Locking strict mode: Configuration ':lockedConf' is locked but does not have a lockfile.")
-        lockfileFixture.expectMissing('unlockedConf')
+        failureHasCause("Locking strict mode: Configuration ':lockedConf' is locked but does not have lock state.")
+        lockfileFixture.expectLockStateMissing('unlockedConf', false)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def 'ignores not locked configurations'() {
         mavenRepo.module('org', 'foo', '1.0').publish()
 

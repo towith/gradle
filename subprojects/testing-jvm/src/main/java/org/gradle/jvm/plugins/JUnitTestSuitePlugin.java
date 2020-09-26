@@ -53,7 +53,10 @@ public class JUnitTestSuitePlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        DeprecationLogger.deprecatePlugin("junit-test-suite").withUpgradeGuideSection(6, "upgrading_jvm_plugins").nagUser();
+        DeprecationLogger.deprecatePlugin("junit-test-suite")
+            .willBeRemovedInGradle7()
+            .withUpgradeGuideSection(6, "upgrading_jvm_plugins")
+            .nagUser();
         project.getPluginManager().apply(TestingModelBasePlugin.class);
         project.getPluginManager().apply(JvmComponentPlugin.class);
         project.getPluginManager().apply(JvmTestSuiteBasePlugin.class);
@@ -86,7 +89,7 @@ public class JUnitTestSuitePlugin implements Plugin<Project> {
         void validateJUnitVersion(@Each JUnitTestSuiteSpec jUnitTestSuiteSpec) {
             if (jUnitTestSuiteSpec.getjUnitVersion() == null) {
                 throw new InvalidModelException(
-                    String.format("Test suite '%s' doesn't declare JUnit version. Please specify it with `jUnitVersion '4.12'` for example.", jUnitTestSuiteSpec.getName()));
+                    String.format("Test suite '%s' doesn't declare JUnit version. Please specify it with `jUnitVersion '4.13'` for example.", jUnitTestSuiteSpec.getName()));
             }
         }
 

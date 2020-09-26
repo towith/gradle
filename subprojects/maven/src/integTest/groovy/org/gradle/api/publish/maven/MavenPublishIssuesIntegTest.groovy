@@ -16,7 +16,7 @@
 
 package org.gradle.api.publish.maven
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.publish.maven.AbstractMavenPublishIntegTest
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.maven.MavenFileModule
@@ -32,7 +32,6 @@ import static org.gradle.util.TextUtil.normaliseFileSeparators
 class MavenPublishIssuesIntegTest extends AbstractMavenPublishIntegTest {
 
     @Issue("GRADLE-2456")
-    @ToBeFixedForInstantExecution
     def "generates SHA1 file with leading zeros"() {
         given:
         def module = mavenRepo.module("org.gradle", "publish", "2")
@@ -71,7 +70,6 @@ class MavenPublishIssuesIntegTest extends AbstractMavenPublishIntegTest {
     }
 
     @Issue("GRADLE-2681")
-    @ToBeFixedForInstantExecution
     def "gradle ignores maven mirror configuration for uploading archives"() {
         given:
         m2.globalSettingsFile << """
@@ -114,7 +112,6 @@ publishing {
     }
 
     @Issue("GRADLE-2837")
-    @ToBeFixedForInstantExecution
     def "project is properly configured when it is the target of a project dependency"() {
         given:
         mavenRepo.module("org.gradle", "dep", "1.1").publish()
@@ -167,7 +164,6 @@ subprojects {
     }
 
     @Issue("GRADLE-2945")
-    @ToBeFixedForInstantExecution
     def "maven-publish plugin adds excludes to pom"() {
 
         given:
@@ -222,7 +218,6 @@ subprojects {
     }
 
     @Issue("GRADLE-3318")
-    @ToBeFixedForInstantExecution
     def "can reference rule-source tasks from sub-projects"() {
         given:
         using m2
@@ -264,7 +259,7 @@ subprojects {
         output.contains(":customPublish")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     @Issue("https://github.com/gradle/gradle/issues/5136")
     void "doesn't publish if main artifact is missing"() {
         settingsFile << 'rootProject.name = "test"'
@@ -312,7 +307,7 @@ subprojects {
         failure.assertHasCause("Artifact test-1.0.jar wasn't produced by this build.")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     @Issue("https://github.com/gradle/gradle/issues/5136")
     void "doesn't publish stale files"() {
         MavenFileModule publishedModule

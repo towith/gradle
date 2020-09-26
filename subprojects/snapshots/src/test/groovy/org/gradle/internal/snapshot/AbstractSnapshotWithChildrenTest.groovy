@@ -28,6 +28,21 @@ abstract class AbstractSnapshotWithChildrenTest<NODE extends FileSystemNode, CHI
     List<CHILD> children
     VfsRelativePath searchedPath
 
+    List<FileSystemNode> removedNodes = []
+    List<FileSystemNode> addedNodes = []
+
+    SnapshotHierarchy.NodeDiffListener diffListener = new SnapshotHierarchy.NodeDiffListener() {
+        @Override
+        void nodeRemoved(FileSystemNode node) {
+            removedNodes.add(node)
+        }
+
+        @Override
+        void nodeAdded(FileSystemNode node) {
+            addedNodes.add(node)
+        }
+    }
+
     /**
      * The child, if any, which has a common prefix with the selected path, i.e. (absolutePath/offset).
      */
@@ -95,9 +110,14 @@ abstract class AbstractSnapshotWithChildrenTest<NODE extends FileSystemNode, CHI
         1 * selectedChild.getSnapshot(searchedPath.suffixStartingFrom(descendantOffset), CASE_SENSITIVE) >> Optional.ofNullable(foundSnapshot)
     }
 
+    def getDescendantNodeOfSelectedChild(ReadOnlyFileSystemNode foundNode) {
+        def descendantOffset = selectedChild.pathToParent.length() + 1
+        1 * selectedChild.getNode(searchedPath.suffixStartingFrom(descendantOffset), CASE_SENSITIVE) >> foundNode
+    }
+
     def invalidateDescendantOfSelectedChild(@Nullable FileSystemNode invalidatedChild) {
         def descendantOffset = selectedChild.pathToParent.length() + 1
-        1 * selectedChild.invalidate(searchedPath.suffixStartingFrom(descendantOffset), CASE_SENSITIVE) >> Optional.ofNullable(invalidatedChild)
+        1 * selectedChild.invalidate(searchedPath.suffixStartingFrom(descendantOffset), CASE_SENSITIVE, _) >> Optional.ofNullable(invalidatedChild)
     }
 
     @SuppressWarnings("GrMethodMayBeStatic")

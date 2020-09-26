@@ -43,11 +43,11 @@ import static org.gradle.util.WrapUtil.toList;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.fail;
 
 public class TarFileTreeTest {
-    @Rule public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider();
+    @Rule public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass());
     @Rule public final Resources resources = new Resources();
     private final TestFile tarFile = tmpDir.getTestDirectory().file("test.tar");
     private final TestFile rootDir = tmpDir.getTestDirectory().file("root");

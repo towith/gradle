@@ -20,6 +20,7 @@ import org.gradle.api.internal.cache.StringInterner
 import org.gradle.api.internal.changedetection.state.CachingFileHasher.FileInfo
 import org.gradle.api.internal.file.TestFiles
 import org.gradle.cache.PersistentIndexedCache
+import org.gradle.internal.file.FileMetadata.AccessType
 import org.gradle.internal.file.impl.DefaultFileMetadata
 import org.gradle.internal.hash.FileHasher
 import org.gradle.internal.hash.HashCode
@@ -29,7 +30,7 @@ import spock.lang.Specification
 
 class CachingFileHasherTest extends Specification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     def target = Mock(FileHasher)
     def cache = Mock(PersistentIndexedCache)
     def cacheAccess = Mock(CrossBuildFileHashCache)
@@ -147,10 +148,10 @@ class CachingFileHasherTest extends Specification {
     def hashesGivenFileLengthAndLastModified() {
         long lastModified = 123l
         long length = 321l
-        def fileDetails = DefaultFileMetadata.file(lastModified, length)
+        def fileMetadata = DefaultFileMetadata.file(lastModified, length, AccessType.DIRECT)
 
         when:
-        def result = hasher.hash(file, fileDetails.length, fileDetails.lastModified)
+        def result = hasher.hash(file, fileMetadata.length, fileMetadata.lastModified)
 
         then:
         result == hash

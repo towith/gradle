@@ -18,7 +18,7 @@ package org.gradle.java.compile.incremental
 
 import org.gradle.integtests.fixtures.CompiledLanguage
 import org.gradle.integtests.fixtures.DirectoryBuildCacheFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import spock.lang.Issue
 import spock.lang.Unroll
 
 class GroovySourceIncrementalCompilationIntegrationTest extends AbstractSourceIncrementalCompilationIntegrationTest implements DirectoryBuildCacheFixture {
@@ -33,7 +33,6 @@ class GroovySourceIncrementalCompilationIntegrationTest extends AbstractSourceIn
         outputs.recompiledClasses(recompiledClasses)
     }
 
-    @ToBeFixedForInstantExecution(skip = ToBeFixedForInstantExecution.Skip.FLAKY)
     def 'rebuild all after loading from cache'() {
         given:
         def a = source "class A {}"
@@ -58,7 +57,6 @@ class GroovySourceIncrementalCompilationIntegrationTest extends AbstractSourceIn
         outputContains('unable to get source-classes mapping relationship')
     }
 
-    @ToBeFixedForInstantExecution
     def 'only recompile affected classes when multiple class in one groovy file'() {
         given:
         def a = file('src/main/groovy/org/gradle/A.groovy')
@@ -81,7 +79,6 @@ class A2{}
         outputs.deletedClasses('A2')
     }
 
-    @ToBeFixedForInstantExecution
     def 'only recompile removed packages'() {
         given:
         file('src/main/groovy/org/gradle/Org.groovy') << 'package org.gradle; class Org {}'
@@ -154,7 +151,6 @@ class A2{}
                 'Change the configuration of your sources or disable incremental Groovy compilation.')
     }
 
-    @ToBeFixedForInstantExecution
     def 'clear class source mapping file on full recompilation'() {
         given:
         source('class A { }')
@@ -172,7 +168,6 @@ class A2{}
         !file('build/tmp/compileGroovy/source-classes-mapping.txt').text.contains('MyClass')
     }
 
-    @ToBeFixedForInstantExecution
     def 'merge old class source mappings if no recompilation required'() {
         given:
         File a =source('class A { }')
@@ -212,5 +207,41 @@ class A2{}
         then:
         succeeds language.compileTaskName
         outputs.recompiledClasses("A", "B")
+    }
+
+    @Issue("https://github.com/gradle/gradle/issues/10340")
+    def "recompiles class when constant from inner class is changed"() {
+        given:
+        file("src/main/${languageName}/MyAnnotation.${languageName}") << """
+            public @interface MyAnnotation { int value(); }
+        """
+        file("src/main/${languageName}/TopLevel.${languageName}") << """
+            public class TopLevel {
+               static class Inner {
+                  public static final int CONST = 9999;
+               }
+            }
+        """
+        file("src/main/${languageName}/MyClass.${languageName}") << """
+            public class MyClass {
+                @MyAnnotation(TopLevel.Inner.CONST)
+                private void foo() { }
+            }
+        """
+
+        outputs.snapshot { run language.compileTaskName }
+
+        when:
+        file("src/main/${languageName}/TopLevel.${languageName}").text = """
+            public class TopLevel {
+               static class Inner {
+                  public static final int CONST = 1223;
+               }
+            }
+        """
+
+        then:
+        succeeds language.compileTaskName
+        outputs.recompiledClasses('MyClass', 'MyAnnotation', 'TopLevel$Inner', 'TopLevel')
     }
 }

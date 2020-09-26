@@ -26,10 +26,10 @@ import org.gradle.api.internal.artifacts.ImmutableModuleIdentifierFactory
 import org.gradle.api.internal.artifacts.component.ComponentIdentifierFactory
 import org.gradle.api.internal.artifacts.dependencies.DefaultExternalModuleDependency
 import org.gradle.api.internal.artifacts.dsl.dependencies.DependencyLockingProvider
-import org.gradle.api.internal.artifacts.dsl.dependencies.ProjectFinder
 import org.gradle.api.internal.artifacts.ivyservice.dependencysubstitution.DependencySubstitutionRules
 import org.gradle.api.internal.artifacts.ivyservice.moduleconverter.LocalComponentMetadataBuilder
 import org.gradle.api.internal.file.FileCollectionFactory
+import org.gradle.api.internal.initialization.RootScriptDomainObjectContext
 import org.gradle.api.internal.project.ProjectStateRegistry
 import org.gradle.api.internal.tasks.TaskResolver
 import org.gradle.configuration.internal.UserCodeApplicationContext
@@ -37,6 +37,7 @@ import org.gradle.initialization.ProjectAccessListener
 import org.gradle.internal.event.ListenerManager
 import org.gradle.internal.operations.BuildOperationExecutor
 import org.gradle.internal.reflect.Instantiator
+import org.gradle.internal.typeconversion.NotationParser
 import org.gradle.util.AttributeTestUtil
 import org.gradle.util.Path
 import org.gradle.util.TestUtil
@@ -51,7 +52,6 @@ class DefaultConfigurationContainerSpec extends Specification {
     private ListenerManager listenerManager = Mock()
     private DependencyMetaDataProvider metaDataProvider = Mock()
     private ProjectAccessListener projectAccessListener = Mock()
-    private ProjectFinder projectFinder = Mock()
     private LocalComponentMetadataBuilder metaDataBuilder = Mock()
     private FileCollectionFactory fileCollectionFactory = Mock()
     private ComponentIdentifierFactory componentIdentifierFactory = Mock()
@@ -74,13 +74,14 @@ class DefaultConfigurationContainerSpec extends Specification {
     def immutableAttributesFactory = AttributeTestUtil.attributesFactory()
 
     private DefaultConfigurationContainer configurationContainer = new DefaultConfigurationContainer(resolver, instantiator, domainObjectContext, listenerManager, metaDataProvider,
-            projectAccessListener, projectFinder, metaDataBuilder, fileCollectionFactory, globalSubstitutionRules, vcsMappingsInternal, componentIdentifierFactory, buildOperationExecutor, taskResolver,
-            immutableAttributesFactory, moduleIdentifierFactory, componentSelectorConverter, dependencyLockingProvider, projectStateRegistry, documentationRegistry,
-            domainObjectCollectionCallbackActionDecorator, userCodeApplicationContext, TestUtil.domainObjectCollectionFactory())
+        projectAccessListener, metaDataBuilder, fileCollectionFactory, globalSubstitutionRules, vcsMappingsInternal, componentIdentifierFactory, buildOperationExecutor, taskResolver,
+        immutableAttributesFactory, moduleIdentifierFactory, componentSelectorConverter, dependencyLockingProvider, projectStateRegistry, documentationRegistry,
+        domainObjectCollectionCallbackActionDecorator, userCodeApplicationContext, TestUtil.domainObjectCollectionFactory(), Mock(NotationParser), TestUtil.objectFactory())
 
     def "adds and gets"() {
         1 * domainObjectContext.identityPath("compile") >> Path.path(":build:compile")
         1 * domainObjectContext.projectPath("compile") >> Path.path(":compile")
+        1 * domainObjectContext.model >> RootScriptDomainObjectContext.INSTANCE
 
         when:
         def compile = configurationContainer.create("compile")
@@ -111,6 +112,7 @@ class DefaultConfigurationContainerSpec extends Specification {
     def "configures and finds"() {
         1 * domainObjectContext.identityPath("compile") >> Path.path(":build:compile")
         1 * domainObjectContext.projectPath("compile") >> Path.path(":compile")
+        1 * domainObjectContext.model >> RootScriptDomainObjectContext.INSTANCE
 
         when:
         def compile = configurationContainer.create("compile") {
@@ -126,6 +128,8 @@ class DefaultConfigurationContainerSpec extends Specification {
     def "creates detached"() {
         given:
         1 * domainObjectContext.projectPath("detachedConfiguration1") >> Path.path(":detachedConfiguration1")
+        1 * domainObjectContext.model >> RootScriptDomainObjectContext.INSTANCE
+
         def dependency1 = new DefaultExternalModuleDependency("group", "name", "version")
         def dependency2 = new DefaultExternalModuleDependency("group", "name2", "version")
 

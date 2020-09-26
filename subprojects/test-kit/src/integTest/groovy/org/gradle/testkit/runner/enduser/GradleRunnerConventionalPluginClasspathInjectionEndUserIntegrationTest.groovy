@@ -16,9 +16,11 @@
 
 package org.gradle.testkit.runner.enduser
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import org.gradle.testkit.runner.fixtures.PluginUnderTest
+import spock.lang.IgnoreIf
 
+@IgnoreIf({ GradleContextualExecuter.embedded }) // These tests run builds that themselves run a build in a test worker with 'gradleTestKit()' dependency, which needs to pick up Gradle modules from a real distribution
 class GradleRunnerConventionalPluginClasspathInjectionEndUserIntegrationTest extends BaseTestKitEndUserIntegrationTest {
 
     def plugin = new PluginUnderTest(testDirectory)
@@ -70,14 +72,12 @@ class GradleRunnerConventionalPluginClasspathInjectionEndUserIntegrationTest ext
         """
     }
 
-    @ToBeFixedForInstantExecution
     def "can test plugin and custom task as external files by using default conventions from Java Gradle plugin development plugin"() {
         expect:
         succeeds 'test'
         executedAndNotSkipped ':test'
     }
 
-    @ToBeFixedForInstantExecution
     def "can override plugin metadata location"() {
         when:
         buildFile << """
@@ -91,7 +91,6 @@ class GradleRunnerConventionalPluginClasspathInjectionEndUserIntegrationTest ext
         executedAndNotSkipped ':test'
     }
 
-    @ToBeFixedForInstantExecution
     def "can use custom source set"() {
         when:
         file("src/test/groovy/Test.groovy").moveToDirectory(file("src/functionalTest/groovy"))

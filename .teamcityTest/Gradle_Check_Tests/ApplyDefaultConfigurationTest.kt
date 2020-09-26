@@ -1,3 +1,4 @@
+import Gradle_Check.model.JsonBasedGradleSubprojectProvider
 import common.Os
 import configurations.BaseGradleBuildType
 import configurations.applyDefaults
@@ -10,12 +11,14 @@ import io.mockk.slot
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.GradleBuildStep
+import model.CIBuildModel
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import java.io.File
 
 /*
  * Copyright 2019 the original author or authors.
@@ -42,7 +45,7 @@ class ApplyDefaultConfigurationTest {
     val steps = BuildSteps()
 
     private
-    val buildModel = model.CIBuildModel(buildScanTags = listOf("Check"))
+    val buildModel = CIBuildModel(buildScanTags = listOf("Check"), subprojects = JsonBasedGradleSubprojectProvider(File("../.teamcity/subprojects.json")))
 
     @BeforeEach
     fun setUp() {
@@ -60,9 +63,9 @@ class ApplyDefaultConfigurationTest {
         applyDefaults(buildModel, buildType, "myTask")
 
         assertEquals(listOf(
+            "KILL_LEAKED_PROCESSES_FROM_PREVIOUS_BUILDS",
             "GRADLE_RUNNER",
-            "CHECK_CLEAN_M2",
-            "VERIFY_TEST_FILES_CLEANUP"
+            "CHECK_CLEAN_M2"
         ), steps.items.map(BuildStep::name))
         assertEquals(expectedRunnerParam(), getGradleStep("GRADLE_RUNNER").gradleParams)
     }
@@ -78,12 +81,12 @@ class ApplyDefaultConfigurationTest {
         applyTestDefaults(buildModel, buildType, "myTask", extraParameters = extraParameters, daemon = daemon)
 
         assertEquals(listOf(
+            "KILL_LEAKED_PROCESSES_FROM_PREVIOUS_BUILDS",
             "GRADLE_RUNNER",
-            "GRADLE_RERUNNER",
-            "CHECK_CLEAN_M2",
-            "VERIFY_TEST_FILES_CLEANUP"
+            "KILL_PROCESSES_STARTED_BY_GRADLE",
+            "CHECK_CLEAN_M2"
         ), steps.items.map(BuildStep::name))
-        verifyGradleRunnerParams(extraParameters, daemon, expectedDaemonParam)
+        verifyGradleRunnerParams(extraParameters, expectedDaemonParam)
     }
 
     @ParameterizedTest
@@ -94,31 +97,26 @@ class ApplyDefaultConfigurationTest {
         "''     , false, '--no-daemon'"
     ])
     fun `can apply defaults to windows test configurations`(extraParameters: String, daemon: Boolean, expectedDaemonParam: String) {
-        applyTestDefaults(buildModel, buildType, "myTask", os = Os.windows, extraParameters = extraParameters, daemon = daemon)
+        applyTestDefaults(buildModel, buildType, "myTask", os = Os.WINDOWS, extraParameters = extraParameters, daemon = daemon)
 
         assertEquals(listOf(
             "ATTACH_FILE_LEAK_DETECTOR",
+            "KILL_LEAKED_PROCESSES_FROM_PREVIOUS_BUILDS",
             "GRADLE_RUNNER",
             "SET_BUILD_SUCCESS_ENV",
             "DUMP_OPEN_FILES_ON_FAILURE",
             "KILL_PROCESSES_STARTED_BY_GRADLE",
-            "GRADLE_RERUNNER",
-            "KILL_PROCESSES_STARTED_BY_GRADLE_RERUN",
-            "CHECK_CLEAN_M2",
-            "VERIFY_TEST_FILES_CLEANUP"
+            "CHECK_CLEAN_M2"
         ), steps.items.map(BuildStep::name))
-        verifyGradleRunnerParams(extraParameters, daemon, expectedDaemonParam)
+        verifyGradleRunnerParams(extraParameters, expectedDaemonParam)
     }
 
     private
-    fun verifyGradleRunnerParams(extraParameters: String, daemon: Boolean, expectedDaemonParam: String) {
+    fun verifyGradleRunnerParams(extraParameters: String, expectedDaemonParam: String) {
         assertEquals(BuildStep.ExecutionMode.DEFAULT, getGradleStep("GRADLE_RUNNER").executionMode)
-        assertEquals(BuildStep.ExecutionMode.RUN_ON_FAILURE, getGradleStep("GRADLE_RERUNNER").executionMode)
 
         assertEquals(expectedRunnerParam(expectedDaemonParam, extraParameters), getGradleStep("GRADLE_RUNNER").gradleParams)
-        assertEquals(expectedRunnerParam(expectedDaemonParam, extraParameters) + " -PonlyPreviousFailedTestClasses=true -Dscan.tag.RERUN_TESTS -PgithubToken=%github.ci.oauth.token%", getGradleStep("GRADLE_RERUNNER").gradleParams)
         assertEquals("clean myTask", getGradleStep("GRADLE_RUNNER").tasks)
-        assertEquals("myTask tagBuild", getGradleStep("GRADLE_RERUNNER").tasks)
     }
 
     private
@@ -126,5 +124,5 @@ class ApplyDefaultConfigurationTest {
 
     private
     fun expectedRunnerParam(daemon: String = "--daemon", extraParameters: String = "") =
-        "-Dorg.gradle.workers.max=%maxParallelForks% -PmaxParallelForks=%maxParallelForks% -Dorg.gradle.unsafe.vfs.drop=true -s $daemon --continue -I \"%teamcity.build.checkoutDir%/gradle/init-scripts/build-scan.init.gradle.kts\" -Dorg.gradle.internal.tasks.createops -Dorg.gradle.internal.plugins.portal.url.override=%gradle.plugins.portal.url% $extraParameters -PteamCityToken=%teamcity.user.bot-gradle.token% -PteamCityBuildId=%teamcity.build.id% \"-Dscan.tag.Check\" \"-Dscan.tag.\""
+        "-Dorg.gradle.workers.max=%maxParallelForks% -PmaxParallelForks=%maxParallelForks% -s $daemon --continue $extraParameters -PteamCityToken=%teamcity.user.bot-gradle.token% -PteamCityBuildId=%teamcity.build.id% \"-Dscan.tag.Check\" \"-Dscan.tag.\""
 }

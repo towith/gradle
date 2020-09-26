@@ -27,12 +27,13 @@ import org.gradle.api.artifacts.ComponentMetadataSupplierDetails
 import org.gradle.api.artifacts.ModuleVersionIdentifier
 import org.gradle.api.internal.artifacts.DefaultModuleVersionIdentifier
 import org.gradle.api.internal.artifacts.configurations.dynamicversion.CachePolicy
+import org.gradle.api.internal.artifacts.configurations.dynamicversion.Expiry
 import org.gradle.cache.CacheBuilder
 import org.gradle.cache.CacheDecorator
 import org.gradle.cache.CacheRepository
 import org.gradle.cache.PersistentCache
 import org.gradle.cache.PersistentIndexedCache
-import org.gradle.cache.internal.InMemoryCacheDecoratorFactory
+import org.gradle.cache.internal.DefaultInMemoryCacheDecoratorFactory
 import org.gradle.internal.action.DefaultConfigurableRule
 import org.gradle.internal.action.DefaultConfigurableRules
 import org.gradle.internal.action.InstantiatingAction
@@ -49,12 +50,13 @@ import spock.lang.Subject
 import spock.lang.Unroll
 
 import javax.inject.Inject
+import java.time.Duration
 
 class ComponentMetadataSupplierRuleExecutorTest extends Specification {
     @Subject
     ComponentMetadataSupplierRuleExecutor executor
     CacheRepository cacheRepository
-    InMemoryCacheDecoratorFactory cacheDecoratorFactory
+    DefaultInMemoryCacheDecoratorFactory cacheDecoratorFactory
     ValueSnapshotter valueSnapshotter
     BuildCommencedTimeProvider timeProvider = Stub(BuildCommencedTimeProvider) {
         getCurrentTime() >> 0
@@ -127,13 +129,17 @@ class ComponentMetadataSupplierRuleExecutorTest extends Specification {
             1 * record.getOutput() >> HashCode.fromInt(10000)
             1 * cachedResult.isChanging() >> changing
             1 * cachedResult.getId() >> id
-            1 * cachePolicy.mustRefreshModule({ it.id == id }, 0, changing) >> false
+            1 * cachePolicy.moduleExpiry({ it.id == id }, Duration.ZERO, changing) >> Stub(Expiry) {
+                isMustCheck() >> false
+            }
             // we make it return false, this should invalidate the cache
             1 * someService.isUpToDate('124', HashCode.fromInt(10000)) >> false
         } else {
             1 * cachedResult.isChanging() >> changing
             1 * cachedResult.getId() >> id
-            1 * cachePolicy.mustRefreshModule({ it.id == id }, 0, changing) >> mustRefresh
+            1 * cachePolicy.moduleExpiry({ it.id == id }, Duration.ZERO, changing) >> Stub(Expiry) {
+                isMustCheck() >> mustRefresh
+            }
         }
         if (reexecute) {
             def details = Mock(ComponentMetadataSupplierDetails)

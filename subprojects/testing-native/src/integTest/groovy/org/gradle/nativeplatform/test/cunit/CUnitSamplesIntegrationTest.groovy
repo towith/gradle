@@ -17,7 +17,7 @@
 
 package org.gradle.nativeplatform.test.cunit
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.Sample
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.nativeplatform.fixtures.AbstractInstalledToolChainIntegrationSpec
@@ -36,9 +36,10 @@ class CUnitSamplesIntegrationTest extends AbstractInstalledToolChainIntegrationS
     @Rule public final Sample cunit = sample(temporaryFolder, 'cunit')
 
     private static Sample sample(TestDirectoryProvider testDirectoryProvider, String name) {
-        return new Sample(testDirectoryProvider, "native-binaries/${name}", name)
+        return new Sample(testDirectoryProvider, "native-binaries/${name}/groovy", name)
     }
 
+    @ToBeFixedForConfigurationCache(because = ":components")
     def "cunit components"() {
         given:
         sample cunit
@@ -51,7 +52,7 @@ class CUnitSamplesIntegrationTest extends AbstractInstalledToolChainIntegrationS
         output.contains "C unit exe 'operatorsTest:passing:cUnitExe'"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "cunit"() {
         given:
         // On windows, CUnit sample only works out of the box with VS2015

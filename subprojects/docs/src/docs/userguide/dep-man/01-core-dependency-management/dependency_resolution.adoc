@@ -73,11 +73,11 @@ Out of these versions, it will select the _highest_ one.
 As you have seen, Gradle supports a concept of <<rich_versions.adoc#,rich version declaration>>, so what is the highest version depends on the way versions were declared:
 
 * If no ranges are involved, then the highest version that is not rejected will be selected.
-** If a strictly is lower than that version, selection will fail.
+** If a version declared as `strictly` is lower than that version, selection will fail.
 * If ranges are involved:
 ** If there is a non range version that falls within the specified ranges or is higher than their upper bound, it will be selected.
 ** If there are only ranges, the highest _existing_ version of the range with the highest upper bound will be selected.
-** If a strictly is lower than that version, selection will fail.
+** If a version declared as `strictly` is lower than that version, selection will fail.
 
 Note that in the case where ranges come into play, Gradle requires metadata to determine which versions do exist for the considered range.
 This causes an intermediate lookup for metadata, as described in <<#sec:how-gradle-downloads-deps>>.
@@ -134,14 +134,14 @@ Given a required dependency, with a version, Gradle attempts to resolve the depe
 
 [NOTE]
 ====
-The last point above is what can make the integration with <<declaring_repositories.adoc#sec:case-for-maven-local,Maven Local>> problematic.
+The penultimate point above is what can make the integration with <<declaring_repositories.adoc#sec:case-for-maven-local,Maven Local>> problematic.
 As it is a cache for Maven, it will sometimes miss some artifacts of a given module.
 If Gradle is sourcing such a module from Maven Local, it will consider the missing artifacts to be missing altogether.
 ====
 
-=== Repository blacklisting
+=== Repository disabling
 
-When Gradle fails to retrieve information from a repository, it will blacklist it for the duration of the build and fail all dependency resolution.
+When Gradle fails to retrieve information from a repository, it will disable it for the duration of the build and fail all dependency resolution.
 
 That last point is important for reproducibility.
 If the build was allowed to continue, ignoring the faulty repository, subsequent builds could have a different result once the repository is back online.
@@ -149,7 +149,7 @@ If the build was allowed to continue, ignoring the faulty repository, subsequent
 [[sub:http-retries]]
 ==== HTTP Retries
 
-Gradle will make several attempts to connect to a given repository before blacklisting it.
+Gradle will make several attempts to connect to a given repository before disabling it.
 If connection fails, Gradle will retry on certain errors which have a chance of being transient, increasing the amount of time waiting between each retry.
 
 Blacklisting happens when the repository cannot be contacted, either because of a permanent error or because the maximum retries was reached.
@@ -250,7 +250,7 @@ The only constraint is placing it using the same structure at the destination, w
 Do not copy the `*.lock` or `gc.properties` files if they exist.
 
 Note that creating the cache and consuming it should be done using compatible Gradle version, as shown in the table below.
-Otherwise the build might still require some interactions with remote repositories to complete missing information, which might be available in a different version.
+Otherwise, the build might still require some interactions with remote repositories to complete missing information, which might be available in a different version.
 If multiple incompatible Gradle versions are in play, all should be used when seeding the cache.
 
 .Dependency cache compatibility
@@ -258,18 +258,25 @@ If multiple incompatible Gradle versions are in play, all should be used when se
 |===
 | Module cache version  | File cache version    | Metadata cache version    | Gradle version(s)
 
-| `modules-2`           | `files-2.1`           | `metadata-2.90`           | Gradle 6.1
+| `modules-2`           | `files-2.1`           | `metadata-2.95`           | Gradle 6.1 to Gradle 6.3
+
+| `modules-2`           | `files-2.1`           | `metadata-2.96`           | Gradle 6.4 and above
 |===
 
 [[sub:shared-readonly-cache]]
 === Sharing the dependency cache with other Gradle instances
 
-Instead of <<sub:cache_copy,copying the dependency cache into each container>>, it's possible to mount a shared, read-only folder that will act as a dependency cache for all containers.
-This cache, unlike the classical dependency cache, is accessed without locking, making it possible for multiple builds to read from the cache concurrently.
-When Gradle looks for dependencies (artifacts or metadata), it will look into the writable cache in the local Gradle home directory, but will also search the shared read-only cache if it is activated.
-If an artifact is present in the read-only cache, it will not be downloaded.
-If an artifact missing from the read-only dependency cache, it will be added to the _local_, writable cache of the Gradle instance.
-In practice it means that the writable cache will contain the _diff_ between what the build requires and what is available in the read-only cache.
+Instead of <<sub:cache_copy,copying the dependency cache into each container>>, it's possible to mount a shared, read-only directory that will act as a dependency cache for all containers.
+This cache, unlike the classical dependency cache, is accessed without locking, making it possible for multiple builds to read from the cache concurrently. It's important that the read-only cache
+is not written to when other builds may be reading from it.
+
+When using the shared read-only cache, Gradle looks for dependencies (artifacts or metadata) in both the writable cache in the local Gradle user home directory and the shared read-only cache.
+If a dependency is present in the read-only cache, it will not be downloaded.
+If a dependency is missing from the read-only cache, it will be downloaded and added to the writable cache.
+In practice, this means that the writable cache will only contain dependencies that are unavailable in the read-only cache.
+
+The read-only cache should be sourced from a Gradle dependency cache that already contains some of the required dependencies.
+The cache can be incomplete; however, an empty shared cache will only add overhead.
 
 NOTE: The shared read-only dependency cache is an incubating feature.
 

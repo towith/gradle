@@ -385,22 +385,16 @@ public class IsolatableSerializerRegistry extends DefaultSerializerRegistry {
         public void write(Encoder encoder, IsolatedSerializedValueSnapshot value) throws Exception {
             encoder.writeByte(SERIALIZED_VALUE);
             encoder.writeString(value.getOriginalClass().getName());
-            encoder.writeInt(value.getImplementationHash().toByteArray().length);
-            encoder.writeBytes(value.getImplementationHash().toByteArray());
-            encoder.writeInt(value.getValue().length);
-            encoder.writeBytes(value.getValue());
+            encoder.writeBinary(value.getImplementationHash().toByteArray());
+            encoder.writeBinary(value.getValue());
         }
 
         @Override
         public IsolatedSerializedValueSnapshot read(Decoder decoder) throws Exception {
             String originalClassName = decoder.readString();
             Class<?> originalClass = fromClassName(originalClassName);
-            int hashSize = decoder.readInt();
-            byte[] hashBytes = new byte[hashSize];
-            decoder.readBytes(hashBytes);
-            int serializedSize = decoder.readInt();
-            byte[] serializedBytes = new byte[serializedSize];
-            decoder.readBytes(serializedBytes);
+            byte[] hashBytes = decoder.readBinary();
+            byte[] serializedBytes = decoder.readBinary();
             return new IsolatedSerializedValueSnapshot(HashCode.fromBytes(hashBytes), serializedBytes, originalClass);
         }
 
@@ -439,8 +433,8 @@ public class IsolatableSerializerRegistry extends DefaultSerializerRegistry {
         public IsolatedEnumValueSnapshot read(Decoder decoder) throws Exception {
             String className = decoder.readString();
             String name = decoder.readString();
-            Class<? extends Enum> enumClass = Cast.uncheckedCast(fromClassName(className));
-            return new IsolatedEnumValueSnapshot(Enum.valueOf(enumClass, name));
+            Class<? extends Enum<?>> enumClass = Cast.uncheckedCast(fromClassName(className));
+            return new IsolatedEnumValueSnapshot(Enum.valueOf(Cast.uncheckedCast(enumClass), name));
         }
 
         @Override

@@ -21,7 +21,7 @@ import org.gradle.api.internal.tasks.TaskPropertyUtils
 import org.gradle.api.internal.tasks.properties.GetInputFilesVisitor
 import org.gradle.api.internal.tasks.properties.PropertyWalker
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import spock.lang.Issue
 import spock.lang.Unroll
 
@@ -38,7 +38,7 @@ class TaskInputFilePropertiesIntegrationTest extends AbstractIntegrationSpec {
             class CustomTask extends DefaultTask {
                 @Optional @$annotation.simpleName input
                 @TaskAction void doSomething() {
-                    def fileCollectionFactory = project.services.get(FileCollectionFactory)
+                    def fileCollectionFactory = services.get(FileCollectionFactory)
                     GetInputFilesVisitor visitor = new GetInputFilesVisitor("ownerName", fileCollectionFactory)
                     def walker = services.get(PropertyWalker)
                     TaskPropertyUtils.visitProperties(walker, this, visitor)
@@ -61,7 +61,7 @@ class TaskInputFilePropertiesIntegrationTest extends AbstractIntegrationSpec {
 
     @Unroll
     @Issue("https://github.com/gradle/gradle/issues/3193")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "multiple build failures")
     def "TaskInputs.#method shows error message when used with complex input"() {
         buildFile << """
             task dependencyTask {
@@ -87,7 +87,7 @@ class TaskInputFilePropertiesIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "multiple build failures")
     def "#annotation.simpleName shows error message when used with complex input"() {
         buildFile << """
             import org.gradle.api.internal.tasks.properties.GetInputFilesVisitor
@@ -178,7 +178,7 @@ class TaskInputFilePropertiesIntegrationTest extends AbstractIntegrationSpec {
             class FooTask extends DefaultTask {
                @InputFiles
                FileCollection bar
-               
+
                @TaskAction
                def go() {
                }

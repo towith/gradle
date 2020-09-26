@@ -17,7 +17,7 @@ package org.gradle.integtests.resolve.maven
 
 import org.gradle.api.credentials.PasswordCredentials
 import org.gradle.integtests.fixtures.AbstractHttpDependencyResolutionTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.executer.ProgressLoggingFixture
 import org.gradle.test.fixtures.encoding.Identifier
 import org.gradle.test.fixtures.server.http.HttpServer
@@ -132,7 +132,7 @@ task retrieve(type: Sync) {
         identifier << Identifier.all
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can resolve and cache artifact-only dependencies from an HTTP Maven repository"() {
         given:
         def projectA = mavenHttpRepo.module('group', 'projectA', '1.2')
@@ -181,7 +181,7 @@ task listJars {
         succeeds('listJars')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can resolve and cache artifact-only dependencies with no pom from an HTTP Maven repository"() {
         given:
         def projectA = mavenHttpRepo.module('group', 'projectA', '1.2')
@@ -230,7 +230,7 @@ task listJars {
         succeeds('listJars')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can resolve and cache dependencies from multiple HTTP Maven repositories"() {
         given:
         def repo1 = mavenHttpRepo("repo1")
@@ -370,7 +370,7 @@ task listJars {
         file('libs/projectA-1.0.jar').assertHasNotChangedSince(snapshot)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "broken file collection")
     void "fails when configured with AwsCredentials"() {
         given:
         mavenHttpRepo.module('group', 'projectA', '1.2').publish()
@@ -443,12 +443,12 @@ task listJars {
                 }
             }
             configurations { compile }
-            dependencies { 
-                compile ':name1:1.0' 
-                compile ':name2:[1.0, 2.0]' 
+            dependencies {
+                compile ':name1:1.0'
+                compile ':name2:[1.0, 2.0]'
                 compile ':name3:1.0-SNAPSHOT'
-                compile 'group1::1.0' 
-                compile 'group2::[1.0, 2.0]' 
+                compile 'group1::1.0'
+                compile 'group2::[1.0, 2.0]'
                 compile 'group3::1.0-SNAPSHOT'
                 compile 'group:name'
             }

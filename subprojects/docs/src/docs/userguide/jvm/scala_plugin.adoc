@@ -131,8 +131,8 @@ If Scala is only used for test code, the `scala-library` dependency should be ad
 
 .Declaring a Scala dependency for test code
 ====
-include::sample[dir="snippets/userguide/scala/scalaDependency/groovy",files="build.gradle[tags=scala-test-dependency]"]
-include::sample[dir="snippets/userguide/scala/scalaDependency/kotlin",files="build.gradle.kts[tags=scala-test-dependency]"]
+include::sample[dir="snippets/scala/scalaDependency/groovy",files="build.gradle[tags=scala-test-dependency]"]
+include::sample[dir="snippets/scala/scalaDependency/kotlin",files="build.gradle.kts[tags=scala-test-dependency]"]
 ====
 
 [[sec:configure_scala_classpath]]
@@ -155,8 +155,8 @@ Gradle supports version 1.2.0 of Zinc and above.
 
 .Declaring a version of the Zinc compiler to use
 ====
-include::sample[dir="snippets/userguide/scala/zincDependency/groovy",files="build.gradle[tags=zinc-dependency]"]
-include::sample[dir="snippets/userguide/scala/zincDependency/kotlin",files="build.gradle.kts[tags=zinc-dependency]"]
+include::sample[dir="snippets/scala/zincDependency/groovy",files="build.gradle[tags=zinc-dependency]"]
+include::sample[dir="snippets/scala/zincDependency/kotlin",files="build.gradle.kts[tags=zinc-dependency]"]
 ====
 
 The Zinc compiler itself needs a compatible version of `scala-library` that may be different from the version required by your application.
@@ -174,6 +174,17 @@ You can diagnose problems with the version of the Zinc compiler selected by runn
 | 1.x through 5.x   | link:https://github.com/typesafehub/zinc[**Deprecated** Typesafe Zinc compiler.] Versions 0.3.0 and above, except for 0.3.2 through 0.3.5.2. | `com.typesafe.zinc:zinc` | Scala `2.10.x` is required for _running_ Zinc. | Scala `2.9.x` through `2.12.x` can be compiled.
 
 |===
+
+[[sec:scala_compiler_plugins]]
+== Adding plugins to the Scala compiler
+
+The Scala plugin adds a configuration named `scalaCompilerPlugins` which is used to declare and resolve optional compiler plugins.
+
+.Adding a dependency on a Scala compiler plugin
+====
+include::sample[dir="snippets/scala/compilerPlugin/groovy",files="build.gradle[tags=compiler-plugin]"]
+include::sample[dir="snippets/scala/compilerPlugin/kotlin",files="build.gradle.kts[tags=compiler-plugin]"]
+====
 
 [[sec:scala_convention_properties]]
 == Convention properties
@@ -253,7 +264,7 @@ The Scala compiler ignores Gradle's `targetCompatibility` and `sourceCompatibili
 [source,properties]
 .gradle.properties
 ----
-include::{samplesPath}/scala/crossCompilation/groovy/gradle.properties[]
+include::{snippetsPath}/scala/crossCompilation/groovy/gradle.properties[]
 ----
 
 ====
@@ -273,8 +284,7 @@ When the IDEA plugin encounters a Scala project, it adds additional configuratio
 
 .Explicitly specify a target IntelliJ IDEA version
 ====
-include::sample[dir="snippets/userguide/scala/ideaTargetVersion/groovy",files="build.gradle[tags=scala-idea-target-version]"]
-include::sample[dir="snippets/userguide/scala/ideaTargetVersion/kotlin",files="build.gradle.kts[tags=scala-idea-target-version]"]
+include::sample[dir="snippets/scala/ideaTargetVersion/groovy",files="build.gradle[tags=scala-idea-target-version]"]
+include::sample[dir="snippets/scala/ideaTargetVersion/kotlin",files="build.gradle.kts[tags=scala-idea-target-version]"]
 ====
-
 

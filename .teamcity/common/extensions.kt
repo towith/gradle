@@ -16,6 +16,7 @@
 
 package common
 
+import Gradle_Check.configurations.allBranchesFilter
 import configurations.m2CleanScriptUnixLike
 import configurations.m2CleanScriptWindows
 import jetbrains.buildServer.configs.kotlin.v2019_2.AbsoluteId
@@ -29,6 +30,9 @@ import jetbrains.buildServer.configs.kotlin.v2019_2.Requirements
 import jetbrains.buildServer.configs.kotlin.v2019_2.VcsSettings
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.GradleBuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.script
+import jetbrains.buildServer.configs.kotlin.v2019_2.failureConditions.BuildFailureOnText
+import jetbrains.buildServer.configs.kotlin.v2019_2.failureConditions.failOnText
+import jetbrains.buildServer.configs.kotlin.v2019_2.ui.add
 
 fun BuildSteps.customGradle(init: GradleBuildStep.() -> Unit, custom: GradleBuildStep.() -> Unit): GradleBuildStep =
     GradleBuildStep(init)
@@ -54,19 +58,20 @@ fun Requirements.requiresOs(os: Os) {
 }
 
 fun VcsSettings.filterDefaultBranch() {
-    branchFilter = """
-                +:*
-                -:<default>
-            """.trimIndent()
+    branchFilter = allBranchesFilter
 }
 
-fun BuildType.applyDefaultSettings(os: Os = Os.linux, timeout: Int = 30, vcsRoot: String = "Gradle_Branches_GradlePersonalBranches") {
+const val failedTestArtifactDestination = ".teamcity/gradle-logs"
+
+fun BuildType.applyDefaultSettings(os: Os = Os.LINUX, timeout: Int = 30, vcsRoot: String = "Gradle_Branches_GradlePersonalBranches") {
     artifactRules = """
-        build/report-* => .
-        buildSrc/build/report-* => .
-        subprojects/*/build/tmp/test files/** => test-files
-        build/errorLogs/** => errorLogs
-        build/reports/incubation/** => incubation-reports
+        build/report-* => $failedTestArtifactDestination
+        buildSrc/build/report-* => $failedTestArtifactDestination
+        subprojects/*/build/tmp/test files/** => $failedTestArtifactDestination/test-files
+        subprojects/*/build/tmp/test files/** => $failedTestArtifactDestination/test-files
+        build/errorLogs/** => $failedTestArtifactDestination/errorLogs
+        subprojects/internal-build-reports/build/reports/incubation/all-incubating.html => incubation-reports
+        build/reports/dependency-verification/** => dependency-verification-reports
     """.trimIndent()
 
     vcs {
@@ -83,42 +88,44 @@ fun BuildType.applyDefaultSettings(os: Os = Os.linux, timeout: Int = 30, vcsRoot
 
     failureConditions {
         executionTimeoutMin = timeout
+        testFailure = false
+        add {
+            failOnText {
+                conditionType = BuildFailureOnText.ConditionType.CONTAINS
+                pattern = "%unmaskedFakeCredentials%"
+                failureMessage = "This build might be leaking credentials"
+                reverse = false
+                stopBuildOnFailure = true
+            }
+        }
     }
 
-    if (os == Os.linux || os == Os.macos) {
+    if (os == Os.LINUX || os == Os.MACOS) {
         params {
             param("env.LC_ALL", "en_US.UTF-8")
         }
     }
 }
 
-fun BuildSteps.checkCleanM2(os: Os = Os.linux) {
+fun BuildSteps.checkCleanM2(os: Os = Os.LINUX) {
     script {
         name = "CHECK_CLEAN_M2"
         executionMode = BuildStep.ExecutionMode.ALWAYS
-        scriptContent = if (os == Os.windows) m2CleanScriptWindows else m2CleanScriptUnixLike
+        scriptContent = if (os == Os.WINDOWS) m2CleanScriptWindows else m2CleanScriptUnixLike
     }
 }
 
-fun buildToolGradleParameters(daemon: Boolean = true, isContinue: Boolean = true, os: Os = Os.linux): List<String> =
+fun buildToolGradleParameters(daemon: Boolean = true, isContinue: Boolean = true): List<String> =
     listOf(
         // We pass the 'maxParallelForks' setting as 'workers.max' to limit the maximum number of executers even
         // if multiple test tasks run in parallel. We also pass it to the Gradle build as a maximum (maxParallelForks)
         // for each test task, such that we are independent of whatever default value is defined in the build itself.
         "-Dorg.gradle.workers.max=%maxParallelForks%",
         "-PmaxParallelForks=%maxParallelForks%",
-        // Drop the VFS on before the build CI for dogfooding, until we do that automatically
-        "-Dorg.gradle.unsafe.vfs.drop=true",
         "-s",
         if (daemon) "--daemon" else "--no-daemon",
-        if (isContinue) "--continue" else "",
-        """-I "%teamcity.build.checkoutDir%/gradle/init-scripts/build-scan.init.gradle.kts"""",
-        "-Dorg.gradle.internal.tasks.createops",
-        // // https://github.com/gradle/gradle-private/issues/2725
-        if (os == Os.macos) "" else "-Dorg.gradle.internal.plugins.portal.url.override=%gradle.plugins.portal.url%"
+        if (isContinue) "--continue" else ""
     )
-
-fun buildToolParametersString(daemon: Boolean = true, os: Os = Os.linux) = buildToolGradleParameters(daemon, os = os).joinToString(separator = " ")
 
 fun Dependencies.compileAllDependency(compileAllId: String = "Gradle_Check_CompileAll") {
     // Compile All has to succeed before anything else is started
@@ -133,13 +140,5 @@ fun Dependencies.compileAllDependency(compileAllId: String = "Gradle_Check_Compi
         id = "ARTIFACT_DEPENDENCY_$compileAllId"
         cleanDestination = true
         artifactRules = "build-receipt.properties => incoming-distributions"
-    }
-}
-
-fun BuildSteps.verifyTestFilesCleanup(daemon: Boolean = true, os: Os = Os.linux) {
-    gradleWrapper {
-        name = "VERIFY_TEST_FILES_CLEANUP"
-        tasks = "verifyTestFilesCleanup"
-        gradleParams = buildToolParametersString(daemon, os)
     }
 }

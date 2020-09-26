@@ -17,13 +17,12 @@ package org.gradle.api.internal.artifacts.repositories;
 
 import org.gradle.api.artifacts.repositories.AuthenticationContainer;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
-import org.gradle.internal.hash.ChecksumService;
-import org.gradle.api.internal.artifacts.repositories.metadata.MavenLocalPomMetadataSource;
-import org.gradle.internal.instantiation.InstantiatorFactory;
+import org.gradle.api.internal.FeaturePreviews;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.GradleModuleMetadataParser;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MetaDataParser;
 import org.gradle.api.internal.artifacts.repositories.maven.MavenMetadataLoader;
 import org.gradle.api.internal.artifacts.repositories.metadata.DefaultMavenPomMetadataSource;
+import org.gradle.api.internal.artifacts.repositories.metadata.MavenLocalPomMetadataSource;
 import org.gradle.api.internal.artifacts.repositories.metadata.MavenMetadataArtifactProvider;
 import org.gradle.api.internal.artifacts.repositories.metadata.MavenMutableModuleMetadataFactory;
 import org.gradle.api.internal.artifacts.repositories.resolver.ExternalResourceArtifactResolver;
@@ -35,6 +34,8 @@ import org.gradle.api.model.ObjectFactory;
 import org.gradle.internal.component.external.model.ModuleComponentArtifactIdentifier;
 import org.gradle.internal.component.external.model.ModuleComponentArtifactMetadata;
 import org.gradle.internal.component.external.model.maven.MutableMavenModuleResolveMetadata;
+import org.gradle.internal.hash.ChecksumService;
+import org.gradle.internal.instantiation.InstantiatorFactory;
 import org.gradle.internal.isolation.IsolatableFactory;
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.resolve.result.DefaultResourceAwareResolveResult;
@@ -61,8 +62,9 @@ public class DefaultMavenLocalArtifactRepository extends DefaultMavenArtifactRep
                                                IsolatableFactory isolatableFactory,
                                                ObjectFactory objectFactory,
                                                DefaultUrlArtifactRepository.Factory urlArtifactRepositoryFactory,
-                                               ChecksumService checksumService) {
-        super(fileResolver, transportFactory, locallyAvailableResourceFinder, instantiatorFactory, artifactFileStore, pomParser, metadataParser, authenticationContainer, null, fileResourceRepository, metadataFactory, isolatableFactory, objectFactory, urlArtifactRepositoryFactory, checksumService);
+                                               ChecksumService checksumService,
+                                               FeaturePreviews featurePreviews) {
+        super(fileResolver, transportFactory, locallyAvailableResourceFinder, instantiatorFactory, artifactFileStore, pomParser, metadataParser, authenticationContainer, null, fileResourceRepository, metadataFactory, isolatableFactory, objectFactory, urlArtifactRepositoryFactory, checksumService, null, featurePreviews);
         this.checksumService = checksumService;
     }
 
@@ -83,7 +85,9 @@ public class DefaultMavenLocalArtifactRepository extends DefaultMavenArtifactRep
             MavenMetadataArtifactProvider.INSTANCE,
             mavenMetadataLoader,
             null,
-            null, injector, checksumService);
+            null,
+            injector,
+            checksumService);
         for (URI repoUrl : getArtifactUrls()) {
             resolver.addArtifactLocation(repoUrl);
         }

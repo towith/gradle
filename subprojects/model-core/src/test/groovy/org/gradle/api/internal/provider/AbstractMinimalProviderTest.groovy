@@ -37,6 +37,11 @@ class AbstractMinimalProviderTest extends ProviderSpec<String> {
     }
 
     @Override
+    Class<String> type() {
+        return String
+    }
+
+    @Override
     String someValue() {
         "s2"
     }
@@ -139,7 +144,7 @@ class AbstractMinimalProviderTest extends ProviderSpec<String> {
         }
 
         @Override
-        protected Value calculateOwnValue() {
+        protected Value calculateOwnValue(ValueConsumer consumer) {
             return Value.ofNullable(value)
         }
     }

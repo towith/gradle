@@ -23,7 +23,7 @@ import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.SetProperty
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.TestBuildCache
 import org.gradle.internal.Actions
 import spock.lang.Issue
@@ -73,7 +73,6 @@ class TaskParametersIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Issue("https://issues.gradle.org/browse/GRADLE-3435")
-    @ToBeFixedForInstantExecution
     def "task is not up-to-date after file moved between input properties"() {
         (1..3).each {
             file("input${it}.txt").createNewFile()
@@ -136,7 +135,6 @@ class TaskParametersIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Issue("https://issues.gradle.org/browse/GRADLE-3435")
-    @ToBeFixedForInstantExecution
     def "task is not up-to-date after swapping directories between output properties"() {
         file("buildSrc/src/main/groovy/TaskWithTwoOutputDirectoriesProperties.groovy") << """
             import org.gradle.api.*
@@ -247,7 +245,6 @@ class TaskParametersIntegrationTest extends AbstractIntegrationSpec {
         succeeds "b" assertTasksExecutedInOrder ":a", ":b"
     }
 
-    @ToBeFixedForInstantExecution
     def "task is out of date when property added"() {
         buildFile << """
 task someTask {
@@ -285,7 +282,6 @@ someTask.inputs.property("b", 12)
         skipped(":someTask")
     }
 
-    @ToBeFixedForInstantExecution
     def "task is out of date when property removed"() {
         buildFile << """
 task someTask {
@@ -329,7 +325,6 @@ task someTask {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     def "task is out of date when property type changes #oldValue -> #newValue"() {
         buildFile << """
 task someTask {
@@ -379,7 +374,6 @@ task someTask {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     def "task can use input property of type #type"() {
         file("buildSrc/src/main/java/SomeTask.java") << """
 import org.gradle.api.DefaultTask;
@@ -398,7 +392,7 @@ public class SomeTask extends DefaultTask {
     File d;
     @OutputDirectory
     public File getD() { return d; }
-    
+
     @TaskAction
     public void go() { }
 }
@@ -643,7 +637,7 @@ task someTask(type: SomeTask) {
                 public Foo() {
                     getInputs().property("a", null).optional(true);
                 }
-                
+
                 @TaskAction
                 public void doSomething() {}
             }
@@ -657,11 +651,17 @@ task someTask(type: SomeTask) {
         succeeds "foo"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "task references other task")
     def "input and output properties are not evaluated too often"() {
-        buildFile << """ 
-            @CacheableTask    
-            class CustomTask extends DefaultTask {
+        buildFile << """
+            import javax.inject.Inject
+
+            @CacheableTask
+            abstract class CustomTask extends DefaultTask {
+
+                @Inject
+                abstract ProjectLayout getLayout()
+
                 @Internal
                 int outputFileCount = 0
                 @Internal
@@ -674,60 +674,60 @@ task someTask(type: SomeTask) {
                 int nestedInputValueCount = 0
 
                 private NestedBean bean = new NestedBean()
-                
+
                 @OutputFile
                 File getOutputFile() {
                     count("outputFile", ++outputFileCount)
-                    return project.file('build/foo.bar')
-                }        
-                
+                    return layout.buildDirectory.file("foo.bar").get().asFile
+                }
+
                 @InputFile
                 @PathSensitive(PathSensitivity.NONE)
                 File getInputFile() {
                     count("inputFile", ++inputFileCount)
-                    return project.file('input.txt')
+                    return layout.projectDirectory.file("input.txt").asFile
                 }
-                
+
                 @Input
                 String getInput() {
                     count("inputValue", ++inputValueCount)
                     return "Input"
                 }
-                
+
                 @Nested
                 Object getBean() {
                     count("nestedInput", ++nestedInputCount)
                     return bean
                 }
-                
+
                 @TaskAction
                 void doStuff() {
                     outputFile.text = inputFile.text
                 }
-                
+
                 void count(String name, int currentValue) {
-                    println "Evaluating \${name} \${currentValue}"                
+                    println "Evaluating \${name} \${currentValue}"
                 }
-                                
+
                 class NestedBean {
                     @Input getFirst() {
                         count("nestedInputValue", ++nestedInputValueCount)
                         return "first"
                     }
-                    
+
                     @Input getSecond() {
                         return "second"
                     }
                 }
             }
-            
+
             task myTask(type: CustomTask)
-            
+
             task assertInputCounts {
                 dependsOn myTask
                 doLast {
                     ['outputFileCount', 'inputFileCount', 'inputValueCount', 'nestedInputCount', 'nestedInputValueCount'].each { name ->
-                        assert myTask."\$name" == project.property(name) as Integer                    
+                        assert myTask."\$name" == providers.gradleProperty(name).get() as Integer
                     }
                 }
             }

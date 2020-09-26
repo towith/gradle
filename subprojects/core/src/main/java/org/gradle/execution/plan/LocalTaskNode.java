@@ -18,7 +18,6 @@ package org.gradle.execution.plan;
 
 import com.google.common.collect.ImmutableSet;
 import org.gradle.api.Action;
-import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.UncheckedIOException;
 import org.gradle.api.internal.TaskInternal;
@@ -70,20 +69,20 @@ public class LocalTaskNode extends TaskNode {
 
     @Nullable
     @Override
-    public Project getProjectToLock() {
+    public ResourceLock getProjectToLock() {
         if (isolated) {
             return null;
         } else {
             // Running the task requires access to the task's owning project
-            return task.getProject();
+            return ((ProjectInternal) task.getProject()).getMutationState().getAccessLock();
         }
     }
 
     @Nullable
     @Override
-    public Project getOwningProject() {
+    public ProjectInternal getOwningProject() {
         // Task requires its owning project's execution services
-        return task.getProject();
+        return (ProjectInternal) task.getProject();
     }
 
     @Override
@@ -174,7 +173,6 @@ public class LocalTaskNode extends TaskNode {
     }
 
     @Override
-    @SuppressWarnings("NullableProblems")
     public int compareTo(Node other) {
         if (getClass() != other.getClass()) {
             return getClass().getName().compareTo(other.getClass().getName());
@@ -211,7 +209,13 @@ public class LocalTaskNode extends TaskNode {
                             value,
                             filePropertyType,
                             fileCollectionFactory,
-                            outputFilePropertySpec -> mutations.outputPaths.addAll(canonicalizedPaths(canonicalizedFileCache, outputFilePropertySpec.getPropertyFiles()))
+                            true,
+                            outputFilePropertySpec -> {
+                                File outputLocation = outputFilePropertySpec.getOutputFile();
+                                if (outputLocation != null) {
+                                    mutations.outputPaths.add(canonicalizePath(outputLocation, canonicalizedFileCache));
+                                }
+                            }
                         )
                     );
                     mutations.hasOutputs = true;
@@ -221,7 +225,7 @@ public class LocalTaskNode extends TaskNode {
                 public void visitLocalStateProperty(final Object value) {
                     withDeadlockHandling(
                         taskNode,
-                        "a local state property", "local state properties",
+                        "a local state", "local state properties",
                         () -> mutations.outputPaths.addAll(canonicalizedPaths(canonicalizedFileCache, fileCollectionFactory.resolving(value))));
                     mutations.hasLocalState = true;
                 }

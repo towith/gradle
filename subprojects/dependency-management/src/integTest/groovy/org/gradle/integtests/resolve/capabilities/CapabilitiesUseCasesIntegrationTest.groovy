@@ -18,7 +18,7 @@ package org.gradle.integtests.resolve.capabilities
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.resolve.AbstractModuleDependencyResolveTest
 import spock.lang.Ignore
 import spock.lang.Unroll
@@ -38,6 +38,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
      * enforce the use of only one of them at the same time.
      */
     @Unroll
+    @ToBeFixedForConfigurationCache(iterationMatchers = [".*conflict fix not applied.*"])
     def "can choose between cglib and cglib-nodep by declaring capabilities (#description)"() {
         given:
         repository {
@@ -62,12 +63,12 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
             dependencies {
                conf "cglib:cglib-nodep:3.2.5"
                conf "cglib:cglib:3.2.5"
-            
+
                components {
                   withModule('cglib:cglib-nodep', CapabilityRule)
                }
             }
-            
+
             configurations.all {
                 resolutionStrategy {
                     dependencySubstitution {
@@ -131,6 +132,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
      * This is from the consumer point of view, fixing the fact the library doesn't declare capabilities.
      */
     @Unroll
+    @ToBeFixedForConfigurationCache(iterationMatchers = [".*conflict fix not applied.*"])
     def "can select groovy-all over individual groovy-whatever (#description)"() {
         given:
         repository {
@@ -166,10 +168,10 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
             dependencies {
                conf "org:a:1.0"
                conf "org:b:1.0"
-            
+
                components {
                   withModule('org.apache:groovy-all', CapabilityRule)
-               }               
+               }
 
                // solution
                configurations.all {
@@ -253,6 +255,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
      * This is from the consumer point of view, fixing the fact the library doesn't declare capabilities.
      */
     @Unroll
+    @ToBeFixedForConfigurationCache(iterationMatchers = [".*conflict fix not applied.*"])
     def "can select individual groovy-whatever over individual groovy-all (#description)"() {
         given:
         repository {
@@ -288,10 +291,10 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
             dependencies {
                conf "org:a:1.0"
                conf "org:b:1.0"
-            
+
                components {
                   withModule('org.apache:groovy-all', CapabilityRule)
-                  
+
                   // solution
                   configurations.all {
                       resolutionStrategy {
@@ -300,7 +303,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
                           }
                       }
                   }
-               } 
+               }
             }
         """
 
@@ -370,9 +373,8 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
      *
      * This test also makes sure that the order in which dependencies are seen in the graph do not matter.
      */
-    @RequiredFeatures(
-        @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
-    )
+    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
+    @ToBeFixedForConfigurationCache(iterationMatchers = [".*failOnVersionConflict=true.*"])
     @Unroll
     def "published module can declare relocation (first in graph = #first, second in graph = #second, failOnVersionConflict=#failOnVersionConflict)"() {
         given:
@@ -392,7 +394,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
                conf "$first"
                conf "$second"
             }
-            
+
             if ($failOnVersionConflict) {
                configurations.conf.resolutionStrategy.failOnVersionConflict()
             }
@@ -440,9 +442,8 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
      * as we visit the graph. But using a module substitution rule, we can fix the problem.
      */
 
-    @RequiredFeatures(
-        @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
-    )
+    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
+    @ToBeFixedForConfigurationCache(iterationMatchers = [".*conflict fix not applied.*"])
     @Unroll
     def "can express preference for capabilities declared in published modules (#description)"() {
         given:
@@ -466,7 +467,7 @@ class CapabilitiesUseCasesIntegrationTest extends AbstractModuleDependencyResolv
                 conf 'org:testA:1.0'
                 conf 'org:testB:1.0'
             }
-            
+
             // fix the conflict between modules providing the same capability
             configurations.all {
                 resolutionStrategy {

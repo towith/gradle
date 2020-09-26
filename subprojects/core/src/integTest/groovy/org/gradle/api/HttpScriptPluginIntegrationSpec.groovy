@@ -17,14 +17,12 @@ package org.gradle.api
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.TestResources
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.test.fixtures.keystore.TestKeyStore
 import org.gradle.test.fixtures.server.http.HttpServer
 import org.gradle.test.matchers.UserAgentMatcher
 import org.gradle.util.GUtil
 import org.gradle.util.GradleVersion
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 import spock.lang.Issue
 import spock.lang.Unroll
 
@@ -111,8 +109,6 @@ class HttpScriptPluginIntegrationSpec extends AbstractIntegrationSpec {
         succeeds()
     }
 
-    // Remove when https://bugs.openjdk.java.net/browse/JDK-8219658 is fixed in JDK 12
-    @Requires(TestPrecondition.JDK11_OR_EARLIER)
     def "can apply script via https"() {
         applyTrustStore()
 
@@ -134,7 +130,6 @@ class HttpScriptPluginIntegrationSpec extends AbstractIntegrationSpec {
         then:
         succeeds()
     }
-
 
     @Issue("https://github.com/gradle/gradle/issues/2891")
     def "can apply script with URI containing a query string"() {
@@ -183,7 +178,7 @@ class HttpScriptPluginIntegrationSpec extends AbstractIntegrationSpec {
         succeeds()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "remote scripts skipped")
     def "does not cache URIs with query parts"() {
         when:
         def queryString = 'p=foo;a=blob_plain;f=bar;hb=foo/bar/foo'
@@ -318,7 +313,7 @@ task check {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "remote scripts skipped")
     def "can recover from failure to download cached #source resource by running with --offline"() {
         given:
         def scriptFile = file("script.gradle")
@@ -363,7 +358,7 @@ task check {
         "initscript"  | "init.gradle"     | "init-script-plugin.gradle"
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "test expects script evaluation")
     def "will only request resource once for build invocation"() {
         given:
         def scriptName = "script-once.gradle"
@@ -386,7 +381,7 @@ task check {
         args('-I', 'init.gradle')
 
         then:
-        succeeds 'tasks'
+        succeeds 'help'
         output.count('loaded external script') == 4
 
         when:
@@ -395,11 +390,11 @@ task check {
         args('-I', 'init.gradle')
 
         then:
-        succeeds 'tasks'
+        succeeds 'help'
         output.count('loaded external script') == 4
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "test expects script evaluation")
     def "will refresh cached value on subsequent build invocation"() {
         given:
         def scriptName = "script-cached.gradle"
@@ -414,7 +409,7 @@ task check {
         server.expectGet('/' + scriptName, scriptFile)
 
         then:
-        succeeds 'tasks'
+        succeeds 'help'
         output.contains('loaded external script 1')
 
         when:
@@ -423,7 +418,7 @@ task check {
         server.expectGet('/' + scriptName, scriptFile)
 
         then:
-        succeeds 'tasks'
+        succeeds 'help'
         output.contains('loaded external script 2')
 
         when:
@@ -431,7 +426,7 @@ task check {
         args("--offline")
 
         then:
-        succeeds 'tasks'
+        succeeds 'help'
         output.contains('loaded external script 2')
     }
 

@@ -28,7 +28,7 @@ The file must be encoded using UTF-8.
 
 The file must contain a JSON object with the following values:
 
-- `formatVersion`: must be present and the first value of the JSON object. Its value must be `"1.0"`
+- `formatVersion`: must be present and the first value of the JSON object. Its value must be `"1.1"`
 - `component`: optional. Describes the identity of the component contained in the module.
 - `createdBy`: optional. Describes the producer of this metadata file and the contents of the module.
 - `variants`: optional. Describes the variants of the component packaged in the module, if any.
@@ -53,7 +53,7 @@ This value must contain an object with the following values:
 This value, nested in `createdBy`, must contain an object with the following values:
 
 - `version`: The version of Gradle. A string
-- `buildId`: The buildId for the Gradle instance. A string
+- `buildId`: optional. The buildId for the Gradle instance. A string
 
 ### `variants` value
 
@@ -63,6 +63,7 @@ This value must contain an array with zero or more elements. Each element must b
 - `attributes`: optional. When missing the variant is assumed to have no attributes.
 - `available-at`: optional. Information about where the metadata and files of this variant are available.
 - `dependencies`: optional. When missing the variant is assumed to have no dependencies. Must not be present when `available-at` is present.
+- `dependencyConstraints`: optional. When missing the variant is assumed to have no dependency constraints. Must not be present when `available-at` is present.
 - `files`: optional. When missing the variant is assumed to have no files. Must not be present when `available-at` is present.
 - `capabilities`: optional. When missing the variant is assumed to declared no specific capability.
 

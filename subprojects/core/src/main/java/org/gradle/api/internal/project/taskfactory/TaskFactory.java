@@ -16,12 +16,15 @@
 package org.gradle.api.internal.project.taskfactory;
 
 import org.gradle.api.DefaultTask;
+import org.gradle.api.Describable;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Task;
-import org.gradle.api.internal.AbstractTask;
+import org.gradle.api.internal.TaskInternal;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.reflect.ObjectInstantiationException;
 import org.gradle.api.tasks.TaskInstantiationException;
+import org.gradle.internal.Describables;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.instantiation.InstantiationScheme;
 import org.gradle.util.NameValidator;
 
@@ -47,6 +50,7 @@ public class TaskFactory implements ITaskFactory {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public <S extends Task> S create(final TaskIdentity<S> identity, @Nullable final Object[] constructorArgs) {
         if (!Task.class.isAssignableFrom(identity.type)) {
             throw new InvalidUserDataException(String.format(
@@ -56,22 +60,36 @@ public class TaskFactory implements ITaskFactory {
 
         NameValidator.validate(identity.name, "task name", "");
 
-        final Class<? extends AbstractTask> implType;
-        if (identity.type.isAssignableFrom(DefaultTask.class)) {
+        final Class<? extends org.gradle.api.internal.AbstractTask> implType;
+        if (identity.type == Task.class) {
+            implType = DefaultTask.class;
+        } else if (DefaultTask.class.isAssignableFrom(identity.type)) {
+            implType = identity.type.asSubclass(org.gradle.api.internal.AbstractTask.class);
+        } else if (identity.type == org.gradle.api.internal.AbstractTask.class || identity.type == TaskInternal.class) {
+            DeprecationLogger.deprecate(String.format("Registering task '%s' with type '%s'", identity.identityPath.toString(), identity.type.getSimpleName()))
+                .willBecomeAnErrorInGradle7()
+                .withUpgradeGuideSection(6, "abstract_task_deprecated")
+                .nagUser();
             implType = DefaultTask.class;
         } else {
-            implType = identity.type.asSubclass(AbstractTask.class);
+            DeprecationLogger.deprecate(String.format("Registering task '%s' with a type (%s) that directly extends AbstractTask", identity.identityPath.toString(), identity.type.getSimpleName()))
+                .willBecomeAnErrorInGradle7()
+                .withUpgradeGuideSection(6, "abstract_task_deprecated")
+                .nagUser();
+            implType = identity.type.asSubclass(org.gradle.api.internal.AbstractTask.class);
         }
 
-        return AbstractTask.injectIntoNewInstance(project, identity, new Callable<S>() {
+        Describable displayName = Describables.withTypeAndName("task", identity.getIdentityPath());
+
+        return org.gradle.api.internal.AbstractTask.injectIntoNewInstance(project, identity, new Callable<S>() {
             @Override
             public S call() {
                 try {
                     Task instance;
                     if (constructorArgs != null) {
-                        instance = instantiationScheme.instantiator().newInstance(implType, constructorArgs);
+                        instance = instantiationScheme.instantiator().newInstanceWithDisplayName(implType, displayName, constructorArgs);
                     } else {
-                        instance = instantiationScheme.deserializationInstantiator().newInstance(implType, AbstractTask.class);
+                        instance = instantiationScheme.deserializationInstantiator().newInstance(implType, org.gradle.api.internal.AbstractTask.class);
                     }
                     return identity.type.cast(instance);
                 } catch (ObjectInstantiationException e) {

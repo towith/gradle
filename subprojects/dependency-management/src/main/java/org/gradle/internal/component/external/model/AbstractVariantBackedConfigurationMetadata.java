@@ -49,7 +49,7 @@ class AbstractVariantBackedConfigurationMetadata implements ModuleConfigurationM
     AbstractVariantBackedConfigurationMetadata(ModuleComponentIdentifier componentId, ComponentVariant variant) {
         this.componentId = componentId;
         this.variant = variant;
-        List<GradleDependencyMetadata> dependencies = new ArrayList<GradleDependencyMetadata>(variant.getDependencies().size());
+        List<GradleDependencyMetadata> dependencies = new ArrayList<>(variant.getDependencies().size());
         // Forced dependencies are only supported for enforced platforms, so it is currently hardcoded.
         // Should we want to add this as a first class concept to Gradle metadata, then it should be available on the component variant
         // metadata as well.
@@ -83,6 +83,11 @@ class AbstractVariantBackedConfigurationMetadata implements ModuleConfigurationM
     @Override
     public String getName() {
         return variant.getName();
+    }
+
+    @Override
+    public Identifier getIdentifier() {
+        return variant.getIdentifier();
     }
 
     @Override
@@ -167,5 +172,10 @@ class AbstractVariantBackedConfigurationMetadata implements ModuleConfigurationM
 
     protected ComponentVariant getVariant() {
         return variant;
+    }
+
+    @Override
+    public boolean isExternalVariant() {
+        return variant.isExternalVariant();
     }
 }

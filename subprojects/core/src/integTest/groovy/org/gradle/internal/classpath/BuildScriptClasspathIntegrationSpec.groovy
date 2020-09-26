@@ -18,19 +18,20 @@ package org.gradle.internal.classpath
 
 import org.gradle.cache.internal.LeastRecentlyUsedCacheCleanup
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.cache.FileAccessTimeJournalFixture
 import org.gradle.integtests.fixtures.executer.ArtifactBuilder
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.server.http.HttpServer
 import org.gradle.test.fixtures.server.http.MavenHttpRepository
 import org.junit.Rule
+import spock.lang.Issue
 import spock.lang.Unroll
 
 class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implements FileAccessTimeJournalFixture {
     static final long MAX_CACHE_AGE_IN_DAYS = LeastRecentlyUsedCacheCleanup.DEFAULT_MAX_AGE_IN_DAYS_FOR_RECREATABLE_CACHE_ENTRIES
 
-    @Rule public final HttpServer server = new HttpServer()
+    @Rule
+    public final HttpServer server = new HttpServer()
     MavenHttpRepository repo
 
     def setup() {
@@ -42,8 +43,7 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         server.start()
     }
 
-    @Unroll("jars on buildscript classpath can change (deleteIfExists: #deleteIfExists, loopNumber: #loopNumber)")
-    @ToBeFixedForInstantExecution
+    @Unroll("jars on buildscript classpath can change (loopNumber: #loopNumber)")
     def "jars on buildscript classpath can change"() {
         given:
         buildFile << '''
@@ -68,7 +68,7 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
                 public String message() { return "hello world"; }
             }
         '''
-        builder.buildJar(jarFile, deleteIfExists)
+        builder.buildJar(jarFile)
 
         then:
         succeeds("hello")
@@ -82,18 +82,17 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
                 public String message() { return "hello again"; }
             }
         '''
-        builder.buildJar(jarFile, deleteIfExists)
+        builder.buildJar(jarFile)
 
         then:
         succeeds("hello")
         outputContains("hello again")
 
         where:
-        deleteIfExists << [false, true] * 3
         loopNumber << (1..6).toList()
     }
 
-    def "build script classloader copies only non-cached jar files"() {
+    def "build script classloader copies jar files to cache"() {
         given:
         createBuildFileThatPrintsClasspathURLs("""
             classpath name: 'test', version: '1.3-BUILD-SNAPSHOT'
@@ -114,7 +113,7 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         then:
         succeeds("showBuildscript")
         inJarCache("test-1.3-BUILD-SNAPSHOT.jar")
-        notInJarCache("commons-io-1.4.jar")
+        inJarCache("commons-io-1.4.jar")
     }
 
     private void createBuildFileThatPrintsClasspathURLs(String dependencies = '') {
@@ -164,7 +163,6 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         succeeds("checkUrlConnectionCaching")
     }
 
-    @ToBeFixedForInstantExecution
     def "jars with resources on buildscript classpath can change"() {
         given:
         buildFile << '''
@@ -217,7 +215,6 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         outputContains("hello again")
     }
 
-    @ToBeFixedForInstantExecution
     def "cleans up unused cached JARs"() {
         given:
         executer.requireIsolatedDaemons() // needs to stop daemon
@@ -257,7 +254,6 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         jar.assertExists()
     }
 
-    @ToBeFixedForInstantExecution
     def "cleans up unused versions of jars cache"() {
         given:
         requireOwnGradleUserHomeDir() // messes with caches
@@ -268,7 +264,7 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         gcFile.createFile().lastModified = daysAgo(2)
 
         when:
-        succeeds("tasks")
+        succeeds("help")
 
         then:
         oldCacheDirs.each {
@@ -276,11 +272,26 @@ class BuildScriptClasspathIntegrationSpec extends AbstractIntegrationSpec implem
         }
     }
 
+    @Issue("https://github.com/gradle/gradle/issues/13816")
+    def "classpath can contain badly formed jar"() {
+        given:
+        file("broken.jar") << "not a jar"
+        buildFile << """
+            buildscript { dependencies { classpath files("broken.jar") } }
+        """
+
+        when:
+        succeeds()
+
+        then:
+        noExceptionThrown()
+    }
+
     void notInJarCache(String filename) {
         inJarCache(filename, false)
     }
 
-    TestFile inJarCache(String filename, boolean shouldBeFound=true) {
+    TestFile inJarCache(String filename, boolean shouldBeFound = true) {
         String fullpath = result.output.readLines().find { it.matches(">>>file:.*${filename}") }.replace(">>>", "")
         assert fullpath.startsWith(cacheDir.toURI().toString()) == shouldBeFound
         return new TestFile(new File(URI.create(fullpath)))

@@ -27,12 +27,13 @@ import org.gradle.initialization.GradleLauncher
 import org.gradle.initialization.GradleLauncherFactory
 import org.gradle.initialization.NestedBuildFactory
 import org.gradle.internal.Actions
+import org.gradle.internal.build.BuildAddedListener
 import org.gradle.internal.build.BuildState
 import org.gradle.internal.build.IncludedBuildState
 import org.gradle.internal.build.RootBuildState
+import org.gradle.internal.buildtree.BuildTreeState
 import org.gradle.internal.event.ListenerManager
 import org.gradle.internal.service.ServiceRegistry
-import org.gradle.internal.service.scopes.BuildTreeScopeServices
 import org.gradle.plugin.management.internal.PluginRequests
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.gradle.util.Path
@@ -41,9 +42,19 @@ import spock.lang.Specification
 
 class DefaultIncludedBuildRegistryTest extends Specification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     def includedBuildFactory = Stub(IncludedBuildFactory)
-    def registry = new DefaultIncludedBuildRegistry(includedBuildFactory, Stub(IncludedBuildDependencySubstitutionsBuilder), Stub(GradleLauncherFactory), Stub(ListenerManager), Stub(BuildTreeScopeServices))
+    def buildAddedListener = Mock(BuildAddedListener)
+    def listenerManager = Stub(ListenerManager) {
+        getBroadcaster(BuildAddedListener) >> buildAddedListener
+    }
+    def registry = new DefaultIncludedBuildRegistry(
+        Stub(BuildTreeState),
+        includedBuildFactory,
+        Stub(IncludedBuildDependencySubstitutionsBuilder),
+        Stub(GradleLauncherFactory),
+        listenerManager
+    )
 
     def "is empty by default"() {
         expect:
@@ -52,11 +63,19 @@ class DefaultIncludedBuildRegistryTest extends Specification {
     }
 
     def "can add a root build"() {
-        expect:
+        def notifiedBuild
+        when:
         def rootBuild = registry.createRootBuild(Stub(BuildDefinition))
+        then:
+        1 * buildAddedListener.buildAdded(_) >> { BuildState addedBuild ->
+            notifiedBuild = addedBuild
+        }
+        0 * _
+
         !rootBuild.implicitBuild
         rootBuild.buildIdentifier == DefaultBuildIdentifier.ROOT
         rootBuild.identityPath == Path.ROOT
+        notifiedBuild.is(rootBuild)
 
         registry.getBuild(rootBuild.buildIdentifier).is(rootBuild)
     }
@@ -71,11 +90,15 @@ class DefaultIncludedBuildRegistryTest extends Specification {
 
         given:
         registry.attachRootBuild(rootBuild())
-        includedBuildFactory.createBuild(buildIdentifier, idPath, buildDefinition, false, _) >> includedBuild
+        includedBuildFactory.createBuild(buildIdentifier, idPath, buildDefinition, false, _ as BuildState) >> includedBuild
 
-        expect:
+        when:
         def result = registry.addIncludedBuild(buildDefinition)
-        result == includedBuild
+        then:
+        1 * buildAddedListener.buildAdded(includedBuild)
+        0 * _
+
+        result.is includedBuild
 
         registry.hasIncludedBuilds()
         registry.includedBuilds as List == [includedBuild]
@@ -162,11 +185,15 @@ class DefaultIncludedBuildRegistryTest extends Specification {
 
         given:
         registry.attachRootBuild(rootBuild())
-        includedBuildFactory.createBuild(new DefaultBuildIdentifier("b1"), Path.path(":b1"), buildDefinition, true, _) >> includedBuild
+        includedBuildFactory.createBuild(new DefaultBuildIdentifier("b1"), Path.path(":b1"), buildDefinition, true, _ as BuildState) >> includedBuild
 
-        expect:
+        when:
         def result = registry.addImplicitIncludedBuild(buildDefinition)
-        result == includedBuild
+        then:
+        1 * buildAddedListener.buildAdded(includedBuild)
+        0 * _
+
+        result.is(includedBuild)
 
         registry.hasIncludedBuilds()
         registry.includedBuilds as List == [includedBuild]
@@ -178,12 +205,20 @@ class DefaultIncludedBuildRegistryTest extends Specification {
         buildDefinition.name >> "buildSrc"
         registry.attachRootBuild(rootBuild())
         def owner = Stub(BuildState) { getIdentityPath() >> Path.ROOT }
+        def notifiedBuild
 
-        expect:
+        when:
         def nestedBuild = registry.addBuildSrcNestedBuild(buildDefinition, owner)
+        then:
+        1 * buildAddedListener.buildAdded(_) >> { BuildState addedBuild ->
+            notifiedBuild = addedBuild
+        }
+        0 * _
+
         nestedBuild.implicitBuild
         nestedBuild.buildIdentifier == new DefaultBuildIdentifier("buildSrc")
         nestedBuild.identityPath == Path.path(":buildSrc")
+        notifiedBuild.is(nestedBuild)
 
         registry.getBuild(nestedBuild.buildIdentifier).is(nestedBuild)
     }

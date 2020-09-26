@@ -32,10 +32,11 @@ import org.gradle.kotlin.dsl.fixtures.codegen.ClassToKClass
 import org.gradle.kotlin.dsl.fixtures.codegen.ClassToKClassParameterizedType
 import org.gradle.kotlin.dsl.fixtures.codegen.GroovyNamedArguments
 import org.gradle.kotlin.dsl.support.normaliseLineSeparators
+import org.gradle.test.fixtures.file.LeaksFileHandles
 
 import org.hamcrest.CoreMatchers.containsString
 import org.hamcrest.CoreMatchers.equalTo
-import org.junit.Assert.assertThat
+import org.hamcrest.MatcherAssert.assertThat
 import org.junit.Test
 
 import org.slf4j.Logger
@@ -52,6 +53,7 @@ import java.util.jar.Manifest
 import kotlin.reflect.KClass
 
 
+@LeaksFileHandles("embedded Kotlin compiler environment keepalive")
 class GradleApiExtensionsTest : TestWithClassPath() {
 
     @Test
@@ -64,7 +66,7 @@ class GradleApiExtensionsTest : TestWithClassPath() {
             ClassAndGroovyNamedArguments::class
         ) {
 
-            assertGeneratedJarHash("9358afc86a3d503f1583a278a0d3cd8d")
+            assertGeneratedJarHash("b429469f8feb02fe9435b6bf7de2f7a5")
         }
     }
 
@@ -376,7 +378,7 @@ class GradleApiExtensionsTest : TestWithClassPath() {
 
     private
     fun apiJarsWith(vararg classes: KClass<*>): List<File> =
-        jarClassPathWith("gradle-api.jar", *classes).asFiles
+        jarClassPathWith("gradle-api.jar", *classes, org.gradle.api.Generated::class).asFiles
 
     private
     fun fixturesApiMetadataJar(): File =

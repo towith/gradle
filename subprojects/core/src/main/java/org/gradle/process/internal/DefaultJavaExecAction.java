@@ -18,18 +18,20 @@ package org.gradle.process.internal;
 
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FileResolver;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.initialization.BuildCancellationToken;
+import org.gradle.internal.jvm.JavaModuleDetector;
 import org.gradle.process.ExecResult;
 import org.gradle.process.JavaForkOptions;
 
 import java.util.concurrent.Executor;
 
 /**
- * Use {@link ExecActionFactory} or {@link DslExecActionFactory} instead.
+ * Use {@link ExecActionFactory} (for core code) or {@link org.gradle.process.ExecOperations} (for plugin code) instead.
  */
 public class DefaultJavaExecAction extends JavaExecHandleBuilder implements JavaExecAction {
-    public DefaultJavaExecAction(FileResolver fileResolver, FileCollectionFactory fileCollectionFactory, Executor executor, BuildCancellationToken buildCancellationToken, JavaForkOptions javaOptions) {
-        super(fileResolver, fileCollectionFactory, executor, buildCancellationToken, javaOptions);
+    public DefaultJavaExecAction(FileResolver fileResolver, FileCollectionFactory fileCollectionFactory, ObjectFactory objectFactory, Executor executor, BuildCancellationToken buildCancellationToken, JavaModuleDetector javaModuleDetector, JavaForkOptions javaOptions) {
+        super(fileResolver, fileCollectionFactory, objectFactory, executor, buildCancellationToken, javaModuleDetector, javaOptions);
     }
 
     @Override

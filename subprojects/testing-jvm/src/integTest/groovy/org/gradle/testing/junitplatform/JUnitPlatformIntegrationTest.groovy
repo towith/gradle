@@ -17,9 +17,6 @@
 package org.gradle.testing.junitplatform
 
 import org.gradle.integtests.fixtures.DefaultTestExecutionResult
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 import spock.lang.Issue
 import spock.lang.Timeout
 import spock.lang.Unroll
@@ -27,7 +24,6 @@ import spock.lang.Unroll
 import static org.gradle.testing.fixture.JUnitCoverage.LATEST_JUPITER_VERSION
 import static org.hamcrest.CoreMatchers.containsString
 
-@Requires(TestPrecondition.JDK8_OR_LATER)
 class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
     void createSimpleJupiterTest() {
         file('src/test/java/org/gradle/JUnitJupiterTest.java') << '''
@@ -57,13 +53,13 @@ class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
 
     def 'should prompt user to add dependencies when they are not in test runtime classpath'() {
         given:
-        buildFile.text = """ 
+        buildFile.text = """
             apply plugin: 'java'
             ${mavenCentralRepository()}
-            dependencies { 
+            dependencies {
                 testCompileOnly 'org.junit.jupiter:junit-jupiter-api:${LATEST_JUPITER_VERSION}','org.junit.jupiter:junit-jupiter-engine:${LATEST_JUPITER_VERSION}'
             }
-            
+
             test { useJUnitPlatform() }
             """
         createSimpleJupiterTest()
@@ -105,9 +101,9 @@ class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
     @Unroll
     def 'can handle class-level error in #location method'() {
         given:
-        file('src/test/java/org/gradle/ClassErrorTest.java') << """ 
+        file('src/test/java/org/gradle/ClassErrorTest.java') << """
             package org.gradle;
-            
+
             import org.junit.jupiter.api.*;
             import static org.junit.jupiter.api.Assertions.*;
 
@@ -120,7 +116,7 @@ class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
                 public static void before() {
                     $beforeStatement;
                 }
-                
+
                 @AfterAll
                 public static void after() {
                     $afterStatement;
@@ -205,8 +201,8 @@ class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
 
         then:
         new DefaultTestExecutionResult(testDirectory)
-            .assertTestClassesExecuted('org.gradle.RepeatTest')
-            .testClass('org.gradle.RepeatTest')
+            .assertTestClassesExecutedJudgementByHtml('org.gradle.RepeatTest')
+            .testClassByHtml('org.gradle.RepeatTest')
             .assertTestCount(9, 1, 0)
             .assertTestPassed('ok()[1]', 'ok 1/3')
             .assertTestPassed('ok()[2]', 'ok 2/3')
@@ -217,47 +213,6 @@ class JUnitPlatformIntegrationTest extends JUnitPlatformIntegrationSpec {
             .assertTestPassed('partialSkip(RepetitionInfo)[1]', 'partialSkip 1/3')
             .assertTestSkipped('partialSkip(RepetitionInfo)[2]', 'partialSkip 2/3')
             .assertTestPassed('partialSkip(RepetitionInfo)[3]', 'partialSkip 3/3')
-    }
-
-    def 'can filter nested tests'() {
-        given:
-        file('src/test/java/org/gradle/NestedTest.java') << '''
-package org.gradle;
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.util.EmptyStackException;
-import java.util.Stack;
-
-import org.junit.jupiter.api.*;
-
-class NestedTest {
-    @Test
-    void outerTest() {
-    }
-
-    @Nested
-    class Inner {
-        @Test
-        void innerTest() {
-        }
-    }
-}
-'''
-        buildFile << '''
-test {
-    filter {
-        includeTestsMatching "*innerTest*"
-    }
-}
-'''
-        when:
-        succeeds('test')
-
-        then:
-        new DefaultTestExecutionResult(testDirectory)
-            .assertTestClassesExecuted('org.gradle.NestedTest$Inner')
-            .testClass('org.gradle.NestedTest$Inner').assertTestCount(1, 0, 0)
-            .assertTestPassed('innerTest()')
     }
 
     @Issue('https://github.com/gradle/gradle/issues/4476')
@@ -301,7 +256,7 @@ public class StaticInnerTest {
         @Test
         public void inside() {
         }
-        
+
         public static class Nested2 {
             @Test
             public void inside() {
@@ -330,7 +285,6 @@ public class StaticInnerTest {
 
     @Unroll
     @Issue('https://github.com/gradle/gradle/issues/4924')
-    @ToBeFixedForInstantExecution
     def "re-executes test when #key is changed"() {
         given:
         buildScriptWithJupiterDependencies("""
@@ -416,5 +370,40 @@ public class StaticInnerTest {
                 testClass("org.gradle.Test$classNumber").assertTestCount(1, 0, 0)
             }
         }
+    }
+
+    @Unroll
+    @Issue("https://github.com/junit-team/junit5/issues/2028 and https://github.com/gradle/gradle/issues/12073")
+    def 'properly fails when engine fails during discovery #scenario'() {
+        given:
+        createSimpleJupiterTest()
+        file('src/test/java/EngineFailingDiscovery.java') << '''
+            import org.junit.platform.engine.*;
+            public class EngineFailingDiscovery implements TestEngine {
+                @Override
+                public String getId() {
+                    return "EngineFailingDiscovery";
+                }
+
+                @Override
+                public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
+                    throw new RuntimeException("oops");
+                }
+
+                @Override
+                public void execute(ExecutionRequest request) {
+                }
+            }
+        '''
+        file('src/test/resources/META-INF/services/org.junit.platform.engine.TestEngine') << 'EngineFailingDiscovery'
+
+        expect:
+        fails('test', *extraArgs)
+        failureCauseContains('There were failing tests.')
+
+        where:
+        scenario       | extraArgs
+        "w/o filters"  | []
+        "with filters" | ['--tests', 'JUnitJupiterTest']
     }
 }

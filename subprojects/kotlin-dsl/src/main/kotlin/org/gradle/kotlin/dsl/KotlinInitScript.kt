@@ -59,15 +59,18 @@ import kotlin.script.templates.ScriptTemplateDefinition
     resolver = KotlinBuildScriptDependenciesResolver::class,
     scriptFilePattern = ".+\\.init\\.gradle\\.kts")
 @ScriptTemplateAdditionalCompilerArguments([
+    "-language-version", "1.3",
+    "-api-version", "1.3",
     "-jvm-target", "1.8",
     "-Xjsr305=strict",
     "-XXLanguage:+NewInference",
-    "-XXLanguage:+SamConversionForKotlinFunctions"
+    "-XXLanguage:+SamConversionForKotlinFunctions",
+    "-XXLanguage:+ReferencesToSyntheticJavaProperties"
 ])
 @SamWithReceiverAnnotations("org.gradle.api.HasImplicitReceiver")
 abstract class KotlinInitScript(
     private val host: KotlinScriptHost<Gradle>
-) : InitScriptApi(host.target) /* TODO:kotlin-dsl configure implicit receiver */ {
+) : @Suppress("deprecation") InitScriptApi(host.target) /* TODO:kotlin-dsl configure implicit receiver */ {
 
     /**
      * The [ScriptHandler] for this script.

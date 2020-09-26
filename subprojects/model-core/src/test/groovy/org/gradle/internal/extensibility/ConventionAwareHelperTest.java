@@ -36,7 +36,7 @@ import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class ConventionAwareHelperTest {
     ConventionAwareHelper conventionAware;
@@ -44,7 +44,7 @@ public class ConventionAwareHelperTest {
     TestTask testTask;
 
     @Rule
-    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider();
+    public TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass());
 
     @Before public void setUp() {
         testTask = TestUtil.create(temporaryFolder).task(TestTask.class);

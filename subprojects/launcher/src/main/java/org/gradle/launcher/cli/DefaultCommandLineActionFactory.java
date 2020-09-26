@@ -16,58 +16,40 @@
 package org.gradle.launcher.cli;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.tools.ant.Main;
 import org.codehaus.groovy.util.ReleaseInfo;
 import org.gradle.api.Action;
-import org.gradle.api.logging.Logger;
-import org.gradle.api.logging.Logging;
 import org.gradle.api.logging.configuration.LoggingConfiguration;
 import org.gradle.cli.CommandLineArgumentException;
-import org.gradle.cli.CommandLineConverter;
 import org.gradle.cli.CommandLineParser;
 import org.gradle.cli.ParsedCommandLine;
-import org.gradle.cli.SystemPropertiesCommandLineConverter;
-import org.gradle.concurrent.ParallelismConfiguration;
 import org.gradle.configuration.GradleLauncherMetaData;
-import org.gradle.initialization.BuildLayoutParameters;
-import org.gradle.initialization.LayoutCommandLineConverter;
-import org.gradle.initialization.ParallelismConfigurationCommandLineConverter;
 import org.gradle.initialization.layout.BuildLayoutFactory;
 import org.gradle.internal.Actions;
-import org.gradle.internal.IoActions;
 import org.gradle.internal.buildevents.BuildExceptionReporter;
-import org.gradle.internal.concurrent.DefaultParallelismConfiguration;
 import org.gradle.internal.jvm.Jvm;
 import org.gradle.internal.logging.DefaultLoggingConfiguration;
-import org.gradle.internal.logging.LoggingCommandLineConverter;
+import org.gradle.internal.logging.LoggingConfigurationBuildOptions;
 import org.gradle.internal.logging.LoggingManagerInternal;
 import org.gradle.internal.logging.services.LoggingServiceRegistry;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
-import org.gradle.internal.nativeintegration.services.NativeServices;
 import org.gradle.internal.os.OperatingSystem;
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.launcher.bootstrap.CommandLineActionFactory;
 import org.gradle.launcher.bootstrap.ExecutionListener;
+import org.gradle.launcher.configuration.AllProperties;
+import org.gradle.launcher.cli.converter.BuildLayoutConverter;
+import org.gradle.launcher.configuration.BuildLayoutResult;
+import org.gradle.launcher.cli.converter.BuildOptionBackedConverter;
+import org.gradle.launcher.configuration.InitialProperties;
+import org.gradle.launcher.cli.converter.InitialPropertiesConverter;
 import org.gradle.launcher.cli.converter.LayoutToPropertiesConverter;
-import org.gradle.launcher.cli.converter.PropertiesToLogLevelConfigurationConverter;
-import org.gradle.launcher.cli.converter.PropertiesToParallelismConfigurationConverter;
-import org.gradle.util.GFileUtils;
 import org.gradle.util.GradleVersion;
 
-import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * <p>Responsible for converting a set of command-line arguments into a {@link Runnable} action.</p>
@@ -120,105 +102,6 @@ public class DefaultCommandLineActionFactory implements CommandLineActionFactory
         out.println();
     }
 
-    @VisibleForTesting
-    static class WelcomeMessageAction implements Action<Logger> {
-
-        private final BuildLayoutParameters buildLayoutParameters;
-        private final GradleVersion gradleVersion;
-        private final Function<String, InputStream> inputStreamProvider;
-
-        WelcomeMessageAction(BuildLayoutParameters buildLayoutParameters) {
-            this(buildLayoutParameters, GradleVersion.current(), new Function<String, InputStream>() {
-                @Nullable
-                @Override
-                public InputStream apply(@Nullable String input) {
-                    return getClass().getClassLoader().getResourceAsStream(input);
-                }
-            });
-        }
-
-        @VisibleForTesting
-        WelcomeMessageAction(BuildLayoutParameters buildLayoutParameters, GradleVersion gradleVersion, Function<String, InputStream> inputStreamProvider) {
-            this.buildLayoutParameters = buildLayoutParameters;
-            this.gradleVersion = gradleVersion;
-            this.inputStreamProvider = inputStreamProvider;
-        }
-
-        @Override
-        public void execute(Logger logger) {
-            if (isWelcomeMessageEnabled()) {
-                File markerFile = getMarkerFile();
-
-                if (!markerFile.exists() && logger.isLifecycleEnabled()) {
-                    logger.lifecycle("");
-                    logger.lifecycle("Welcome to Gradle " + gradleVersion.getVersion() + "!");
-
-                    String featureList = readReleaseFeatures();
-
-                    if (StringUtils.isNotBlank(featureList)) {
-                        logger.lifecycle("");
-                        logger.lifecycle("Here are the highlights of this release:");
-                        logger.lifecycle(StringUtils.stripEnd(featureList, " \n\r"));
-                    }
-
-                    if (!gradleVersion.isSnapshot()) {
-                        logger.lifecycle("");
-                        logger.lifecycle("For more details see https://docs.gradle.org/" + gradleVersion.getVersion() + "/release-notes.html");
-                    }
-
-                    logger.lifecycle("");
-
-                    writeMarkerFile(markerFile);
-                }
-            }
-        }
-
-        /**
-         * The system property is set for the purpose of internal testing.
-         * In user environments the system property will never be available.
-         */
-        private boolean isWelcomeMessageEnabled() {
-            String messageEnabled = System.getProperty(DefaultCommandLineActionFactory.WELCOME_MESSAGE_ENABLED_SYSTEM_PROPERTY);
-
-            if (messageEnabled == null) {
-                return true;
-            }
-
-            return Boolean.parseBoolean(messageEnabled);
-        }
-
-        private File getMarkerFile() {
-            File gradleUserHomeDir = buildLayoutParameters.getGradleUserHomeDir();
-            File notificationsDir = new File(gradleUserHomeDir, "notifications");
-            File versionedNotificationsDir = new File(notificationsDir, gradleVersion.getVersion());
-            return new File(versionedNotificationsDir, "release-features.rendered");
-        }
-
-        private String readReleaseFeatures() {
-            InputStream inputStream = inputStreamProvider.apply("release-features.txt");
-
-            if (inputStream != null) {
-                StringWriter writer = new StringWriter();
-
-                try {
-                    IOUtils.copy(inputStream, writer, "UTF-8");
-                    return writer.toString();
-                } catch (IOException e) {
-                    // do not fail the build as feature is non-critical
-                } finally {
-                    IoActions.closeQuietly(inputStream);
-                }
-            }
-
-            return null;
-        }
-
-        private void writeMarkerFile(File markerFile) {
-            GFileUtils.mkdirs(markerFile.getParentFile());
-            GFileUtils.touch(markerFile);
-        }
-    }
-
     private static class BuiltInActions implements CommandLineAction {
         @Override
         public void configureCommandLineParser(CommandLineParser parser) {
@@ -239,20 +122,20 @@ public class DefaultCommandLineActionFactory implements CommandLineActionFactory
     }
 
     private static class CommandLineParseFailureAction implements Action<ExecutionListener> {
-        private final Exception e;
+        private final Exception exception;
         private final CommandLineParser parser;
 
-        public CommandLineParseFailureAction(CommandLineParser parser, Exception e) {
+        public CommandLineParseFailureAction(CommandLineParser parser, Exception exception) {
             this.parser = parser;
-            this.e = e;
+            this.exception = exception;
         }
 
         @Override
         public void execute(ExecutionListener executionListener) {
             System.err.println();
-            System.err.println(e.getMessage());
+            System.err.println(exception.getMessage());
             showUsage(System.err, parser);
-            executionListener.onFailure(e);
+            executionListener.onFailure(exception);
         }
     }
 
@@ -314,46 +197,33 @@ public class DefaultCommandLineActionFactory implements CommandLineActionFactory
 
         @Override
         public void execute(ExecutionListener executionListener) {
-            CommandLineConverter<LoggingConfiguration> loggingConfigurationConverter = new LoggingCommandLineConverter();
-            CommandLineConverter<BuildLayoutParameters> buildLayoutConverter = new LayoutCommandLineConverter();
-            CommandLineConverter<ParallelismConfiguration> parallelConverter = new ParallelismConfigurationCommandLineConverter();
-            CommandLineConverter<Map<String, String>> systemPropertiesCommandLineConverter = new SystemPropertiesCommandLineConverter();
+            BuildOptionBackedConverter<LoggingConfiguration> loggingBuildOptions = new BuildOptionBackedConverter<>(new LoggingConfigurationBuildOptions());
+            InitialPropertiesConverter propertiesConverter = new InitialPropertiesConverter();
+            BuildLayoutConverter buildLayoutConverter = new BuildLayoutConverter();
             LayoutToPropertiesConverter layoutToPropertiesConverter = new LayoutToPropertiesConverter(new BuildLayoutFactory());
 
-            BuildLayoutParameters buildLayout = new BuildLayoutParameters();
-            ParallelismConfiguration parallelismConfiguration = new DefaultParallelismConfiguration();
+            BuildLayoutResult buildLayout = buildLayoutConverter.defaultValues();
 
             CommandLineParser parser = new CommandLineParser();
-            loggingConfigurationConverter.configure(parser);
+            propertiesConverter.configure(parser);
             buildLayoutConverter.configure(parser);
-            parallelConverter.configure(parser);
-            systemPropertiesCommandLineConverter.configure(parser);
+            loggingBuildOptions.configure(parser);
 
             parser.allowUnknownOptions();
             parser.allowMixedSubcommandsAndOptions();
 
             try {
                 ParsedCommandLine parsedCommandLine = parser.parse(args);
+                InitialProperties initialProperties = propertiesConverter.convert(parsedCommandLine);
 
-                buildLayoutConverter.convert(parsedCommandLine, buildLayout);
+                // Calculate build layout, for loading properties and other logging configuration
+                buildLayout = buildLayoutConverter.convert(initialProperties, parsedCommandLine, null);
 
-
-                Map<String, String> properties = new HashMap<String, String>();
                 // Read *.properties files
-                layoutToPropertiesConverter.convert(buildLayout, properties);
-                // Read -D command line flags
-                systemPropertiesCommandLineConverter.convert(parsedCommandLine, properties);
+                AllProperties properties = layoutToPropertiesConverter.convert(initialProperties, buildLayout);
 
-                // Convert properties for logging  object
-                PropertiesToLogLevelConfigurationConverter propertiesToLogLevelConfigurationConverter = new PropertiesToLogLevelConfigurationConverter();
-                propertiesToLogLevelConfigurationConverter.convert(properties, loggingConfiguration);
-                loggingConfigurationConverter.convert(parsedCommandLine, loggingConfiguration);
-
-                // Convert properties to ParallelismConfiguration object
-                PropertiesToParallelismConfigurationConverter propertiesToParallelismConfigurationConverter = new PropertiesToParallelismConfigurationConverter();
-                propertiesToParallelismConfigurationConverter.convert(properties, parallelismConfiguration);
-                // Parse parallelism flags
-                parallelConverter.convert(parsedCommandLine, parallelismConfiguration);
+                // Calculate the logging configuration
+                loggingBuildOptions.convert(parsedCommandLine, properties, loggingConfiguration);
             } catch (CommandLineArgumentException e) {
                 // Ignore, deal with this problem later
             }
@@ -361,11 +231,12 @@ public class DefaultCommandLineActionFactory implements CommandLineActionFactory
             LoggingManagerInternal loggingManager = loggingServices.getFactory(LoggingManagerInternal.class).create();
             loggingManager.setLevelInternal(loggingConfiguration.getLogLevel());
             loggingManager.start();
-            Action<ExecutionListener> exceptionReportingAction = new ExceptionReportingAction(action, reporter, loggingManager);
             try {
-                NativeServices.initialize(buildLayout.getGradleUserHomeDir());
-                loggingManager.attachProcessConsole(loggingConfiguration.getConsoleOutput());
-                new WelcomeMessageAction(buildLayout).execute(Logging.getLogger(WelcomeMessageAction.class));
+                Action<ExecutionListener> exceptionReportingAction =
+                    new ExceptionReportingAction(reporter, loggingManager,
+                        new NativeServicesInitializingAction(buildLayout, loggingConfiguration, loggingManager,
+                            new WelcomeMessageAction(buildLayout,
+                                new DebugLoggerWarningAction(loggingConfiguration, action))));
                 exceptionReportingAction.execute(executionListener);
             } finally {
                 loggingManager.stop();

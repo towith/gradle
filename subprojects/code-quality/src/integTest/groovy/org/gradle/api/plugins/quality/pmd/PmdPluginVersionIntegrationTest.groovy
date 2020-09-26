@@ -15,8 +15,6 @@
  */
 package org.gradle.api.plugins.quality.pmd
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
-import org.gradle.util.TestPrecondition
 import org.gradle.util.VersionNumber
 import org.hamcrest.Matcher
 import spock.lang.Issue
@@ -37,6 +35,7 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
 
             pmd {
                 toolVersion = '$version'
+                ${supportIncrementalAnalysis() ? "" : "incrementalAnalysis = false"}
             }
 
             ${fileLockingIssuesSolved() ? "" : """
@@ -45,11 +44,10 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
                 classpath = files()
             }"""}
 
-            ${!TestPrecondition.FIX_TO_WORK_ON_JAVA9.fulfilled ? "sourceCompatibility = 1.7" : ""}
+            ${requiredSourceCompatibility()}
         """.stripIndent()
     }
 
-    @ToBeFixedForInstantExecution
     def "analyze good code"() {
         goodCode()
 
@@ -59,7 +57,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         file("build/reports/pmd/test.xml").exists()
     }
 
-    @ToBeFixedForInstantExecution
     def "analyze bad code"() {
         badCode()
 
@@ -71,7 +68,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         file("build/reports/pmd/test.xml").assertContents(containsClass("org.gradle.Class1Test"))
     }
 
-    @ToBeFixedForInstantExecution
     void "can ignore failures"() {
         badCode()
         buildFile << """
@@ -87,12 +83,42 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         output.contains("2 PMD rule violations were found. See the report at:")
     }
 
-    @ToBeFixedForInstantExecution
+    void "can set max failures"() {
+        badCode()
+        buildFile << """
+            pmd {
+                maxFailures = 2
+            }
+        """
+
+        expect:
+        succeeds("check")
+        file("build/reports/pmd/main.xml").assertContents(not(containsClass("org.gradle.Class1")))
+        file("build/reports/pmd/test.xml").assertContents(containsClass("org.gradle.Class1Test"))
+        output.contains("2 PMD rule violations were found. See the report at:")
+    }
+
+    void "does not ignore more than max failures"() {
+        badCode()
+        buildFile << """
+            pmd {
+                maxFailures = 1
+            }
+        """
+
+        expect:
+        fails("check")
+        failure.assertHasDescription("Execution failed for task ':pmdTest'.")
+        failure.assertThatCause(containsString("2 PMD rule violations were found. See the report at:"))
+        file("build/reports/pmd/main.xml").assertContents(not(containsClass("org.gradle.Class1")))
+        file("build/reports/pmd/test.xml").assertContents(containsClass("org.gradle.Class1Test"))
+    }
+
     void "can configure priority level threshold"() {
         badCode()
         buildFile << """
             pmd {
-                rulePriority = 2
+                rulesMinimumPriority = 2
             }
         """
 
@@ -109,27 +135,26 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         goodCode()
         buildFile << """
         pmd {
-            rulePriority = 11
+            rulesMinimumPriority = 11
         }
 """
         expect:
         fails("check")
-        failure.assertHasCause("Invalid rulePriority '11'.  Valid range 1 (highest) to 5 (lowest).")
+        failure.assertHasCause("Invalid rulesMinimumPriority '11'.  Valid range 1 (highest) to 5 (lowest).")
     }
 
     def "gets reasonable message when priority level threshold is out of range from task"() {
         goodCode()
         buildFile << """
         pmdMain {
-            rulePriority = 11
+            rulesMinimumPriority = 11
         }
 """
         expect:
         fails("check")
-        failure.assertHasCause("Invalid rulePriority '11'.  Valid range 1 (highest) to 5 (lowest).")
+        failure.assertHasCause("Invalid rulesMinimumPriority '11'.  Valid range 1 (highest) to 5 (lowest).")
     }
 
-    @ToBeFixedForInstantExecution
     def "can configure reporting"() {
         goodCode()
         buildFile << """
@@ -147,7 +172,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         file("htmlReport.html").exists()
     }
 
-    @ToBeFixedForInstantExecution
     def "use custom rule set files"() {
         assumeTrue(fileLockingIssuesSolved())
 
@@ -169,7 +193,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         file("build/reports/pmd/main.xml").assertContents(containsClass("org.gradle.Class2"))
     }
 
-    @ToBeFixedForInstantExecution
     def "add custom rule set files"() {
         assumeTrue(fileLockingIssuesSolved())
 
@@ -192,7 +215,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         file("build/reports/pmd/main.xml").assertContents(containsClass("org.gradle.Class2"))
     }
 
-    @ToBeFixedForInstantExecution
     def "use custom rule set"() {
         customCode()
 
@@ -212,7 +234,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
 
     }
 
-    @ToBeFixedForInstantExecution
     def "can enable console output"() {
         buildFile << """
             pmd {
@@ -231,7 +252,6 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
     }
 
     @Issue("https://github.com/gradle/gradle/issues/2326")
-    @ToBeFixedForInstantExecution
     def "check task should not be up-to-date after clean if it only outputs to console"() {
         given:
         badCode()
@@ -295,8 +315,7 @@ class PmdPluginVersionIntegrationTest extends AbstractPmdPluginVersionIntegratio
         String pathToRuleset = "category/java/codestyle.xml/IfStmtsMustUseBraces"
         if (versionNumber < VersionNumber.version(5)) {
             pathToRuleset = "rulesets/braces.xml"
-        }
-        else if (versionNumber < VersionNumber.version(6)) {
+        } else if (versionNumber < VersionNumber.version(6)) {
             pathToRuleset = "rulesets/java/braces.xml"
         }
         """

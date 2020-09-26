@@ -17,8 +17,9 @@
 package org.gradle.execution.plan;
 
 import org.gradle.api.Action;
-import org.gradle.api.Project;
+import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.internal.tasks.NodeExecutionContext;
+import org.gradle.api.internal.tasks.TaskDependencyContainer;
 import org.gradle.api.internal.tasks.WorkNodeAction;
 import org.gradle.internal.resources.ResourceLock;
 
@@ -50,6 +51,11 @@ public class ActionNode extends Node implements SelfExecutingNode {
 
     @Override
     public void resolveDependencies(TaskDependencyResolver dependencyResolver, Action<Node> processHardSuccessor) {
+        TaskDependencyContainer dependencies = action::visitDependencies;
+        for (Node node : dependencyResolver.resolveDependenciesFor(null, dependencies)) {
+            addDependencySuccessor(node);
+            processHardSuccessor.execute(node);
+        }
     }
 
     @Override
@@ -88,14 +94,18 @@ public class ActionNode extends Node implements SelfExecutingNode {
 
     @Nullable
     @Override
-    public Project getProjectToLock() {
-        return action.getProject();
+    public ResourceLock getProjectToLock() {
+        ProjectInternal project = (ProjectInternal) action.getProject();
+        if (project != null) {
+            return project.getMutationState().getAccessLock();
+        }
+        return null;
     }
 
     @Nullable
     @Override
-    public Project getOwningProject() {
-        return action.getProject();
+    public ProjectInternal getOwningProject() {
+        return (ProjectInternal) action.getProject();
     }
 
     @Override

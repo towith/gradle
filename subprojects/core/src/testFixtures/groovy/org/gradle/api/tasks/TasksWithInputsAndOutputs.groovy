@@ -26,7 +26,7 @@ trait TasksWithInputsAndOutputs {
 
     abstract TestFile getBuildKotlinFile()
 
-    def taskTypeWithOutputFileProperty() {
+    def taskTypeWithOutputFileProperty(TestFile buildFile = getBuildFile()) {
         buildFile << """
             class FileProducer extends DefaultTask {
                 @OutputFile
@@ -69,23 +69,33 @@ trait TasksWithInputsAndOutputs {
         """
     }
 
-    def taskTypeWithOutputDirectoryProperty() {
+    def taskTypeWithOutputDirectoryProperty(TestFile buildFile = getBuildFile()) {
         buildFile << """
-            class DirProducer extends DefaultTask {
+            import javax.inject.Inject
+
+            abstract class DirProducer extends DefaultTask {
                 @OutputDirectory
-                final DirectoryProperty output = project.objects.directoryProperty()
+                abstract DirectoryProperty getOutput()
                 @Input
-                final ListProperty<String> names = project.objects.listProperty(String)
+                abstract ListProperty<String> getNames()
                 @Input
-                String content = "content" // set to empty string to delete directory
+                abstract Property<String> getContent() // set to empty string to delete directory
+
+                @Inject
+                abstract FileSystemOperations getFs()
+
+                DirProducer() {
+                    content.convention("content")
+                }
 
                 @TaskAction
                 def go() {
                     def dir = output.get().asFile
+                    def content = this.content.get()
                     if (content.empty) {
-                        project.delete(dir)
+                        fs.delete { delete(dir) }
                     } else {
-                        project.delete(dir)
+                        fs.delete { delete(dir) }
                         dir.mkdirs()
                         names.get().forEach {
                             new File(dir, it).text = content
@@ -199,6 +209,41 @@ trait TasksWithInputsAndOutputs {
                 @TaskAction
                 def go() {
                     outFile.get().asFile.text = inFiles*.text.sort().join(',')
+                }
+            }
+        """
+    }
+
+    def taskTypeLogsInputFileCollectionContent() {
+        buildFile << """
+            class ShowFilesTask extends DefaultTask {
+                @InputFiles
+                final ConfigurableFileCollection inFiles = project.files()
+                @TaskAction
+                def go() {
+                    println "result = " + inFiles.files.name
+                }
+            }
+        """
+    }
+
+    def taskTypeLogsArtifactCollectionDetails(TestFile buildFile = getBuildFile()) {
+        buildFile << """
+            class ShowArtifactCollection extends DefaultTask {
+                @Internal
+                ArtifactCollection collection
+
+                @InputFiles
+                FileCollection getFiles() {
+                    return collection?.artifactFiles
+                }
+
+                @TaskAction
+                def log() {
+                    println("artifacts = \${collection.artifacts.id}")
+                    println("components = \${collection.artifacts.id.componentIdentifier}")
+                    println("variants = \${collection.artifacts.variant.attributes}")
+                    println("files = \${collection.artifactFiles.files.name}")
                 }
             }
         """

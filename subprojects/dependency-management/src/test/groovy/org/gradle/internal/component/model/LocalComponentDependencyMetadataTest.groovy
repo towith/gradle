@@ -39,7 +39,6 @@ import org.gradle.internal.component.AmbiguousConfigurationSelectionException
 import org.gradle.internal.component.IncompatibleConfigurationSelectionException
 import org.gradle.internal.component.external.descriptor.DefaultExclude
 import org.gradle.internal.component.local.model.LocalConfigurationMetadata
-import org.gradle.internal.component.local.model.OpaqueComponentIdentifier
 import org.gradle.util.AttributeTestUtil
 import org.gradle.util.SnapshotTestUtil
 import org.gradle.util.TestUtil
@@ -52,7 +51,12 @@ import static org.gradle.util.TextUtil.toPlatformLineSeparators
 class LocalComponentDependencyMetadataTest extends Specification {
     AttributesSchemaInternal attributesSchema
     ImmutableAttributesFactory factory
-    ComponentIdentifier componentId = new OpaqueComponentIdentifier("foo")
+    ComponentIdentifier componentId = new ComponentIdentifier() {
+        @Override
+        String getDisplayName() {
+            return "example"
+        }
+    }
 
     def setup() {
         attributesSchema = new DefaultAttributesSchema(new ComponentAttributeMatcher(), TestUtil.instantiatorFactory(), SnapshotTestUtil.valueSnapshotter())
@@ -133,7 +137,7 @@ class LocalComponentDependencyMetadataTest extends Specification {
         def toComponent = Stub(ComponentResolveMetadata) {
             getAttributesSchema() >> attributesSchema
             getId() >> Stub(ComponentIdentifier) {
-                getDisplayName() >> "<target>"
+                getDisplayName() >> "[target]"
             }
         }
         attributesSchema.attribute(Attribute.of('key', String))
@@ -147,10 +151,9 @@ class LocalComponentDependencyMetadataTest extends Specification {
 
         then:
         def e = thrown(IncompatibleConfigurationSelectionException)
-        e.message == toPlatformLineSeparators("""Configuration 'default' in <target> does not match the consumer attributes
+        e.message == toPlatformLineSeparators("""Configuration 'default' in [target] does not match the consumer attributes
 Configuration 'default':
-  - Incompatible attribute:
-      - Required key 'other' and found incompatible value 'nothing'.""")
+  - Incompatible because this component declares attribute 'key' with value 'nothing' and the consumer needed attribute 'key' with value 'other'""")
     }
 
     def "revalidates explicit configuration selection if it has attributes"() {
@@ -169,7 +172,7 @@ Configuration 'default':
         def toComponent = Stub(ComponentResolveMetadata) {
             getConsumableConfigurationsHavingAttributes() >> [toFooConfig, toBarConfig]
             getId() >> Stub(ComponentIdentifier) {
-                getDisplayName() >> "<target>"
+                getDisplayName() >> "[target]"
             }
             getAttributesSchema() >> EmptySchema.INSTANCE
         }
@@ -186,10 +189,9 @@ Configuration 'default':
 
         then:
         def e = thrown(IncompatibleConfigurationSelectionException)
-        e.message == toPlatformLineSeparators("""Configuration 'bar' in <target> does not match the consumer attributes
+        e.message == toPlatformLineSeparators("""Configuration 'bar' in [target] does not match the consumer attributes
 Configuration 'bar':
-  - Incompatible attribute:
-      - Required key 'something' and found incompatible value 'something else'.""")
+  - Incompatible because this component declares attribute 'key' with value 'something else' and the consumer needed attribute 'key' with value 'something'""")
     }
 
     @Unroll("selects configuration '#expected' from target component with Java proximity matching strategy (#scenario)")
@@ -212,7 +214,7 @@ Configuration 'bar':
             getVariantsForGraphTraversal() >> Optional.of(ImmutableList.of(toFooConfig, toBarConfig))
             getAttributesSchema() >> attributesSchema
             getId() >> Stub(ComponentIdentifier) {
-                getDisplayName() >> "<target>"
+                getDisplayName() >> "[target]"
             }
         }
         attributesSchema.attribute(Attribute.of('platform', JavaVersion), {
@@ -236,7 +238,7 @@ Configuration 'bar':
             assert result == [expected] as Set
         } catch (AmbiguousConfigurationSelectionException e) {
             if (expected == null) {
-                assert e.message.startsWith(toPlatformLineSeparators("Cannot choose between the following variants of <target>:\n  - bar\n  - foo\nAll of them match the consumer attributes:"))
+                assert e.message.startsWith(toPlatformLineSeparators("The consumer was configured to find attribute 'platform' with value '${queryAttributes.platform}'${queryAttributes.flavor?", attribute 'flavor' with value '$queryAttributes.flavor'":""}. However we cannot choose between the following variants of [target]:\n  - bar\n  - foo\nAll of them match the consumer attributes:"))
             } else {
                 throw e
             }
@@ -282,7 +284,7 @@ Configuration 'bar':
             getVariantsForGraphTraversal() >> Optional.of(ImmutableList.of(toFooConfig, toBarConfig))
             getAttributesSchema() >> attributesSchema
             getId() >> Stub(ComponentIdentifier) {
-                getDisplayName() >> "<target>"
+                getDisplayName() >> "[target]"
             }
         }
         attributesSchema.attribute(Attribute.of('platform', JavaVersion), {
@@ -306,7 +308,7 @@ Configuration 'bar':
             assert result == [expected] as Set
         } catch (AmbiguousConfigurationSelectionException e) {
             if (expected == null) {
-                assert e.message.startsWith(toPlatformLineSeparators("Cannot choose between the following variants of <target>:\n  - bar\n  - foo\nAll of them match the consumer attributes:"))
+                assert e.message.startsWith(toPlatformLineSeparators("The consumer was configured to find attribute 'platform' with value '${queryAttributes.platform}'${queryAttributes.flavor?", attribute 'flavor' with value '${queryAttributes.flavor}'":""}. However we cannot choose between the following variants of [target]:\n  - bar\n  - foo\nAll of them match the consumer attributes:"))
             } else {
                 throw e
             }

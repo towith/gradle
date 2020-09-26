@@ -18,8 +18,7 @@ package org.gradle.integtests.fixtures
 
 abstract class AbstractTaskRelocationIntegrationTest extends AbstractIntegrationSpec {
 
-    @ToBeFixedForInstantExecution(bottomSpecs = [
-        "JacocoReportRelocationIntegrationTest",
+    @ToBeFixedForConfigurationCache(bottomSpecs = [
         "ScalaDocRelocationIntegrationTest"
     ])
     def "task is relocatable"() {

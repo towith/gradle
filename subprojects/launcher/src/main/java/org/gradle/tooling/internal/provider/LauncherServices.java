@@ -16,12 +16,17 @@
 
 package org.gradle.tooling.internal.provider;
 
-import org.gradle.api.execution.internal.TaskInputsListener;
+import org.gradle.api.execution.internal.TaskInputsListeners;
+import org.gradle.deployment.internal.DeploymentRegistryInternal;
+import org.gradle.initialization.BuildCancellationToken;
+import org.gradle.initialization.BuildEventConsumer;
+import org.gradle.initialization.BuildRequestMetaData;
+import org.gradle.internal.build.BuildStateRegistry;
+import org.gradle.internal.build.event.BuildEventListenerFactory;
+import org.gradle.internal.buildevents.BuildStartedTime;
 import org.gradle.internal.classpath.CachedClasspathTransformer;
 import org.gradle.internal.concurrent.ExecutorFactory;
-import org.gradle.internal.concurrent.ParallelismConfigurationManager;
 import org.gradle.internal.event.ListenerManager;
-import org.gradle.internal.build.event.BuildEventListenerFactory;
 import org.gradle.internal.filewatch.DefaultFileSystemChangeWaiterFactory;
 import org.gradle.internal.filewatch.FileSystemChangeWaiterFactory;
 import org.gradle.internal.filewatch.FileWatcherFactory;
@@ -29,14 +34,18 @@ import org.gradle.internal.invocation.BuildActionRunner;
 import org.gradle.internal.logging.LoggingManagerInternal;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 import org.gradle.internal.operations.BuildOperationListenerManager;
+import org.gradle.internal.operations.notify.BuildOperationNotificationValve;
 import org.gradle.internal.service.ServiceRegistration;
+import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.internal.service.scopes.AbstractPluginServiceRegistry;
 import org.gradle.internal.service.scopes.GradleUserHomeScopeServiceRegistry;
+import org.gradle.internal.time.Clock;
 import org.gradle.internal.time.Time;
 import org.gradle.launcher.exec.BuildCompletionNotifyingBuildActionRunner;
 import org.gradle.launcher.exec.BuildExecuter;
 import org.gradle.launcher.exec.BuildOutcomeReportingBuildActionRunner;
-import org.gradle.launcher.exec.BuildTreeScopeBuildActionExecuter;
+import org.gradle.launcher.exec.BuildTreeBuildActionExecutor;
+import org.gradle.launcher.exec.BuildTreeScopeLifecycleBuildActionExecuter;
 import org.gradle.launcher.exec.ChainingBuildActionRunner;
 import org.gradle.launcher.exec.InProcessBuildActionExecuter;
 import org.gradle.launcher.exec.RunAsBuildOperationBuildActionRunner;
@@ -58,50 +67,33 @@ public class LauncherServices extends AbstractPluginServiceRegistry {
 
     @Override
     public void registerGradleUserHomeServices(ServiceRegistration registration) {
+        registration.addProvider(new ToolingGradleUserHomeScopeServices());
+    }
+
+    @Override
+    public void registerBuildSessionServices(ServiceRegistration registration) {
         registration.addProvider(new ToolingBuildSessionScopeServices());
     }
 
+    @Override
+    public void registerBuildTreeServices(ServiceRegistration registration) {
+        registration.addProvider(new ToolingBuildTreeScopeServices());
+    }
+
     static class ToolingGlobalScopeServices {
-        BuildExecuter createBuildExecuter(List<BuildActionRunner> buildActionRunners,
-                                          List<BuildEventListenerFactory> registrations,
-                                          ListenerManager listenerManager,
-                                          BuildOperationListenerManager buildOperationListenerManager,
-                                          TaskInputsListener inputsListener,
-                                          StyledTextOutputFactory styledTextOutputFactory,
-                                          ExecutorFactory executorFactory,
+        BuildExecuter createBuildExecuter(StyledTextOutputFactory styledTextOutputFactory,
                                           LoggingManagerInternal loggingManager,
                                           GradleUserHomeScopeServiceRegistry userHomeServiceRegistry,
-                                          FileSystemChangeWaiterFactory fileSystemChangeWaiterFactory,
-                                          ParallelismConfigurationManager parallelismConfigurationManager
-        ) {
-            return new SetupLoggingActionExecuter(
-                new SessionFailureReportingActionExecuter(
-                    new StartParamsValidatingActionExecuter(
-                        new ParallelismConfigurationBuildActionExecuter(
-                            new GradleThreadBuildActionExecuter(
-                                new SessionScopeBuildActionExecuter(
-                                    new SubscribableBuildActionExecuter(
-                                        new ContinuousBuildActionExecuter(
-                                            new BuildTreeScopeBuildActionExecuter(
-                                                new InProcessBuildActionExecuter(
-                                                    new RunAsBuildOperationBuildActionRunner(
-                                                        new BuildCompletionNotifyingBuildActionRunner(
-                                                            new ValidatingBuildActionRunner(
-                                                                new BuildOutcomeReportingBuildActionRunner(
-                                                                    new ChainingBuildActionRunner(buildActionRunners),
-                                                                    styledTextOutputFactory)))))),
-                                        fileSystemChangeWaiterFactory,
-                                        inputsListener,
-                                        styledTextOutputFactory,
-                                        executorFactory),
-                                            listenerManager,
-                                            buildOperationListenerManager,
-                                            registrations),
-                                    userHomeServiceRegistry)),
-                            parallelismConfigurationManager)),
-                    styledTextOutputFactory,
-                    Time.clock()),
-                loggingManager);
+                                          ServiceRegistry globalServices) {
+            // @formatter:off
+            return
+                new SetupLoggingActionExecuter(loggingManager,
+                new SessionFailureReportingActionExecuter(styledTextOutputFactory, Time.clock(),
+                new StartParamsValidatingActionExecuter(
+                new GradleThreadBuildActionExecuter(
+                new SessionScopeLifecycleBuildActionExecuter(userHomeServiceRegistry, globalServices
+                )))));
+            // @formatter:on
         }
 
         FileSystemChangeWaiterFactory createFileSystemChangeWaiterFactory(FileWatcherFactory fileWatcherFactory) {
@@ -117,7 +109,7 @@ public class LauncherServices extends AbstractPluginServiceRegistry {
         }
     }
 
-    static class ToolingBuildSessionScopeServices {
+    static class ToolingGradleUserHomeScopeServices {
         PayloadClassLoaderFactory createClassLoaderFactory(CachedClasspathTransformer cachedClasspathTransformer) {
             return new DaemonSidePayloadClassLoaderFactory(
                 new ModelClassLoaderFactory(),
@@ -131,6 +123,45 @@ public class LauncherServices extends AbstractPluginServiceRegistry {
                         classLoaderCache,
                         classLoaderFactory))
             );
+        }
+    }
+
+    static class ToolingBuildSessionScopeServices {
+        SessionScopeBuildActionExecutor createActionExecutor(BuildEventListenerFactory listenerFactory,
+                                                             ExecutorFactory executorFactory,
+                                                             ListenerManager listenerManager,
+                                                             BuildOperationListenerManager buildOperationListenerManager,
+                                                             TaskInputsListeners inputsListeners,
+                                                             StyledTextOutputFactory styledTextOutputFactory,
+                                                             FileSystemChangeWaiterFactory fileSystemChangeWaiterFactory,
+                                                             BuildRequestMetaData requestMetaData,
+                                                             BuildCancellationToken cancellationToken,
+                                                             DeploymentRegistryInternal deploymentRegistry,
+                                                             BuildEventConsumer eventConsumer,
+                                                             BuildStartedTime buildStartedTime,
+                                                             Clock clock
+        ) {
+            return new SubscribableBuildActionExecuter(listenerManager, buildOperationListenerManager, listenerFactory, eventConsumer,
+                new ContinuousBuildActionExecuter(fileSystemChangeWaiterFactory, inputsListeners, styledTextOutputFactory, executorFactory, requestMetaData, cancellationToken, deploymentRegistry, listenerManager, buildStartedTime, clock,
+                    new BuildTreeScopeLifecycleBuildActionExecuter()));
+        }
+    }
+
+    static class ToolingBuildTreeScopeServices {
+        BuildTreeBuildActionExecutor createActionExecuter(List<BuildActionRunner> buildActionRunners,
+                                                          StyledTextOutputFactory styledTextOutputFactory,
+                                                          BuildStateRegistry buildStateRegistry,
+                                                          PayloadSerializer payloadSerializer,
+                                                          BuildOperationNotificationValve buildOperationNotificationValve,
+                                                          BuildCancellationToken buildCancellationToken
+        ) {
+            return new InProcessBuildActionExecuter(buildStateRegistry, payloadSerializer, buildOperationNotificationValve, buildCancellationToken,
+                new RunAsBuildOperationBuildActionRunner(
+                    new BuildCompletionNotifyingBuildActionRunner(
+                        new FileSystemWatchingBuildActionRunner(
+                            new ValidatingBuildActionRunner(
+                                new BuildOutcomeReportingBuildActionRunner(styledTextOutputFactory,
+                                    new ChainingBuildActionRunner(buildActionRunners)))))));
         }
     }
 }

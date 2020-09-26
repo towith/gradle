@@ -43,6 +43,7 @@ import org.gradle.ide.xcode.internal.xcodeproj.PBXSourcesBuildPhase;
 import org.gradle.ide.xcode.internal.xcodeproj.PBXTarget;
 import org.gradle.ide.xcode.internal.xcodeproj.XcodeprojSerializer;
 import org.gradle.ide.xcode.tasks.internal.XcodeProjectFile;
+import org.gradle.internal.Cast;
 import org.gradle.language.swift.SwiftVersion;
 import org.gradle.nativeplatform.MachineArchitecture;
 import org.gradle.plugins.ide.api.PropertyListGeneratorTask;
@@ -71,6 +72,7 @@ import static org.gradle.ide.xcode.internal.XcodeUtils.toSpaceSeparatedList;
 public class GenerateXcodeProjectFileTask extends PropertyListGeneratorTask<XcodeProjectFile> {
     private static final String PRODUCTS_GROUP_NAME = "Products";
     private static final String UNBUILDABLE_BUILD_CONFIGURATION_NAME = "unbuildable";
+    private final String projectPath = getProject().getPath();
     private final GidGenerator gidGenerator;
     private DefaultXcodeProject xcodeProject;
     private Map<String, PBXFileReference> pathToFileReference = new HashMap<String, PBXFileReference>();
@@ -82,7 +84,7 @@ public class GenerateXcodeProjectFileTask extends PropertyListGeneratorTask<Xcod
 
     @Override
     protected void configure(XcodeProjectFile projectFile) {
-        PBXProject project = new PBXProject(getProject().getPath());
+        PBXProject project = new PBXProject(projectPath);
 
         addToGroup(project.getMainGroup(), xcodeProject.getGroups().getSources(), "Sources");
         addToGroup(project.getMainGroup(), xcodeProject.getGroups().getHeaders(), "Headers");
@@ -93,7 +95,7 @@ public class GenerateXcodeProjectFileTask extends PropertyListGeneratorTask<Xcod
             if (xcodeTarget.isBuildable()) {
                 project.getTargets().add(toGradlePbxTarget(xcodeTarget));
             } else {
-                getLogger().warn("'" + xcodeTarget.getName() + "' component in project '" + getProject().getPath() + "' is not buildable.");
+                getLogger().warn("'" + xcodeTarget.getName() + "' component in project '" + projectPath + "' is not buildable.");
             }
             project.getTargets().add(toIndexPbxTarget(xcodeTarget));
 
@@ -140,7 +142,7 @@ public class GenerateXcodeProjectFileTask extends PropertyListGeneratorTask<Xcod
 
     @Override
     protected XcodeProjectFile create() {
-        return new XcodeProjectFile(getPropertyListTransformer());
+        return new XcodeProjectFile(Cast.uncheckedNonnullCast(getPropertyListTransformer()));
     }
 
     private PBXFileReference toFileReference(File file) {

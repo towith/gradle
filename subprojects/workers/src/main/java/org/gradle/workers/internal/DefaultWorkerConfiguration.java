@@ -109,6 +109,7 @@ public class DefaultWorkerConfiguration extends DefaultActionConfiguration imple
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public ForkMode getForkMode() {
         switch (getIsolationMode()) {
             case AUTO:
@@ -124,6 +125,7 @@ public class DefaultWorkerConfiguration extends DefaultActionConfiguration imple
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void setForkMode(ForkMode forkMode) {
         switch (forkMode) {
             case AUTO:

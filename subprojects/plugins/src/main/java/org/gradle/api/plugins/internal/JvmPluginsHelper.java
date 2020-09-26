@@ -15,16 +15,11 @@
  */
 package org.gradle.api.plugins.internal;
 
-import com.google.common.collect.ImmutableList;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
-import org.gradle.api.Transformer;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ConfigurationContainer;
-import org.gradle.api.artifacts.ConfigurationPublications;
-import org.gradle.api.artifacts.PublishArtifact;
-import org.gradle.api.artifacts.type.ArtifactTypeDefinition;
 import org.gradle.api.attributes.Bundling;
 import org.gradle.api.attributes.Category;
 import org.gradle.api.attributes.DocsType;
@@ -35,84 +30,81 @@ import org.gradle.api.component.AdhocComponentWithVariants;
 import org.gradle.api.component.SoftwareComponent;
 import org.gradle.api.component.SoftwareComponentContainer;
 import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.internal.ConventionMapping;
-import org.gradle.api.internal.artifacts.ConfigurationVariantInternal;
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.artifacts.dsl.LazyPublishArtifact;
 import org.gradle.api.internal.artifacts.publish.AbstractPublishArtifact;
+import org.gradle.api.internal.attributes.AttributeContainerInternal;
+import org.gradle.api.internal.file.FileTreeInternal;
 import org.gradle.api.internal.plugins.DslObject;
 import org.gradle.api.internal.tasks.DefaultSourceSetOutput;
+import org.gradle.api.internal.tasks.compile.CompilationSourceDirs;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.BasePlugin;
 import org.gradle.api.plugins.JavaBasePlugin;
+import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.TaskContainer;
-import org.gradle.api.tasks.TaskDependency;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.api.tasks.compile.AbstractCompile;
 import org.gradle.api.tasks.compile.CompileOptions;
+import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.javadoc.Javadoc;
 import org.gradle.internal.Cast;
-import org.gradle.internal.Factory;
+import org.gradle.internal.jvm.JavaModuleDetector;
 import org.gradle.language.base.plugins.LifecycleBasePlugin;
 import org.gradle.util.TextUtil;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 
 /**
  * Helpers for Jvm plugins. They are in a separate class so that they don't leak
  * into the public API.
  */
 public class JvmPluginsHelper {
-    private static void registerClassesDirVariant(final SourceSet sourceSet, ObjectFactory objectFactory, Configuration configuration) {
-        // Define a classes variant to use for compilation
-        ConfigurationPublications publications = configuration.getOutgoing();
-        ConfigurationVariantInternal variant = (ConfigurationVariantInternal) publications.getVariants().maybeCreate("classes");
-        variant.getAttributes().attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, LibraryElements.CLASSES));
-        variant.artifactsProvider(new Factory<List<PublishArtifact>>() {
-            @Nullable
-            @Override
-            public List<PublishArtifact> create() {
-                Set<File> classesDirs = sourceSet.getOutput().getClassesDirs().getFiles();
-                DefaultSourceSetOutput output = Cast.uncheckedCast(sourceSet.getOutput());
-                TaskDependency compileDependencies = output.getCompileDependencies();
-                ImmutableList.Builder<PublishArtifact> artifacts = ImmutableList.builderWithExpectedSize(classesDirs.size());
-                for (File classesDir : classesDirs) {
-                    // this is an approximation: all "compiled" sources will use the same task dependency
-                    artifacts.add(new IntermediateJavaArtifact(ArtifactTypeDefinition.JVM_CLASS_DIRECTORY, compileDependencies) {
-                        @Override
-                        public File getFile() {
-                            return classesDir;
-                        }
-                    });
-                }
-                return artifacts.build();
-            }
-        });
-    }
 
-    public static void addApiToSourceSet(SourceSet sourceSet, ConfigurationContainer configurations) {
+    /**
+     * Adds an API configuration to a source set, so that API dependencies
+     * can be declared.
+     *
+     * @param sourceSet the source set to add an API for
+     * @return the created API configuration
+     */
+    public static Configuration addApiToSourceSet(SourceSet sourceSet, ConfigurationContainer configurations) {
         Configuration apiConfiguration = configurations.maybeCreate(sourceSet.getApiConfigurationName());
         apiConfiguration.setVisible(false);
         apiConfiguration.setDescription("API dependencies for " + sourceSet + ".");
         apiConfiguration.setCanBeResolved(false);
         apiConfiguration.setCanBeConsumed(false);
 
+        Configuration compileOnlyApiConfiguration = configurations.maybeCreate(sourceSet.getCompileOnlyApiConfigurationName());
+        compileOnlyApiConfiguration.setVisible(false);
+        compileOnlyApiConfiguration.setDescription("Compile only API dependencies for " + sourceSet + ".");
+        compileOnlyApiConfiguration.setCanBeConsumed(false);
+        compileOnlyApiConfiguration.setCanBeResolved(false);
+
         Configuration apiElementsConfiguration = configurations.getByName(sourceSet.getApiElementsConfigurationName());
-        apiElementsConfiguration.extendsFrom(apiConfiguration);
+        apiElementsConfiguration.extendsFrom(apiConfiguration, compileOnlyApiConfiguration);
 
         Configuration implementationConfiguration = configurations.getByName(sourceSet.getImplementationConfigurationName());
         implementationConfiguration.extendsFrom(apiConfiguration);
 
+        Configuration compileOnlyConfiguration = configurations.getByName(sourceSet.getCompileOnlyConfigurationName());
+        compileOnlyConfiguration.extendsFrom(compileOnlyApiConfiguration);
+
+        @SuppressWarnings("deprecation")
         Configuration compileConfiguration = configurations.getByName(sourceSet.getCompileConfigurationName());
         apiConfiguration.extendsFrom(compileConfiguration);
+
+        return apiConfiguration;
     }
 
     public static void configureForSourceSet(final SourceSet sourceSet, final SourceDirectorySet sourceDirectorySet, AbstractCompile compile, CompileOptions options, final Project target) {
@@ -125,36 +117,16 @@ public class JvmPluginsHelper {
         compile.setSource(sourceSet.getJava());
 
         ConfigurableFileCollection classpath = compile.getProject().getObjects().fileCollection();
-        classpath.from(new Callable<Object>() {
-            @Override
-            public Object call() {
-                return sourceSet.getCompileClasspath().plus(target.files(sourceSet.getJava().getClassesDirectory()));
-            }
-        });
+        classpath.from((Callable<Object>) () -> sourceSet.getCompileClasspath().plus(target.files(sourceSet.getJava().getClassesDirectory())));
 
-        compile.getConventionMapping().map("classpath", new Callable<Object>() {
-            @Override
-            public Object call() {
-                return classpath;
-            }
-        });
+        compile.getConventionMapping().map("classpath", () -> classpath);
     }
 
     public static void configureAnnotationProcessorPath(final SourceSet sourceSet, SourceDirectorySet sourceDirectorySet, CompileOptions options, final Project target) {
         final ConventionMapping conventionMapping = new DslObject(options).getConventionMapping();
-        conventionMapping.map("annotationProcessorPath", new Callable<Object>() {
-            @Override
-            public Object call() {
-                return sourceSet.getAnnotationProcessorPath();
-            }
-        });
-        final String annotationProcessorGeneratedSourcesChildPath = "generated/sources/annotationProcessor/" + sourceDirectorySet.getName() + "/" + sourceSet.getName();
-        conventionMapping.map("annotationProcessorGeneratedSourcesDirectory", new Callable<Object>() {
-            @Override
-            public Object call() {
-                return new File(target.getBuildDir(), annotationProcessorGeneratedSourcesChildPath);
-            }
-        });
+        conventionMapping.map("annotationProcessorPath", sourceSet::getAnnotationProcessorPath);
+        String annotationProcessorGeneratedSourcesChildPath = "generated/sources/annotationProcessor/" + sourceDirectorySet.getName() + "/" + sourceSet.getName();
+        options.getGeneratedSourceOutputDirectory().convention(target.getLayout().getBuildDirectory().dir(annotationProcessorGeneratedSourcesChildPath));
     }
 
     /***
@@ -162,43 +134,25 @@ public class JvmPluginsHelper {
      */
     public static void configureOutputDirectoryForSourceSet(final SourceSet sourceSet, final SourceDirectorySet sourceDirectorySet, final Project target, Provider<? extends AbstractCompile> compileTask, Provider<CompileOptions> options) {
         TaskProvider<? extends AbstractCompile> taskProvider = Cast.uncheckedCast(compileTask);
-        configureOutputDirectoryForSourceSet(sourceSet, sourceDirectorySet, target, taskProvider, options);
+        configureOutputDirectoryForSourceSet(sourceSet, sourceDirectorySet, target, taskProvider, options, AbstractCompile::getDestinationDirectory);
     }
 
     public static void configureOutputDirectoryForSourceSet(final SourceSet sourceSet, final SourceDirectorySet sourceDirectorySet, final Project target, TaskProvider<? extends AbstractCompile> compileTask, Provider<CompileOptions> options) {
+        configureOutputDirectoryForSourceSet(sourceSet, sourceDirectorySet, target, compileTask, options, AbstractCompile::getDestinationDirectory);
+    }
+
+    public static <T extends Task> void configureOutputDirectoryForSourceSet(final SourceSet sourceSet, final SourceDirectorySet sourceDirectorySet, final Project target, TaskProvider<T> compileTask, Provider<CompileOptions> options, Function<T, DirectoryProperty> classesDirectoryExtractor) {
         final String sourceSetChildPath = "classes/" + sourceDirectorySet.getName() + "/" + sourceSet.getName();
         sourceDirectorySet.getDestinationDirectory().convention(target.getLayout().getBuildDirectory().dir(sourceSetChildPath));
 
         DefaultSourceSetOutput sourceSetOutput = Cast.cast(DefaultSourceSetOutput.class, sourceSet.getOutput());
-        sourceSetOutput.addClassesDir(new Callable<File>() {
-            @Override
-            public File call() {
-                return sourceDirectorySet.getDestinationDirectory().getAsFile().get();
-            }
-        });
-        sourceSetOutput.registerCompileTask(compileTask);
-        sourceSetOutput.getGeneratedSourcesDirs().from(options.map(new Transformer<Object, CompileOptions>() {
-            @Override
-            public Object transform(CompileOptions compileOptions) {
-                return compileOptions.getAnnotationProcessorGeneratedSourcesDirectory();
-            }
-        })).builtBy(compileTask);
-
-        sourceDirectorySet.compiledBy(compileTask, AbstractCompile::getDestinationDirectory);
+        sourceSetOutput.addClassesDir(sourceDirectorySet.getDestinationDirectory());
+        sourceSetOutput.registerClassesContributor(compileTask);
+        sourceSetOutput.getGeneratedSourcesDirs().from(options.flatMap(CompileOptions::getGeneratedSourceOutputDirectory));
+        sourceDirectorySet.compiledBy(compileTask, classesDirectoryExtractor);
     }
 
-    public static void configureClassesDirectoryVariant(SourceSet sourceSet, Project target, String targetConfigName, final String usage) {
-        target.getConfigurations().all(new Action<Configuration>() {
-            @Override
-            public void execute(Configuration config) {
-                if (targetConfigName.equals(config.getName())) {
-                    registerClassesDirVariant(sourceSet, target.getObjects(), config);
-                }
-            }
-        });
-    }
-
-    public static void configureJavaDocTask(@Nullable String featureName, SourceSet sourceSet, TaskContainer tasks) {
+    public static void configureJavaDocTask(@Nullable String featureName, SourceSet sourceSet, TaskContainer tasks, @Nullable JavaPluginExtension javaPluginExtension) {
         String javadocTaskName = sourceSet.getJavadocTaskName();
         if (!tasks.getNames().contains(javadocTaskName)) {
             tasks.register(javadocTaskName, Javadoc.class, javadoc -> {
@@ -206,6 +160,9 @@ public class JvmPluginsHelper {
                 javadoc.setGroup(JavaBasePlugin.DOCUMENTATION_GROUP);
                 javadoc.setClasspath(sourceSet.getOutput().plus(sourceSet.getCompileClasspath()));
                 javadoc.setSource(sourceSet.getAllJava());
+                if (javaPluginExtension != null) {
+                    javadoc.getModularity().getInferModulePath().convention(javaPluginExtension.getModularity().getInferModulePath());
+                }
             });
         }
     }
@@ -247,6 +204,22 @@ public class JvmPluginsHelper {
             return (AdhocComponentWithVariants) component;
         }
         return null;
+    }
+
+    public static Action<ConfigurationInternal> configureLibraryElementsAttributeForCompileClasspath(boolean javaClasspathPackaging, SourceSet sourceSet, TaskProvider<JavaCompile> compileTaskProvider, ObjectFactory objectFactory) {
+        return conf -> {
+            AttributeContainerInternal attributes = conf.getAttributes();
+            if (!attributes.contains(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE)) {
+                String libraryElements;
+                // If we are compiling a module, we require JARs of all dependencies as they may potentially include an Automatic-Module-Name
+                if (javaClasspathPackaging || JavaModuleDetector.isModuleSource(compileTaskProvider.get().getModularity().getInferModulePath().get(), CompilationSourceDirs.inferSourceRoots((FileTreeInternal) sourceSet.getJava().getAsFileTree()))) {
+                    libraryElements = LibraryElements.JAR;
+                } else {
+                    libraryElements = LibraryElements.CLASSES;
+                }
+                attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, libraryElements));
+            }
+        };
     }
 
     /**

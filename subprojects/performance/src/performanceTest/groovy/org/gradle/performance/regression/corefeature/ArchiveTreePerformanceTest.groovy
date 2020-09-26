@@ -16,16 +16,15 @@
 
 package org.gradle.performance.regression.corefeature
 
-import org.gradle.performance.AbstractCrossVersionGradleProfilerPerformanceTest
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
 
-class ArchiveTreePerformanceTest extends AbstractCrossVersionGradleProfilerPerformanceTest {
+class ArchiveTreePerformanceTest extends AbstractCrossVersionPerformanceTest {
     def setup() {
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.7-20200824220048+0000"]
     }
 
     def "visiting zip trees"() {
         given:
-        runner.testProject = "archivePerformanceProject"
         runner.tasksToRun = ['visitZip']
 
         when:
@@ -36,7 +35,6 @@ class ArchiveTreePerformanceTest extends AbstractCrossVersionGradleProfilerPerfo
     }
     def "visiting tar trees"() {
         given:
-        runner.testProject = "archivePerformanceProject"
         runner.tasksToRun = ['visitTar']
 
         when:
@@ -48,7 +46,6 @@ class ArchiveTreePerformanceTest extends AbstractCrossVersionGradleProfilerPerfo
 
     def "visiting gzip tar trees"() {
         given:
-        runner.testProject = "archivePerformanceProject"
         runner.tasksToRun = ['visitTarGz']
 
         when:

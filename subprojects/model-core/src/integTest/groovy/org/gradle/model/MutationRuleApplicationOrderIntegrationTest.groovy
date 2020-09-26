@@ -17,7 +17,9 @@
 package org.gradle.model
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class MutationRuleApplicationOrderIntegrationTest extends AbstractIntegrationSpec {
 
     def setup() {

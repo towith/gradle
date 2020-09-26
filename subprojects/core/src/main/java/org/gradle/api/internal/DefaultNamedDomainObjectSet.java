@@ -24,6 +24,7 @@ import org.gradle.api.internal.collections.CollectionFilter;
 import org.gradle.api.internal.collections.SortedSetElementSource;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
+import org.gradle.internal.Cast;
 import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.reflect.Instantiator;
 
@@ -43,6 +44,7 @@ public class DefaultNamedDomainObjectSet<T> extends DefaultNamedDomainObjectColl
         this(type, instantiator, CollectionCallbackActionDecorator.NOOP);
         DeprecationLogger.deprecateInternalApi("constructor DefaultNamedDomainObjectSet(Class<T>, Instantiator, Namer<T>)")
             .replaceWith("ObjectFactory.namedDomainObjectSet(Class<T>)")
+            .willBeRemovedInGradle7()
             .withUserManual("custom_gradle_types", "nameddomainobjectset")
             .nagUser();
     }
@@ -63,7 +65,7 @@ public class DefaultNamedDomainObjectSet<T> extends DefaultNamedDomainObjectColl
 
     @Override
     protected <S extends T> DefaultNamedDomainObjectSet<S> filtered(CollectionFilter<S> filter) {
-        return getInstantiator().newInstance(DefaultNamedDomainObjectSet.class, this, filter, getInstantiator(), getNamer());
+        return Cast.uncheckedNonnullCast(getInstantiator().newInstance(DefaultNamedDomainObjectSet.class, this, filter, getInstantiator(), getNamer()));
     }
 
     @Override

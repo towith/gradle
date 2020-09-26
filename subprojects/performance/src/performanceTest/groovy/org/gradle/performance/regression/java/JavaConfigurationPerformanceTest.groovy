@@ -16,33 +16,20 @@
 
 package org.gradle.performance.regression.java
 
-import org.gradle.performance.AbstractCrossVersionGradleProfilerPerformanceTest
-import spock.lang.Unroll
+import org.gradle.performance.AbstractCrossVersionPerformanceTest
 
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT_KOTLIN_DSL
-import static org.gradle.performance.generator.JavaTestProject.LARGE_MONOLITHIC_JAVA_PROJECT
+class JavaConfigurationPerformanceTest extends AbstractCrossVersionPerformanceTest {
 
-class JavaConfigurationPerformanceTest extends AbstractCrossVersionGradleProfilerPerformanceTest {
-
-    @Unroll
-    def "configure #testProject"() {
+    def "configure"() {
         given:
-        runner.testProject = testProject
-        runner.gradleOpts = ["-Xms${testProject.daemonMemory}", "-Xmx${testProject.daemonMemory}"]
+        runner.gradleOpts = runner.projectMemoryOptions
         runner.tasksToRun = ['help']
-        runner.targetVersions = ["6.2-20200108160029+0000"]
+        runner.targetVersions = ["6.8-20200910220041+0000"]
 
         when:
         def result = runner.run()
 
         then:
         result.assertCurrentVersionHasNotRegressed()
-
-        where:
-        testProject                              | _
-        LARGE_MONOLITHIC_JAVA_PROJECT            | _
-        LARGE_JAVA_MULTI_PROJECT                 | _
-        LARGE_JAVA_MULTI_PROJECT_KOTLIN_DSL      | _
     }
 }

@@ -16,13 +16,14 @@
 
 package org.gradle.api.internal.tasks.compile.incremental.recomp
 
+import org.gradle.api.internal.tasks.compile.CompilationSourceDirs
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
 import spock.lang.Specification
 
 class CompilationSourceDirsTest extends Specification {
     @Rule
-    TestNameTestDirectoryProvider temp = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider temp = new TestNameTestDirectoryProvider(getClass())
 
     def compilationSourceDirs = new CompilationSourceDirs(["src/main/java", "src/main/java2"].collect { temp.file(it) })
 

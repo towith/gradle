@@ -17,16 +17,14 @@
 package org.gradle.integtests.samples.dependencymanagement
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.Sample
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.UsesSample
-import org.gradle.util.Requires
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import org.junit.Rule
+import spock.lang.IgnoreIf
 import spock.lang.Unroll
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
-
-@Requires(KOTLIN_SCRIPT)
 class SamplesDefiningUsingConfigurationsIntegrationTest extends AbstractIntegrationSpec {
 
     @Rule
@@ -37,12 +35,12 @@ class SamplesDefiningUsingConfigurationsIntegrationTest extends AbstractIntegrat
     }
 
     @Unroll
-    @UsesSample("userguide/dependencyManagement/definingUsingConfigurations/custom")
-    @ToBeFixedForInstantExecution(iterationMatchers = ".*kotlin dsl")
+    @UsesSample("dependencyManagement/definingUsingConfigurations-custom")
+    @ToBeFixedForConfigurationCache(iterationMatchers = ".*kotlin dsl")
+    @IgnoreIf({ GradleContextualExecuter.embedded }) // Sample only works with isolated distribution classpath, because otherwise multiple JARs contain conflicting versions of 'javax/servlet/descriptor/JspConfigDescriptor'
     def "can declare and resolve custom configuration with #dsl dsl"() {
         setup:
         executer.inDirectory(sample.dir.file(dsl))
-        executer.requireGradleDistribution() // required to avoid multiple Servlet API JARs in classpath
 
         when:
         succeeds('preCompileJsps')
@@ -55,7 +53,7 @@ class SamplesDefiningUsingConfigurationsIntegrationTest extends AbstractIntegrat
     }
 
     @Unroll
-    @UsesSample("userguide/dependencyManagement/definingUsingConfigurations/inheritance")
+    @UsesSample("dependencyManagement/definingUsingConfigurations-inheritance")
     def "can extend one configuration from another configuration"() {
         setup:
         executer.inDirectory(sample.dir.file(dsl))
@@ -64,7 +62,7 @@ class SamplesDefiningUsingConfigurationsIntegrationTest extends AbstractIntegrat
         succeeds('copyLibs')
 
         then:
-        sample.dir.file("$dsl/build/libs/junit-4.12.jar").isFile()
+        sample.dir.file("$dsl/build/libs/junit-4.13.jar").isFile()
         sample.dir.file("$dsl/build/libs/httpclient-4.5.5.jar").isFile()
 
         where:

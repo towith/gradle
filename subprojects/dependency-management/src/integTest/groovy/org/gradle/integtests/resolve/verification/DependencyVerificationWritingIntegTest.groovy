@@ -16,12 +16,15 @@
 
 package org.gradle.integtests.resolve.verification
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.api.internal.artifacts.ivyservice.CacheLayout
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
+import org.gradle.integtests.fixtures.cache.CachingIntegrationFixture
 import org.gradle.test.fixtures.maven.MavenFileModule
 import org.gradle.test.fixtures.maven.MavenFileRepository
+import spock.lang.Issue
 import spock.lang.Unroll
 
-class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificationIntegTest {
+class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificationIntegTest implements CachingIntegrationFixture {
 
     def "can generate an empty verification file"() {
         when:
@@ -109,7 +112,7 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     @Unroll
     def "generates verification file for dependencies downloaded in previous build (stop in between = #stop)"() {
         given:
@@ -388,7 +391,6 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         hasModules([])
     }
 
-    @ToBeFixedForInstantExecution
     def "writes checksums of plugins using plugins block"() {
         given:
         addPlugin()
@@ -416,7 +418,6 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         hasModules(["test-plugin:test-plugin.gradle.plugin", "com:myplugin"])
     }
 
-    @ToBeFixedForInstantExecution
     def "writes checksums of plugins using buildscript block"() {
         given:
         addPlugin()
@@ -626,6 +627,7 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
 """
     }
 
+    @ToBeFixedForConfigurationCache(because = "composite builds")
     def "included build dependencies are used when generating the verification file"() {
         given:
         javaLibrary()
@@ -915,7 +917,7 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         javaLibrary()
         uncheckedModule("org", "foo")
         uncheckedModule("org", "bar", "1.0") {
-            artifact(classifier:'classy')
+            artifact(classifier: 'classy')
         }
         buildFile << """
             dependencies {
@@ -1011,7 +1013,7 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         )
         MavenFileModule otherFile = alternateRepo.module("org", "foo", "1.0")
             .publish()
-        otherFile.artifactFile.bytes = [0,0,0,0]
+        otherFile.artifactFile.bytes = [0, 0, 0, 0]
 
         buildFile << """
             dependencies {
@@ -1139,7 +1141,6 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "can use --dry-run to write a different file for comparison"() {
         given:
         javaLibrary()
@@ -1241,7 +1242,6 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
 """
     }
 
-    @ToBeFixedForInstantExecution
     def "doesn't write verification metadata for skipped configurations"() {
         javaLibrary()
         uncheckedModule("org", "foo")
@@ -1276,6 +1276,43 @@ class DependencyVerificationWritingIntegTest extends AbstractDependencyVerificat
         then:
         outputContains "Dependency verification has been disabled for configuration runtimeClasspath"
         hasModules(["org:foo"])
+    }
+
+    @Issue("https://github.com/gradle/gradle/issues/12260")
+    @Unroll
+    def "doesn't fail writing verification file if a #artifact file is missing from local store"() {
+        javaLibrary()
+        uncheckedModule("org", "foo")
+        buildFile << """
+            dependencies {
+                implementation "org:foo:1.0"
+            }
+        """
+
+        when:
+        run ":compileJava"
+
+        then:
+        noExceptionThrown()
+
+        when:
+        def group = new File(CacheLayout.FILE_STORE.getPath(metadataCacheDir), "org")
+        def module = new File(group, "foo")
+        def version = new File(module, "1.0")
+        version.eachFileRecurse {
+            if (it.name.endsWith(".${artifact}")) {
+                it.delete()
+            }
+        }
+
+        writeVerificationMetadata()
+        run ":help", "--offline"
+
+        then:
+        hasModules(artifact == 'pom' ? [] : ["org:foo"])
+
+        where:
+        artifact << ['jar', 'pom']
     }
 
 }

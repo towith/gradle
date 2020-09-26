@@ -17,7 +17,8 @@
 package org.gradle.integtests.resolve.maven
 
 import org.gradle.integtests.fixtures.AbstractHttpDependencyResolutionTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
+import org.gradle.integtests.fixtures.FeaturePreviewsFixture
 
 import static org.gradle.internal.resource.transport.http.JavaSystemPropertiesHttpTimeoutSettings.SOCKET_TIMEOUT_SYSTEM_PROPERTY
 
@@ -143,7 +144,7 @@ task retrieve(type: Sync) {
                     mavenPom()
                     artifact()
                 }
-            } 
+            }
         """
 
         when:
@@ -168,7 +169,7 @@ task retrieve(type: Sync) {
         file('libs/projectA-1.5.jar').assertHasNotChangedSince(snapshot)
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "reports and recovers from broken maven-metadata.xml and directory listing"() {
         given:
         mavenHttpRepo.module('group', 'projectA', '1.0').publish()
@@ -181,7 +182,7 @@ task retrieve(type: Sync) {
                     mavenPom()
                     artifact()
                 }
-            } 
+            }
         """
 
         when:
@@ -225,7 +226,7 @@ task retrieve(type: Sync) {
         file('libs').assertHasDescendants('projectA-1.5.jar')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "dynamic version reports and recovers from broken module"() {
         given:
         def repo = mavenHttpRepo("repo1")
@@ -267,7 +268,7 @@ task retrieve(type: Sync) {
         file('libs').assertHasDescendants('projectA-1.1.jar')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "dynamic version reports and recovers from missing module"() {
         given:
         def repo = mavenHttpRepo("repo1")
@@ -359,7 +360,7 @@ Searched in the following locations:
                         }
                     }
                 }
-            } 
+            }
 """
 
         when:
@@ -375,7 +376,7 @@ Searched in the following locations:
         file('libs').assertHasDescendants('projectA-1.4.jar')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "dynamic version fails on broken module in one repository when available in another repository"() {
         given:
         def repo1 = mavenHttpRepo("repo1")
@@ -413,7 +414,7 @@ Searched in the following locations:
         file('libs').assertHasDescendants('projectA-1.5.jar')
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "dynamic version fails on timeout in one repository even when available in another repository"() {
         given:
         def repo1 = mavenHttpRepo("repo1")
@@ -454,6 +455,25 @@ Searched in the following locations:
         file('libs').assertHasDescendants('projectA-1.5.jar')
     }
 
+    def 'a -SNAPSHOT is higher than a -RC for a given version'() {
+        given:
+        def repo = mavenHttpRepo("repo")
+        repo.getModuleMetaData('group', 'projectA').expectGet()
+
+        repo.module('group', 'projectA', '1.5-SNAPSHOT').publish().allowAll()
+        repo.module('group', 'projectA', '1.5-RC1').publish().allowAll()
+
+        buildFile << createBuildFile(repo.uri)
+
+        FeaturePreviewsFixture.enableUpdatedVersionSorting(settingsFile)
+
+        when:
+        succeeds 'retrieve'
+
+        then:
+        file('libs').assertHasDescendants('projectA-1.5-SNAPSHOT.jar')
+    }
+
     static String createBuildFile(URI... repoUris) {
         """
          repositories {
@@ -463,7 +483,7 @@ Searched in the following locations:
          dependencies {
              compile 'group:projectA:1.+'
          }
- 
+
          task retrieve(type: Sync) {
              into 'libs'
              from configurations.compile

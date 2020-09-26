@@ -16,7 +16,7 @@
 package org.gradle.api.plugins.quality.codenarc
 
 import org.gradle.api.plugins.quality.CodeNarcPlugin
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.WellBehavedPluginTest
 import spock.lang.Unroll
 
@@ -61,20 +61,15 @@ class CodeNarcPluginIntegrationTest extends WellBehavedPluginTest {
                     assert ignoreFailures == false
                 }
             }
-            task assertTaskForEachSourceSet {
-                doLast {
-                    assertTaskConfiguration('codenarcMain', project.sourceSets.main)
-                    assertTaskConfiguration('codenarcTest', project.sourceSets.test)
-                    assertTaskConfiguration('codenarcOther', project.sourceSets.other)
-                }
-            }
+            assertTaskConfiguration('codenarcMain', project.sourceSets.main)
+            assertTaskConfiguration('codenarcTest', project.sourceSets.test)
+            assertTaskConfiguration('codenarcOther', project.sourceSets.other)
         '''.stripIndent()
 
         expect:
-        succeeds 'assertTaskForEachSourceSet'
+        succeeds 'help'
     }
 
-    @ToBeFixedForInstantExecution
     def "adds codenarc tasks from each source sets to check lifecycle task"() {
         given:
         buildFile << '''
@@ -130,20 +125,15 @@ class CodeNarcPluginIntegrationTest extends WellBehavedPluginTest {
                     assert ignoreFailures == true
                 }
             }
-            task assertHasCustomizedSettings {
-                doLast {
-                    hasCustomizedSettings('codenarcMain', project.sourceSets.main)
-                    hasCustomizedSettings('codenarcTest', project.sourceSets.test)
-                    hasCustomizedSettings('codenarcOther', project.sourceSets.other)
-                }
-            }
+            hasCustomizedSettings('codenarcMain', project.sourceSets.main)
+            hasCustomizedSettings('codenarcTest', project.sourceSets.test)
+            hasCustomizedSettings('codenarcOther', project.sourceSets.other)
         '''.stripIndent()
 
         expect:
-        succeeds 'assertHasCustomizedSettings'
+        succeeds 'help'
     }
 
-    @ToBeFixedForInstantExecution
     def "can customize which tasks are added to check lifecycle task"() {
         given:
         buildFile << '''
@@ -174,21 +164,17 @@ class CodeNarcPluginIntegrationTest extends WellBehavedPluginTest {
             codenarc {
                 configFile = project.file("codenarc-config")
             }
-            task assertCodeNarcConfiguration {
-                doLast {
-                    assert project.codenarc.configFile == project.file("codenarc-config") // computed property
-                    assert project.tasks.codenarcMain.configFile == project.file("codenarc-config")
-                    assert project.tasks.codenarcTest.configFile == project.file("codenarc-config")
-                }
-            }
+            assert project.codenarc.configFile == project.file("codenarc-config") // computed property
+            assert project.tasks.codenarcMain.configFile == project.file("codenarc-config")
+            assert project.tasks.codenarcTest.configFile == project.file("codenarc-config")
         '''.stripIndent()
 
         expect:
-        succeeds 'assertCodeNarcConfiguration'
+        succeeds 'help'
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = ":dependencies")
     def "allows configuring tool dependencies explicitly via #method"(String method, String buildScriptSnippet) {
         expect: //defaults exist and can be inspected
         succeeds("dependencies", "--configuration", "codenarc")

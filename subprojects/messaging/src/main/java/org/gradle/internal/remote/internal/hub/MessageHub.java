@@ -17,6 +17,7 @@
 package org.gradle.internal.remote.internal.hub;
 
 import org.gradle.api.Action;
+import org.gradle.internal.Cast;
 import org.gradle.internal.concurrent.AsyncStoppable;
 import org.gradle.internal.concurrent.ExecutorFactory;
 import org.gradle.internal.concurrent.ManagedExecutor;
@@ -40,6 +41,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * Use {@link #addHandler(String, Object)} to create a worker for incoming messages on a given channel.
  * Use {@link #addConnection(RemoteConnection)} to attach another router to this router.
  *
+ * TODO - this type could be simplified, as there is no longer any need to send/receive messages to/from multiple connections
  */
 public class MessageHub implements AsyncStoppable {
     private enum State {Running, Stopping, Stopped}
@@ -110,13 +112,13 @@ public class MessageHub implements AsyncStoppable {
             }
             Dispatch<Object> dispatch;
             if (handler instanceof Dispatch) {
-                dispatch = (Dispatch) handler;
+                dispatch = Cast.uncheckedNonnullCast(handler);
             } else {
                 dispatch = DISCARD;
             }
             BoundedDispatch<Object> boundedDispatch;
             if (dispatch instanceof BoundedDispatch) {
-                boundedDispatch = (BoundedDispatch) dispatch;
+                boundedDispatch = Cast.uncheckedNonnullCast(dispatch);
             } else {
                 boundedDispatch = DISCARD;
             }

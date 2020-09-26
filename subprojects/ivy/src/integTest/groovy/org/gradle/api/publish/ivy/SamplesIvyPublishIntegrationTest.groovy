@@ -16,7 +16,7 @@
 package org.gradle.api.publish.ivy
 
 import org.gradle.integtests.fixtures.AbstractSampleIntegrationTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.Sample
 import org.gradle.integtests.fixtures.UsesSample
 import org.gradle.util.TextUtil
@@ -28,7 +28,7 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample("ivy-publish/quickstart")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "quickstart sample with #dsl dsl"() {
         given:
         def sampleDir = sampleProject.dir.file(dsl)
@@ -50,7 +50,7 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample("ivy-publish/java-multi-project")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "java-multi-project sample with #dsl dsl"() {
         given:
         def sampleDir = sampleProject.dir.file(dsl)
@@ -70,7 +70,7 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
 
         project1module.parsedIvy.configurations.keySet() == ['default', 'compile', 'runtime', 'javadocElements', 'sourcesElements'] as Set
         project1module.parsedIvy.description.text() == "The first project"
-        project1module.parsedIvy.assertDependsOn("junit:junit:4.12@runtime", "org.gradle.sample:project2:1.0@runtime")
+        project1module.parsedIvy.assertDependsOn("junit:junit:4.13@runtime", "org.gradle.sample:project2:1.0@runtime")
 
         and:
         project2module.assertPublished()
@@ -89,7 +89,7 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample("ivy-publish/descriptor-customization")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "descriptor-customization sample with #dsl dsl"() {
         given:
         def sampleDir = sampleProject.dir.file(dsl)
@@ -118,8 +118,8 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
         dsl << ['groovy', 'kotlin']
     }
 
-    @UsesSample("ivy-publish/conditional-publishing")
-    @ToBeFixedForInstantExecution
+    @UsesSample("ivy-publish/conditional-publishing/groovy")
+    @ToBeFixedForConfigurationCache
     def conditionalPublishing() {
         given:
         sample sampleProject
@@ -146,10 +146,10 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
     }
 
     @UsesSample("ivy-publish/conditional-publishing")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def shorthandPublishToExternalRepository() {
         given:
-        sample sampleProject
+        inDirectory(sampleProject.dir.file('groovy'))
 
         when:
         succeeds "publishToExternalRepository"
@@ -161,10 +161,10 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
     }
 
     @UsesSample("ivy-publish/conditional-publishing")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def shorthandPublishToInternalRepository() {
         given:
-        sample sampleProject
+        inDirectory(sampleProject.dir.file('groovy'))
 
         when:
         succeeds "publishToInternalRepository"
@@ -175,8 +175,8 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
         notExecuted ":publishBinaryPublicationToExternalRepository", ":publishBinaryAndSourcesPublicationToExternalRepository"
     }
 
-    @UsesSample("ivy-publish/publish-artifact")
-    @ToBeFixedForInstantExecution
+    @UsesSample("ivy-publish/publish-artifact/groovy")
+    @ToBeFixedForConfigurationCache
     def publishesRpmArtifact() {
         given:
         sample sampleProject
@@ -198,11 +198,11 @@ class SamplesIvyPublishIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Unroll
     @UsesSample("ivy-publish/distribution")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "publishes distribution archives with #dsl dsl"() {
         given:
         def sampleDir = sampleProject.dir.file(dsl)
-        executer.inDirectory(sampleDir).requireGradleDistribution()
+        executer.inDirectory(sampleDir)
 
         and:
         def repo = ivy(sampleDir.file("build/repo"))

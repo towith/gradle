@@ -52,13 +52,13 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         given:
         buildFile << """
             apply plugin: 'java-library'
-            
+
             java {
                 registerFeature("myFeature") {
                     usingSourceSet(sourceSets.main)
                 }
             }
-            
+
             dependencies {
                 $configuration project(":b")
             }
@@ -76,7 +76,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         file("src/main/java/com/bar/Bar.java") << """
             package com.bar;
             import com.foo.Foo;
-            
+
             public class Bar {
                 public void bar() {
                     Foo foo = new Foo();
@@ -104,27 +104,30 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
     def "Java Library can depend on feature of component [compileClasspathPackaging=#compileClasspathPackaging]"() {
         toggleCompileClasspathPackaging(compileClasspathPackaging)
         settingsFile << """
-            include 'b', 'c', 'd'
+            include 'b', 'c', 'd', 'e', 'f', 'g'
         """
         given:
         file("b/build.gradle") << """
             apply plugin: 'java-library'
-            
+
             java {
                 registerFeature("myFeature") {
                     usingSourceSet(sourceSets.main)
                 }
             }
-            
+
             dependencies {
                 myFeatureApi project(":c")
                 myFeatureImplementation project(":d")
+                myFeatureCompileOnlyApi project(":e")
+                myFeatureCompileOnly project(":f")
+                myFeatureRuntimeOnly project(":g")
             }
-            
+
         """
         buildFile << """
             apply plugin: 'java-library'
-            
+
             dependencies {
                 implementation(project(":b")) {
                     capabilities {
@@ -132,21 +135,21 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
                     }
                 }
             }
-            
+
             task verifyClasspath {
                 dependsOn(configurations.compileClasspath)
                 dependsOn(configurations.runtimeClasspath)
                 doLast {
                     assert configurations.compileClasspath.incoming.resolutionResult.allDependencies.collect {
                         it.toString()
-                    } as Set == ['project :b', 'project :c'] as Set // only API dependencies
+                    } as Set == ['project :b', 'project :c', 'project :e'] as Set // only API dependencies
                     assert configurations.runtimeClasspath.incoming.resolutionResult.allDependencies.collect {
                         it.toString()
-                    } as Set == ['project :b', 'project :c', 'project :d'] as Set // all dependencies
+                    } as Set == ['project :b', 'project :c', 'project :d', 'project :g'] as Set // all dependencies (except compile only)
                 }
             }
         """
-        ['c', 'd'].each {
+        ['c', 'd', 'e', 'f', 'g'].each {
             file("$it/build.gradle") << """
             apply plugin: 'java-library'
         """
@@ -166,7 +169,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         file("src/main/java/com/bar/Bar.java") << """
             package com.bar;
             import com.foo.Foo;
-            
+
             public class Bar {
                 public void bar() {
                     Foo foo = new Foo();
@@ -179,16 +182,20 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         succeeds ':compileJava'
 
         then:
-        executedAndNotSkipped ':b:compileJava', ':c:compileJava', ':d:compileJava'
+        executedAndNotSkipped ':b:compileJava', ':c:compileJava', ':d:compileJava', ':e:compileJava', ':f:compileJava'
         packagingTasks(compileClasspathPackaging, 'b')
         packagingTasks(compileClasspathPackaging, 'c')
         packagingTasks(compileClasspathPackaging, 'd')
+        packagingTasks(compileClasspathPackaging, 'e')
+        packagingTasks(compileClasspathPackaging, 'f')
 
         when:
         succeeds 'clean', ':verifyClasspath'
 
         then:
-        executedAndNotSkipped ':b:jar', ':c:jar', ':d:jar'
+        executedAndNotSkipped ':b:jar', ':c:jar', ':d:jar', ':g:jar' // runtime
+        packagingTasks(compileClasspathPackaging, 'e') // compile time only
+        packagingTasks(compileClasspathPackaging, 'f') // compile time only
 
         where:
         compileClasspathPackaging | _
@@ -206,25 +213,25 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         given:
         file("b/build.gradle") << """
             apply plugin: 'java-library'
-            
+
             java {
                 registerFeature("myFeature") {
                     usingSourceSet(sourceSets.main)
                 }
             }
-            
+
             dependencies {
                 myFeatureImplementation project(":c")
             }
-            
+
         """
         buildFile << """
             apply plugin: 'java-library'
-            
+
             dependencies {
                 implementation(project(":b"))
             }
-            
+
             task resolveRuntime {
                 dependsOn(configurations.runtimeClasspath)
                 doLast {
@@ -249,7 +256,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         file("src/main/java/com/bar/Bar.java") << """
             package com.bar;
             import com.foo.Foo;
-            
+
             public class Bar {
                 public void bar() {
                     Foo foo = new Foo();
@@ -294,14 +301,14 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
                         srcDir "src/myFeature/java"
                     }
                 }
-            }            
+            }
 
             java {
                 registerFeature("myFeature") {
                     usingSourceSet(sourceSets.myFeature)
                 }
             }
-            
+
             dependencies {
                 $configuration project(":b")
             }
@@ -319,7 +326,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         file("src/myFeature/java/com/bar/Bar.java") << """
             package com.bar;
             import com.foo.Foo;
-            
+
             public class Bar {
                 public void bar() {
                     Foo foo = new Foo();
@@ -353,30 +360,30 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         given:
         file("b/build.gradle") << """
             apply plugin: 'java-library'
-            
+
             sourceSets {
                 myFeature {
                     java {
                         srcDir "src/myFeature/java"
                     }
                 }
-            }            
+            }
 
             java {
                 registerFeature("myFeature") {
                     usingSourceSet(sourceSets.myFeature)
                 }
             }
-            
+
             dependencies {
                 myFeatureApi project(":c")
                 myFeatureImplementation project(":d")
             }
-            
+
         """
         buildFile << """
             apply plugin: 'java-library'
-            
+
             dependencies {
                 implementation(project(":b")) {
                     capabilities {
@@ -384,7 +391,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
                     }
                 }
             }
-            
+
             task verifyClasspath {
                 dependsOn(configurations.compileClasspath)
                 dependsOn(configurations.runtimeClasspath)
@@ -419,7 +426,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
         file("src/main/java/com/bar/Bar.java") << """
             package com.bar;
             import com.foo.Foo;
-            
+
             public class Bar {
                 public void bar() {
                     Foo foo = new Foo();
@@ -454,9 +461,9 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
     def "dependencies of a feature that uses the main source set are available on test compile classpath"() {
         buildFile << """
             apply plugin: 'java-library'
-            
+
             ${mavenCentralRepository()}
-            
+
             java {
                 registerFeature('feat') {
                    usingSourceSet(sourceSets.main)
@@ -464,7 +471,7 @@ class JavaLibraryFeatureCompilationIntegrationTest extends AbstractIntegrationSp
             }
 
             dependencies {
-                testImplementation "junit:junit:4.12"
+                testImplementation "junit:junit:4.13"
                 featApi "org.apache.commons:commons-math3:3.6.1"
             }
         """

@@ -22,6 +22,7 @@ import org.gradle.internal.instantiation.InstantiatorFactory;
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.operations.BuildOperationRef;
 import org.gradle.internal.service.ServiceRegistry;
+import org.gradle.process.internal.worker.RequestHandler;
 import org.gradle.workers.IsolationMode;
 
 public class IsolatedClassloaderWorkerFactory implements WorkerFactory {
@@ -48,13 +49,13 @@ public class IsolatedClassloaderWorkerFactory implements WorkerFactory {
             public DefaultWorkResult execute(IsolatedParametersActionExecutionSpec<?> spec, BuildOperationRef parentBuildOperation) {
                 return executeWrappedInBuildOperation(spec, parentBuildOperation, workSpec -> {
                     // Serialize the incoming class and parameters
-                    TransportableActionExecutionSpec<?> transportableSpec = actionExecutionSpecFactory.newTransportableSpec(spec);
+                    TransportableActionExecutionSpec transportableSpec = actionExecutionSpecFactory.newTransportableSpec(spec);
 
                     ClassLoader workerInfrastructureClassloader = classLoaderRegistry.getPluginsClassLoader();
                     ClassLoaderStructure classLoaderStructure = ((IsolatedClassLoaderWorkerRequirement) workerRequirement).getClassLoaderStructure();
                     ClassLoader workerClassLoader = IsolatedClassloaderWorker.createIsolatedWorkerClassloader(classLoaderStructure, workerInfrastructureClassloader, legacyTypesSupport);
-                    WorkerProtocol worker = new IsolatedClassloaderWorker(workerClassLoader, internalServices, actionExecutionSpecFactory, instantiatorFactory);
-                    return worker.execute(transportableSpec);
+                    RequestHandler<TransportableActionExecutionSpec, DefaultWorkResult> worker = new IsolatedClassloaderWorker(workerClassLoader, internalServices, actionExecutionSpecFactory, instantiatorFactory);
+                    return worker.run(transportableSpec);
                 });
             }
         };

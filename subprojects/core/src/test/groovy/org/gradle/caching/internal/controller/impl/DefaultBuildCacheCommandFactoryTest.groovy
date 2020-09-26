@@ -27,13 +27,14 @@ import org.gradle.caching.internal.origin.OriginMetadataFactory
 import org.gradle.caching.internal.origin.OriginReader
 import org.gradle.caching.internal.origin.OriginWriter
 import org.gradle.caching.internal.packaging.BuildCacheEntryPacker
+import org.gradle.internal.file.FileMetadata.AccessType
 import org.gradle.internal.file.TreeType
+import org.gradle.internal.file.impl.DefaultFileMetadata
 import org.gradle.internal.hash.HashCode
 import org.gradle.internal.snapshot.CompleteDirectorySnapshot
 import org.gradle.internal.snapshot.CompleteFileSystemLocationSnapshot
-import org.gradle.internal.snapshot.FileMetadata
 import org.gradle.internal.snapshot.RegularFileSnapshot
-import org.gradle.internal.vfs.VirtualFileSystem
+import org.gradle.internal.vfs.FileSystemAccess
 import org.gradle.test.fixtures.file.CleanupTestDirectory
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
@@ -46,9 +47,9 @@ import static org.gradle.internal.file.TreeType.FILE
 class DefaultBuildCacheCommandFactoryTest extends Specification {
     def packer = Mock(BuildCacheEntryPacker)
     def originFactory = Mock(OriginMetadataFactory)
-    def virtualFileSystem = Mock(VirtualFileSystem)
+    def fileSystemAccess = Mock(FileSystemAccess)
     def stringInterner = new StringInterner()
-    def commandFactory = new DefaultBuildCacheCommandFactory(packer, originFactory, virtualFileSystem, stringInterner)
+    def commandFactory = new DefaultBuildCacheCommandFactory(packer, originFactory, fileSystemAccess, stringInterner)
 
     def key = Mock(BuildCacheKey)
 
@@ -56,7 +57,7 @@ class DefaultBuildCacheCommandFactoryTest extends Specification {
     def originReader = Mock(OriginReader)
     def originWriter = Mock(OriginWriter)
 
-    @Rule TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider()
+    @Rule TestNameTestDirectoryProvider temporaryFolder = new TestNameTestDirectoryProvider(getClass())
 
     def "load invokes unpacker and fingerprints trees"() {
         def outputFile = temporaryFolder.file("output.txt")
@@ -69,9 +70,9 @@ class DefaultBuildCacheCommandFactoryTest extends Specification {
         )
         def load = commandFactory.createLoad(key, entity)
 
-        def outputFileSnapshot = new RegularFileSnapshot(outputFile.absolutePath, outputFile.name, HashCode.fromInt(234), new FileMetadata(15, 234))
+        def outputFileSnapshot = new RegularFileSnapshot(outputFile.absolutePath, outputFile.name, HashCode.fromInt(234), DefaultFileMetadata.file(15, 234, AccessType.DIRECT))
         def fileSnapshots = ImmutableMap.of(
-            "outputDir", new CompleteDirectorySnapshot(outputDir.getAbsolutePath(), outputDir.name, ImmutableList.of(new RegularFileSnapshot(outputDirFile.getAbsolutePath(), outputDirFile.name, HashCode.fromInt(123), new FileMetadata(46, 123))), HashCode.fromInt(456)),
+            "outputDir", new CompleteDirectorySnapshot(outputDir.getAbsolutePath(), outputDir.name, ImmutableList.of(new RegularFileSnapshot(outputDirFile.getAbsolutePath(), outputDirFile.name, HashCode.fromInt(123), DefaultFileMetadata.file(46, 123, AccessType.DIRECT))), HashCode.fromInt(456), AccessType.DIRECT),
             "outputFile", outputFileSnapshot)
 
         when:
@@ -79,17 +80,17 @@ class DefaultBuildCacheCommandFactoryTest extends Specification {
 
         then:
         1 * originFactory.createReader(entity) >> originReader
-        1 * virtualFileSystem.update([outputDir.absolutePath, outputFile.absolutePath], _)
+        1 * fileSystemAccess.write([outputDir.absolutePath, outputFile.absolutePath], _)
 
         then:
         1 * packer.unpack(entity, input, originReader) >> new BuildCacheEntryPacker.UnpackResult(originMetadata, 123L, fileSnapshots)
 
         then:
-        1 * virtualFileSystem.updateWithKnownSnapshot(_ as CompleteDirectorySnapshot) >> { CompleteFileSystemLocationSnapshot snapshot  ->
+        1 * fileSystemAccess.record(_ as CompleteDirectorySnapshot) >> { CompleteFileSystemLocationSnapshot snapshot  ->
             assert snapshot.absolutePath == outputDir.absolutePath
             assert snapshot.name == outputDir.name
         }
-        1 * virtualFileSystem.updateWithKnownSnapshot(_ as RegularFileSnapshot) >> { CompleteFileSystemLocationSnapshot snapshot ->
+        1 * fileSystemAccess.record(_ as RegularFileSnapshot) >> { CompleteFileSystemLocationSnapshot snapshot ->
             assert snapshot.absolutePath == outputFileSnapshot.absolutePath
             assert snapshot.name == outputFileSnapshot.name
             assert snapshot.hash == outputFileSnapshot.hash
@@ -115,7 +116,7 @@ class DefaultBuildCacheCommandFactoryTest extends Specification {
 
         then:
         1 * originFactory.createReader(entity) >> originReader
-        1 * virtualFileSystem.update([outputFile.absolutePath], _)
+        1 * fileSystemAccess.write([outputFile.absolutePath], _)
 
         then:
         1 * packer.unpack(entity, input, originReader) >> {

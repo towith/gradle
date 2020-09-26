@@ -15,6 +15,7 @@
  */
 package org.gradle.tooling.internal.consumer;
 
+import org.gradle.api.Transformer;
 import org.gradle.tooling.BuildAction;
 import org.gradle.tooling.BuildActionExecuter;
 import org.gradle.tooling.BuildLauncher;
@@ -34,15 +35,22 @@ import java.util.List;
 class DefaultProjectConnection implements ProjectConnection {
     private final AsyncConsumerActionExecutor connection;
     private final ConnectionParameters parameters;
+    private final ProjectConnectionCloseListener listener;
 
-    public DefaultProjectConnection(AsyncConsumerActionExecutor connection, ConnectionParameters parameters) {
+    public DefaultProjectConnection(AsyncConsumerActionExecutor connection, ConnectionParameters parameters, ProjectConnectionCloseListener listener) {
         this.connection = connection;
         this.parameters = parameters;
+        this.listener = listener;
     }
 
     @Override
     public void close() {
         connection.stop();
+        listener.connectionClosed(this);
+    }
+
+    void disconnect() {
+        connection.disconnect();
     }
 
     @Override
@@ -70,12 +78,12 @@ class DefaultProjectConnection implements ProjectConnection {
         if (!modelType.isInterface()) {
             throw new IllegalArgumentException(String.format("Cannot fetch a model of type '%s' as this type is not an interface.", modelType.getName()));
         }
-        return new DefaultModelBuilder<>(modelType, connection, parameters);
+        return new DefaultModelBuilder<T>(modelType, connection, parameters);
     }
 
     @Override
     public <T> BuildActionExecuter<T> action(final BuildAction<T> buildAction) {
-        return new DefaultBuildActionExecuter<>(buildAction, connection, parameters);
+        return new DefaultBuildActionExecuter<T>(buildAction, connection, parameters);
     }
 
     @Override
@@ -85,14 +93,14 @@ class DefaultProjectConnection implements ProjectConnection {
 
     @Override
     public void notifyDaemonsAboutChangedPaths(List<Path> changedPaths) {
-        List<String> absolutePaths = new ArrayList<>(changedPaths.size());
+        final List<String> absolutePaths = new ArrayList<String>(changedPaths.size());
         for (Path changedPath : changedPaths) {
             if (!changedPath.isAbsolute()) {
                 throw new IllegalArgumentException(String.format("Changed path '%s' is not absolute", changedPath));
             }
             absolutePaths.add(changedPath.toString());
         }
-        ConsumerOperationParameters.Builder operationParamsBuilder = ConsumerOperationParameters.builder();
+        final ConsumerOperationParameters.Builder operationParamsBuilder = ConsumerOperationParameters.builder();
         operationParamsBuilder.setCancellationToken(new DefaultCancellationTokenSource().token());
         operationParamsBuilder.setParameters(parameters);
         operationParamsBuilder.setEntryPoint("Notify daemons about changed paths API");
@@ -109,8 +117,13 @@ class DefaultProjectConnection implements ProjectConnection {
                     return null;
                 }
             },
-            new ResultHandlerAdapter<>(new BlockingResultHandler<>(Void.class),
-                new ExceptionTransformer(throwable -> String.format("Could not notify daemons about changed paths: %s.", connection.getDisplayName()))
+            new ResultHandlerAdapter<Void>(new BlockingResultHandler<Void>(Void.class),
+                new ExceptionTransformer(new Transformer<String, Throwable>() {
+                    @Override
+                    public String transform(Throwable throwable) {
+                        return String.format("Could not notify daemons about changed paths: %s.", connection.getDisplayName());
+                    }
+                })
             ));
     }
 }

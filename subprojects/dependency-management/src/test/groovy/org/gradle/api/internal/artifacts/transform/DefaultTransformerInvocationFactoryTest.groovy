@@ -17,21 +17,32 @@
 package org.gradle.api.internal.artifacts.transform
 
 import com.google.common.collect.ImmutableList
-import org.gradle.api.artifacts.component.BuildIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.transform.TransformAction
 import org.gradle.api.file.FileSystemLocation
 import org.gradle.api.internal.artifacts.DefaultBuildIdentifier
 import org.gradle.api.internal.artifacts.DefaultProjectComponentIdentifier
-import org.gradle.api.internal.artifacts.dsl.dependencies.ProjectFinder
 import org.gradle.api.internal.attributes.ImmutableAttributes
 import org.gradle.api.internal.file.TestFiles
 import org.gradle.api.internal.project.ProjectInternal
+import org.gradle.api.internal.project.ProjectState
+import org.gradle.api.internal.project.ProjectStateRegistry
 import org.gradle.api.internal.tasks.TaskDependencyResolveContext
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.FileNormalizer
+import org.gradle.caching.internal.controller.BuildCacheCommandFactory
+import org.gradle.caching.internal.controller.BuildCacheController
+import org.gradle.initialization.DefaultBuildCancellationToken
 import org.gradle.internal.Try
 import org.gradle.internal.component.local.model.ComponentFileArtifactIdentifier
+import org.gradle.internal.deprecation.DeprecationLogger
+import org.gradle.internal.enterprise.core.GradleEnterprisePluginManager
+import org.gradle.internal.execution.DefaultOutputSnapshotter
+import org.gradle.internal.execution.OutputChangeListener
 import org.gradle.internal.execution.TestExecutionHistoryStore
+import org.gradle.internal.execution.history.OutputFilesRepository
+import org.gradle.internal.execution.history.changes.DefaultExecutionStateChangeDetector
+import org.gradle.internal.execution.timeout.impl.DefaultTimeoutHandler
 import org.gradle.internal.fingerprint.AbsolutePathInputNormalizer
 import org.gradle.internal.fingerprint.FileCollectionFingerprinter
 import org.gradle.internal.fingerprint.FileCollectionFingerprinterRegistry
@@ -39,11 +50,14 @@ import org.gradle.internal.fingerprint.impl.AbsolutePathFileCollectionFingerprin
 import org.gradle.internal.fingerprint.impl.DefaultFileCollectionFingerprinterRegistry
 import org.gradle.internal.fingerprint.impl.DefaultFileCollectionSnapshotter
 import org.gradle.internal.fingerprint.impl.OutputFileCollectionFingerprinter
+import org.gradle.internal.fingerprint.overlap.impl.DefaultOverlappingOutputDetector
 import org.gradle.internal.hash.ClassLoaderHierarchyHasher
 import org.gradle.internal.hash.HashCode
-import org.gradle.internal.operations.BuildOperationExecutor
-import org.gradle.internal.operations.CallableBuildOperation
+import org.gradle.internal.id.UniqueId
+import org.gradle.internal.operations.TestBuildOperationExecutor
+import org.gradle.internal.scopeids.id.BuildInvocationScopeId
 import org.gradle.internal.service.ServiceRegistry
+import org.gradle.internal.service.scopes.ExecutionGradleServices
 import org.gradle.internal.snapshot.impl.DefaultValueSnapshotter
 import org.gradle.test.fixtures.AbstractProjectBuilderSpec
 import org.gradle.util.Path
@@ -63,9 +77,8 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
     def valueSnapshotter = new DefaultValueSnapshotter(classloaderHasher, null)
 
     def executionHistoryStore = new TestExecutionHistoryStore()
-    def virtualFileSystem = TestFiles.virtualFileSystem()
-    def workExecutorTestFixture = new WorkExecutorTestFixture(virtualFileSystem, classloaderHasher, valueSnapshotter)
-    def fileCollectionSnapshotter = new DefaultFileCollectionSnapshotter(virtualFileSystem, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
+    def fileSystemAccess = TestFiles.fileSystemAccess()
+    def fileCollectionSnapshotter = new DefaultFileCollectionSnapshotter(fileSystemAccess, TestFiles.genericFileTreeSnapshotter(), TestFiles.fileSystem())
 
     def transformationWorkspaceProvider = new TestTransformationWorkspaceProvider(immutableTransformsStoreDirectory, executionHistoryStore)
 
@@ -83,8 +96,10 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         getServices() >> projectServiceRegistry
     }
 
-    def projectFinder = Stub(ProjectFinder) {
-        findProject(_ as BuildIdentifier, _ as String) >> childProject
+    def projectStateRegistry = Stub(ProjectStateRegistry) {
+        stateFor(_ as ProjectComponentIdentifier) >> Stub(ProjectState) {
+            getMutableModel()>> childProject
+        }
     }
 
     def dependencies = Stub(ArtifactTransformDependencies) {
@@ -92,20 +107,48 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         fingerprint(_ as FileCollectionFingerprinter) >> { FileCollectionFingerprinter fingerprinter -> fingerprinter.empty() }
     }
 
-    def buildOperationExecutor = Stub(BuildOperationExecutor) {
-        call(_) >> { CallableBuildOperation op ->
-            op.call(null)
-        }
+    def buildOperationExecutor = new TestBuildOperationExecutor()
+
+    def buildCacheController = Stub(BuildCacheController)
+    def buildInvocationScopeId = new BuildInvocationScopeId(UniqueId.generate())
+    def cancellationToken = new DefaultBuildCancellationToken()
+    def buildCacheCommandFactory = Stub(BuildCacheCommandFactory)
+    def outputChangeListener = { affectedOutputPaths -> fileSystemAccess.write(affectedOutputPaths, {}) } as OutputChangeListener
+    def outputFilesRepository = Stub(OutputFilesRepository) {
+        isGeneratedByGradle(_ as File) >> true
     }
+    def outputSnapshotter = new DefaultOutputSnapshotter(fileCollectionSnapshotter)
+    def deleter = TestFiles.deleter()
+    def workExecutor = new ExecutionGradleServices().createWorkExecutor(
+        buildCacheCommandFactory,
+        buildCacheController,
+        cancellationToken,
+        buildInvocationScopeId,
+        buildOperationExecutor,
+        new GradleEnterprisePluginManager(),
+        classloaderHasher,
+        deleter,
+        new DefaultExecutionStateChangeDetector(),
+        outputChangeListener,
+        outputFilesRepository,
+        outputSnapshotter,
+        new DefaultOverlappingOutputDetector(),
+        new DefaultTimeoutHandler(null),
+        { String behavior -> DeprecationLogger.deprecateBehaviour(behavior)
+            .willBeRemovedInGradle7()
+            .undocumented()
+            .nagUser()
+        },
+        valueSnapshotter
+    )
 
     def invoker = new DefaultTransformerInvocationFactory(
-        workExecutorTestFixture.workExecutor,
-        virtualFileSystem,
+        workExecutor,
+        fileSystemAccess,
         artifactTransformListener,
         transformationWorkspaceProvider,
         fileCollectionFactory,
-        fileCollectionSnapshotter,
-        projectFinder,
+        projectStateRegistry,
         buildOperationExecutor
     )
 
@@ -289,8 +332,7 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         outputFile?.isFile()
 
         when:
-        outputFile.text = "changed"
-        virtualFileSystem.invalidateAll()
+        fileSystemAccess.write([outputFile.absolutePath], { -> outputFile.text = "changed" })
 
         invoke(transformer, inputArtifact, dependencies, TransformationSubject.initial(inputArtifact), fingerprinterRegistry)
         then:
@@ -343,8 +385,7 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         workspaces.size() == 1
 
         when:
-        virtualFileSystem.invalidateAll()
-        inputArtifact1.text = "changed"
+        fileSystemAccess.write([inputArtifact1.absolutePath], { -> inputArtifact1.text = "changed"})
         invoke(transformer, inputArtifact2, dependencies, dependency(transformationType, inputArtifact2), fingerprinterRegistry)
 
         then:
@@ -373,8 +414,7 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         workspaces.size() == 1
 
         when:
-        virtualFileSystem.invalidateAll()
-        inputArtifact.text = "changed"
+        fileSystemAccess.write([inputArtifact.absolutePath], { -> inputArtifact.text = "changed"})
         invoke(transformer, inputArtifact, dependencies, subject, fingerprinterRegistry)
 
         then:
@@ -400,8 +440,7 @@ class DefaultTransformerInvocationFactoryTest extends AbstractProjectBuilderSpec
         workspaces.size() == 1
 
         when:
-        virtualFileSystem.invalidateAll()
-        inputArtifact.text = "changed"
+        fileSystemAccess.write([inputArtifact.absolutePath], { -> inputArtifact.text = "changed"})
         invoke(transformer, inputArtifact, dependencies, subject, fingerprinterRegistry)
 
         then:

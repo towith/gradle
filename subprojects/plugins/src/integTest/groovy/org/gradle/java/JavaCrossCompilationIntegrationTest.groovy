@@ -18,7 +18,6 @@ package org.gradle.java
 
 import org.gradle.api.JavaVersion
 import org.gradle.integtests.fixtures.AvailableJavaHomes
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.MultiVersionIntegrationSpec
 import org.gradle.integtests.fixtures.TargetVersions
 import org.gradle.internal.FileUtils
@@ -39,44 +38,34 @@ class JavaCrossCompilationIntegrationTest extends MultiVersionIntegrationSpec {
 
     def setup() {
         Assume.assumeTrue(target != null)
-        def java = TextUtil.escapeString(target.getJavaExecutable())
         def javaHome = TextUtil.escapeString(target.getJavaHome())
-        def javadoc = TextUtil.escapeString(target.getExecutable("javadoc"))
 
         buildFile << """
 apply plugin: 'java'
-sourceCompatibility = ${version}
-targetCompatibility = ${version}
 ${mavenCentralRepository()}
-tasks.withType(JavaCompile) {
-    options.with {
-        fork = true
-        forkOptions.javaHome = file("$javaHome")
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of($javaVersion.majorVersion )
     }
 }
 tasks.withType(Javadoc) {
-    executable = "$javadoc"
     options.noTimestamp = false
 }
-tasks.withType(Test) {
-    executable = "$java"
-}
-tasks.withType(JavaExec) {
-    executable = "$java"
-}
-
 """
 
         file("src/main/java/Thing.java") << """
 /** Some thing. */
 public class Thing { }
 """
+        executer.withArgument("-Porg.gradle.java.installations.auto-detect=false")
+            .withArgument("-Porg.gradle.java.installations.auto-download=false")
+            .withArgument("-Porg.gradle.java.installations.paths=" + javaHome)
     }
 
     def "can compile source and run JUnit tests using target Java version"() {
         given:
         buildFile << """
-dependencies { testImplementation 'junit:junit:4.12' }
+dependencies { testImplementation 'junit:junit:4.13' }
 """
 
         file("src/test/java/ThingTest.java") << """
@@ -118,12 +107,14 @@ public class ThingTest {
         succeeds 'test'
     }
 
-    @ToBeFixedForInstantExecution
     def "can build and run application using target Java version"() {
         given:
         buildFile << """
 apply plugin: 'application'
-mainClassName = 'Main'
+
+application {
+    mainClass = 'Main'
+}
 """
 
         file("src/main/java/Main.java") << """

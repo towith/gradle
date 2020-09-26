@@ -18,6 +18,7 @@ package org.gradle.internal.logging.console.taskgrouping
 
 import org.fusesource.jansi.Ansi
 import org.gradle.api.logging.LogLevel
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.console.AbstractConsoleGroupedTaskFunctionalTest
 import org.gradle.integtests.fixtures.executer.LogContent
 import spock.lang.Unroll
@@ -76,11 +77,12 @@ BUILD SUCCESSFUL in [ \\dms]+
         result.assertNotOutput("actionable task")
     }
 
+    @ToBeFixedForConfigurationCache(because = "Gradle.buildFinished")
     def "outcome for successful build is logged after user logic has completed"() {
         given:
         buildFile << """
             task success { doLast { } }
-            gradle.buildFinished { 
+            gradle.buildFinished {
                 println "build finished"
             }
         """

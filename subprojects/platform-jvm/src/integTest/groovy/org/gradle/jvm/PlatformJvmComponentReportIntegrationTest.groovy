@@ -16,9 +16,11 @@
 package org.gradle.jvm
 
 import org.gradle.api.reporting.components.AbstractComponentReportIntegrationTest
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.util.Requires
 import org.gradle.util.TestPrecondition
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class PlatformJvmComponentReportIntegrationTest extends AbstractComponentReportIntegrationTest {
 
     def setup() {

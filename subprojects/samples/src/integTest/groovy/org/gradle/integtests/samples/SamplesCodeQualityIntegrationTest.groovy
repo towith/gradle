@@ -16,25 +16,19 @@
 package org.gradle.integtests.samples
 
 import org.gradle.integtests.fixtures.AbstractSampleIntegrationTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.integtests.fixtures.Sample
 import org.gradle.integtests.fixtures.UsesSample
 import org.gradle.test.fixtures.file.TestFile
-import org.gradle.util.Requires
 import org.junit.Rule
 import spock.lang.Unroll
 
-import static org.gradle.util.TestPrecondition.KOTLIN_SCRIPT
-
-@Requires([KOTLIN_SCRIPT])
 class SamplesCodeQualityIntegrationTest extends AbstractSampleIntegrationTest {
 
     @Rule
     Sample sample = new Sample(testDirectoryProvider)
 
     @Unroll
-    @UsesSample('codeQuality')
-    @ToBeFixedForInstantExecution
+    @UsesSample('codeQuality/codeQuality')
     def "can generate reports with #dsl dsl"() {
         TestFile projectDir = sample.dir.file(dsl)
         TestFile buildDir = projectDir.file('build')
@@ -42,7 +36,6 @@ class SamplesCodeQualityIntegrationTest extends AbstractSampleIntegrationTest {
         when:
         executer
             .inDirectory(projectDir)
-            .requireGradleDistribution()
             .withTasks('check')
             .run()
 

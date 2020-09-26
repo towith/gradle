@@ -24,154 +24,147 @@ pluginManagement {
 }
 
 plugins {
-    id("com.gradle.enterprise").version("3.1")
+    id("com.gradle.enterprise").version("3.4.1")
+    id("com.gradle.enterprise.gradle-enterprise-conventions-plugin").version("0.7.1")
 }
 
-apply(from = "gradle/build-cache-configuration.settings.gradle.kts")
 apply(from = "gradle/shared-with-buildSrc/mirrors.settings.gradle.kts")
 
-include("instantExecution")
-include("instantExecutionReport")
-include("apiMetadata")
-include("distributionsDependencies")
-include("distributions")
-include("baseServices")
-include("baseServicesGroovy")
+// If you include a new subproject here, you will need to execute the
+// ./gradlew generateSubprojectsInfo
+// task to update metadata about the build for CI
+
+include("distributions-dependencies") // platform for dependency versions
+include("core-platform")              // platform for Gradle distribution core
+
+// Gradle Distributions - for testing and for publishing a full distribution
+include("distributions-core")
+include("distributions-basics")
+include("distributions-publishing")
+include("distributions-jvm")
+include("distributions-native")
+include("distributions-full")
+
+// Gradle implementation projects
+include("configuration-cache")
+include("api-metadata")
+include("base-services")
+include("base-services-groovy")
 include("logging")
-include("processServices")
-include("jvmServices")
+include("process-services")
+include("jvm-services")
 include("core")
-include("dependencyManagement")
+include("dependency-management")
 include("wrapper")
 include("cli")
 include("launcher")
 include("bootstrap")
 include("messaging")
 include("resources")
-include("resourcesHttp")
-include("resourcesGcs")
-include("resourcesS3")
-include("resourcesSftp")
+include("resources-http")
+include("resources-gcs")
+include("resources-s3")
+include("resources-sftp")
 include("plugins")
 include("scala")
 include("ide")
-include("ideNative")
-include("idePlay")
+include("ide-native")
+include("ide-play")
 include("maven")
-include("codeQuality")
+include("code-quality")
 include("antlr")
-include("toolingApi")
-include("buildEvents")
-include("toolingApiBuilders")
-include("docs")
-include("integTest")
+include("tooling-api")
+include("build-events")
+include("tooling-api-builders")
 include("signing")
 include("ear")
 include("native")
-include("internalTesting")
-include("internalIntegTesting")
-include("internalPerformanceTesting")
-include("internalAndroidPerformanceTesting")
-include("performance")
-include("buildScanPerformance")
 include("javascript")
 include("reporting")
 include("diagnostics")
 include("publish")
 include("ivy")
 include("jacoco")
-include("buildInit")
-include("buildOption")
-include("platformBase")
-include("platformNative")
-include("platformJvm")
-include("languageJvm")
-include("languageJava")
-include("languageGroovy")
-include("languageNative")
-include("toolingNative")
-include("languageScala")
-include("pluginUse")
-include("pluginDevelopment")
-include("modelCore")
-include("modelGroovy")
-include("buildCacheHttp")
-include("testingBase")
-include("testingNative")
-include("testingJvm")
-include("testingJunitPlatform")
-include("platformPlay")
-include("testKit")
-include("installationBeacon")
-include("soak")
-include("smokeTest")
-include("compositeBuilds")
+include("build-init")
+include("build-option")
+include("platform-base")
+include("platform-native")
+include("platform-jvm")
+include("language-jvm")
+include("language-java")
+include("java-compiler-plugin")
+include("language-groovy")
+include("language-native")
+include("tooling-native")
+include("language-scala")
+include("plugin-use")
+include("plugin-development")
+include("model-core")
+include("model-groovy")
+include("build-cache-http")
+include("testing-base")
+include("testing-native")
+include("testing-jvm")
+include("testing-junit-platform")
+include("platform-play")
+include("test-kit")
+include("installation-beacon")
+include("composite-builds")
 include("workers")
-include("runtimeApiInfo")
-include("persistentCache")
-include("buildCacheBase")
-include("buildCache")
-include("coreApi")
-include("versionControl")
-include("fileCollections")
+include("persistent-cache")
+include("build-cache-base")
+include("build-cache")
+include("core-api")
+include("version-control")
+include("file-collections")
 include("files")
 include("hashing")
 include("snapshots")
-include("architectureTest")
-include("buildCachePackaging")
+include("file-watching")
+include("build-cache-packaging")
 include("execution")
-include("buildProfile")
-include("kotlinCompilerEmbeddable")
-include("kotlinDsl")
-include("kotlinDslProviderPlugins")
-include("kotlinDslPlugins")
-include("kotlinDslToolingModels")
-include("kotlinDslToolingBuilders")
-include("kotlinDslTestFixtures")
-include("kotlinDslIntegTests")
-include("workerProcesses")
-include("baseAnnotations")
-include("samples")
+include("build-profile")
+include("kotlin-compiler-embeddable")
+include("kotlin-dsl")
+include("kotlin-dsl-provider-plugins")
+include("kotlin-dsl-tooling-models")
+include("kotlin-dsl-tooling-builders")
+include("worker-processes")
+include("base-annotations")
 include("security")
+include("normalization-java")
+include("enterprise")
+include("build-operations")
 
-val upperCaseLetters = "\\p{Upper}".toRegex()
+// Plugin portal projects
+include("kotlin-dsl-plugins")
 
-fun String.toKebabCase() =
-    replace(upperCaseLetters) { "-${it.value.toLowerCase()}" }
+// Internal utility and verification projects
+include("docs")
+include("samples")
+include("architecture-test")
+include("internal-testing")
+include("internal-integ-testing")
+include("internal-performance-testing")
+include("internal-android-performance-testing")
+include("internal-build-reports")
+include("integ-test")
+include("kotlin-dsl-integ-tests")
+include("distributions-integ-tests")
+include("soak")
+include("smoke-test")
+include("performance")
+include("build-scan-performance")
+include("configuration-cache-report")
 
 rootProject.name = "gradle"
 
-// List of sub-projects that have a Groovy DSL build script.
-// The intent is for this list to diminish until it disappears.
-val groovyBuildScriptProjects = hashSetOf(
-    "distributions",
-    "docs",
-    "performance"
-)
-
-fun buildFileNameFor(projectDirName: String) =
-    "$projectDirName${buildFileExtensionFor(projectDirName)}"
-
-fun buildFileExtensionFor(projectDirName: String) =
-    if (projectDirName in groovyBuildScriptProjects) ".gradle" else ".gradle.kts"
-
 for (project in rootProject.children) {
-    val projectDirName = project.name.toKebabCase()
-    project.projectDir = file("subprojects/$projectDirName")
-    project.buildFileName = buildFileNameFor(projectDirName)
-    require(project.projectDir.isDirectory) {
-        "Project directory ${project.projectDir} for project ${project.name} does not exist."
-    }
-    require(project.buildFile.isFile) {
-        "Build file ${project.buildFile} for project ${project.name} does not exist."
-    }
+    project.projectDir = file("subprojects/${project.name}")
 }
 
-val ignoredFeatures = setOf<FeaturePreviews.Feature>()
-
 FeaturePreviews.Feature.values().forEach { feature ->
-    if (feature.isActive && feature !in ignoredFeatures) {
+    if (feature.isActive) {
         enableFeaturePreview(feature.name)
     }
 }
-

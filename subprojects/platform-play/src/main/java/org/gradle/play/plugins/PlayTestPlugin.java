@@ -49,7 +49,11 @@ public class PlayTestPlugin extends RuleSource {
     @Mutate
     void createTestTasks(ModelMap<Task> tasks, @Path("binaries") ModelMap<PlayApplicationBinarySpecInternal> playBinaries, final PlayPluginConfigurations configurations,
                          final ProjectLayout projectLayout, final ProjectIdentifier projectIdentifier, @Path("buildDir") final File buildDir) {
-        DeprecationLogger.deprecatePlugin("Play Test").replaceWithExternalPlugin("org.gradle.playframework-test").withUserManual("play_plugin").nagUser();
+        DeprecationLogger.deprecatePlugin("Play Test")
+            .replaceWithExternalPlugin("org.gradle.playframework-test")
+            .willBeRemovedInGradle7()
+            .withUserManual("play_plugin")
+            .nagUser();
         for (final PlayApplicationBinarySpecInternal binary : playBinaries) {
             final FileCollection binaryOutputs = projectLayout.files(binary.getJarFile());
             final FileCollection testCompileClasspath = binaryOutputs.plus(configurations.getPlayTest().getAllArtifacts());
@@ -73,6 +77,7 @@ public class PlayTestPlugin extends RuleSource {
 
                 IncrementalCompileOptions incrementalOptions = scalaCompile.getScalaCompileOptions().getIncrementalOptions();
                 incrementalOptions.getAnalysisFile().set(new File(buildDir, "tmp/scala/compilerAnalysis/" + testCompileTaskName + ".analysis"));
+                incrementalOptions.getClassfileBackupDir().set(new File(buildDir, "tmp/scala/classfileBackup/" + testCompileTaskName + ".bak"));
 
             });
 
@@ -82,8 +87,6 @@ public class PlayTestPlugin extends RuleSource {
             tasks.create(testTaskName, Test.class, test -> {
                 test.setDescription("Runs " + WordUtils.uncapitalize(binary.getDisplayName() + "."));
 
-                test.setClasspath(testClassesDirs.plus(testCompileClasspath));
-
                 test.setTestClassesDirs(testClassesDirs);
                 test.setBinResultsDir(new File(binaryBuildDir, "results/" + testTaskName + "/bin"));
                 test.getReports().getJunitXml().setDestination(new File(binaryBuildDir, "reports/test/xml"));
@@ -91,6 +94,7 @@ public class PlayTestPlugin extends RuleSource {
                 test.dependsOn(testCompileTaskName);
                 test.setWorkingDir(projectIdentifier.getProjectDir());
             });
+            tasks.withType(Test.class).named(testTaskName, test -> test.setClasspath(testClassesDirs.plus(testCompileClasspath)));
             binary.getTasks().add(tasks.get(testTaskName));
         }
     }

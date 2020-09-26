@@ -18,17 +18,13 @@
 
 package org.gradle.api.publish.ivy
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.test.fixtures.keystore.TestKeyStore
 import org.gradle.test.fixtures.server.http.HttpServer
 import org.gradle.test.fixtures.server.http.IvyHttpModule
 import org.gradle.test.fixtures.server.http.IvyHttpRepository
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 import org.junit.Rule
 
-// Remove when https://bugs.openjdk.java.net/browse/JDK-8219658 is fixed in JDK 12
-@Requires(TestPrecondition.JDK11_OR_EARLIER)
 class IvyPublishHttpsIntegTest extends AbstractIvyPublishIntegTest {
     TestKeyStore keyStore
 
@@ -45,7 +41,7 @@ class IvyPublishHttpsIntegTest extends AbstractIvyPublishIntegTest {
         module = ivyRemoteRepo.module('org.gradle', 'publish', '2').allowAll()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "publish with server certificate"() {
         given:
         keyStore.enableSslWithServerCert(server)
@@ -60,7 +56,7 @@ class IvyPublishHttpsIntegTest extends AbstractIvyPublishIntegTest {
         verifyPublications()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "publish with server and client certificate"() {
         given:
         keyStore.enableSslWithServerAndClientCerts(server)
@@ -75,7 +71,7 @@ class IvyPublishHttpsIntegTest extends AbstractIvyPublishIntegTest {
         verifyPublications()
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "decent error message when client can't authenticate server"() {
         keyStore.enableSslWithServerCert(server)
         initBuild()
@@ -90,7 +86,7 @@ class IvyPublishHttpsIntegTest extends AbstractIvyPublishIntegTest {
         failure.assertHasCause("Could not write to resource '${module.jar.uri}'")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "build fails when server can't authenticate client"() {
         keyStore.enableSslWithServerAndBadClientCert(server)
         initBuild()

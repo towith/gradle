@@ -17,6 +17,7 @@
 package org.gradle.internal.isolated;
 
 import com.google.common.reflect.TypeToken;
+import org.gradle.api.file.ArchiveOperations;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.ProviderFactory;
@@ -125,7 +126,14 @@ public class IsolationScheme<IMPLEMENTATION, PARAMS> {
         private final Object params;
         private final Spec<Class<?>> whiteListPolicy;
 
-        public ServicesForIsolatedObject(Class<?> interfaceType, Class<?> noParamsType, @Nullable Object params, ServiceLookup allServices, Collection<? extends Class<?>> additionalWhiteListedServices, Spec<Class<?>> whiteListPolicy) {
+        public ServicesForIsolatedObject(
+            Class<?> interfaceType,
+            Class<?> noParamsType,
+            @Nullable Object params,
+            ServiceLookup allServices,
+            Collection<? extends Class<?>> additionalWhiteListedServices,
+            Spec<Class<?>> whiteListPolicy
+        ) {
             this.interfaceType = interfaceType;
             this.noParamsType = noParamsType;
             this.additionalWhiteListedServices = additionalWhiteListedServices;
@@ -150,6 +158,9 @@ public class IsolationScheme<IMPLEMENTATION, PARAMS> {
                 }
                 if (serviceClass.isAssignableFrom(FileSystemOperations.class)) {
                     return allServices.find(FileSystemOperations.class);
+                }
+                if (serviceClass.isAssignableFrom(ArchiveOperations.class)) {
+                    return allServices.find(ArchiveOperations.class);
                 }
                 if (serviceClass.isAssignableFrom(ObjectFactory.class)) {
                     return allServices.find(ObjectFactory.class);

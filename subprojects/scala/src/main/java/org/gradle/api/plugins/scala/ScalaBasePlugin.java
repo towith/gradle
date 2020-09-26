@@ -19,6 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.gradle.api.Action;
+import org.gradle.api.Incubating;
 import org.gradle.api.InvalidUserCodeException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -34,14 +35,15 @@ import org.gradle.api.attributes.AttributeMatchingStrategy;
 import org.gradle.api.attributes.MultipleCandidatesDetails;
 import org.gradle.api.attributes.Usage;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.file.FileTreeElement;
 import org.gradle.api.file.SourceDirectorySet;
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.tasks.DefaultScalaSourceSet;
 import org.gradle.api.internal.tasks.scala.DefaultScalaPluginExtension;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.Convention;
 import org.gradle.api.plugins.JavaBasePlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.plugins.jvm.JvmEcosystemUtilities;
 import org.gradle.api.plugins.internal.JvmPluginsHelper;
 import org.gradle.api.reporting.ReportingExtension;
 import org.gradle.api.specs.Spec;
@@ -60,6 +62,9 @@ import javax.inject.Inject;
 import java.io.File;
 import java.util.concurrent.Callable;
 
+import static org.gradle.api.attributes.Usage.USAGE_ATTRIBUTE;
+import static org.gradle.api.internal.lambdas.SerializableLambdas.spec;
+
 /**
  * <p>A {@link Plugin} which compiles and tests Scala sources.</p>
  */
@@ -76,19 +81,27 @@ public class ScalaBasePlugin implements Plugin<Project> {
     @VisibleForTesting
     public static final String ZINC_CONFIGURATION_NAME = "zinc";
     public static final String SCALA_RUNTIME_EXTENSION_NAME = "scalaRuntime";
+    /**
+     * Configuration for scala compiler plugins.
+     *
+     * @since 6.4
+     */
+    @Incubating
+    public static final String SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME = "scalaCompilerPlugins";
 
 
     private final ObjectFactory objectFactory;
+    private final JvmEcosystemUtilities jvmEcosystemUtilities;
 
     @Inject
-    public ScalaBasePlugin(ObjectFactory objectFactory) {
+    public ScalaBasePlugin(ObjectFactory objectFactory, JvmEcosystemUtilities jvmEcosystemUtilities) {
         this.objectFactory = objectFactory;
+        this.jvmEcosystemUtilities = jvmEcosystemUtilities;
     }
 
     @Override
     public void apply(final Project project) {
         project.getPluginManager().apply(JavaBasePlugin.class);
-
 
         ScalaRuntime scalaRuntime = project.getExtensions().create(SCALA_RUNTIME_EXTENSION_NAME, ScalaRuntime.class, project);
         ScalaPluginExtension scalaPluginExtension = project.getExtensions().create(ScalaPluginExtension.class, "scala", DefaultScalaPluginExtension.class);
@@ -103,6 +116,11 @@ public class ScalaBasePlugin implements Plugin<Project> {
 
     private void configureConfigurations(final Project project, final Usage incrementalAnalysisUsage, ScalaPluginExtension scalaPluginExtension) {
         DependencyHandler dependencyHandler = project.getDependencies();
+
+        ConfigurationInternal plugins = (ConfigurationInternal) project.getConfigurations().create(SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
+        plugins.setTransitive(false);
+        plugins.setCanBeConsumed(false);
+        jvmEcosystemUtilities.configureAsRuntimeClasspath(plugins);
 
         Configuration zinc = project.getConfigurations().create(ZINC_CONFIGURATION_NAME);
         zinc.setVisible(false);
@@ -135,9 +153,9 @@ public class ScalaBasePlugin implements Plugin<Project> {
         incrementalAnalysisElements.setDescription("Incremental compilation analysis files");
         incrementalAnalysisElements.setCanBeResolved(false);
         incrementalAnalysisElements.setCanBeConsumed(true);
-        incrementalAnalysisElements.getAttributes().attribute(Usage.USAGE_ATTRIBUTE, incrementalAnalysisUsage);
+        incrementalAnalysisElements.getAttributes().attribute(USAGE_ATTRIBUTE, incrementalAnalysisUsage);
 
-        AttributeMatchingStrategy<Usage> matchingStrategy = dependencyHandler.getAttributesSchema().attribute(Usage.USAGE_ATTRIBUTE);
+        AttributeMatchingStrategy<Usage> matchingStrategy = dependencyHandler.getAttributesSchema().attribute(USAGE_ATTRIBUTE);
         matchingStrategy.getDisambiguationRules().add(UsageDisambiguationRules.class, actionConfiguration -> {
             actionConfiguration.params(incrementalAnalysisUsage);
             actionConfiguration.params(objectFactory.named(Usage.class, Usage.JAVA_API));
@@ -158,12 +176,12 @@ public class ScalaBasePlugin implements Plugin<Project> {
                 scalaDirectorySet.srcDir(project.file("src/" + sourceSet.getName() + "/scala"));
                 sourceSet.getAllJava().source(scalaDirectorySet);
                 sourceSet.getAllSource().source(scalaDirectorySet);
-                sourceSet.getResources().getFilter().exclude(new Spec<FileTreeElement>() {
-                    @Override
-                    public boolean isSatisfiedBy(FileTreeElement element) {
-                        return scalaDirectorySet.contains(element.getFile());
-                    }
-                });
+
+                // Explicitly capture only a FileCollection in the lambda below for compatibility with configuration-cache.
+                FileCollection scalaSource = scalaDirectorySet;
+                sourceSet.getResources().getFilter().exclude(
+                    spec(element -> scalaSource.contains(element.getFile()))
+                );
 
                 Configuration classpath = project.getConfigurations().getByName(sourceSet.getImplementationConfigurationName());
                 Configuration incrementalAnalysis = project.getConfigurations().create("incrementalScalaAnalysisFor" + sourceSet.getName());
@@ -172,7 +190,7 @@ public class ScalaBasePlugin implements Plugin<Project> {
                 incrementalAnalysis.setCanBeResolved(true);
                 incrementalAnalysis.setCanBeConsumed(false);
                 incrementalAnalysis.extendsFrom(classpath);
-                incrementalAnalysis.getAttributes().attribute(Usage.USAGE_ATTRIBUTE, incrementalAnalysisUsage);
+                incrementalAnalysis.getAttributes().attribute(USAGE_ATTRIBUTE, incrementalAnalysisUsage);
 
                 configureScalaCompile(project, sourceSet, incrementalAnalysis, incrementalAnalysisUsage);
             }
@@ -199,6 +217,10 @@ public class ScalaBasePlugin implements Plugin<Project> {
                     project.getLayout().getBuildDirectory().file("tmp/scala/compilerAnalysis/" + scalaCompile.getName() + ".analysis")
                 );
 
+                incrementalOptions.getClassfileBackupDir().set(
+                    project.getLayout().getBuildDirectory().file("tmp/scala/classfileBackup/" + scalaCompile.getName() + ".bak")
+                );
+
                 final Jar jarTask = (Jar) project.getTasks().findByName(sourceSet.getJarTaskName());
                 if (jarTask != null) {
                     incrementalOptions.getPublishedCode().set(jarTask.getArchiveFile());
@@ -215,6 +237,11 @@ public class ScalaBasePlugin implements Plugin<Project> {
                         });
                     }
                 }).getFiles());
+
+                // See https://github.com/gradle/gradle/issues/14434.  We do this so that the incrementalScalaAnalysisForXXX configuration
+                // is resolved during task graph calculation.  It is not an input, but if we leave it to be resolved during task execution,
+                // it can potentially block trying to resolve project dependencies.
+                scalaCompile.dependsOn(scalaCompile.getAnalysisFiles());
             }
         });
         JvmPluginsHelper.configureOutputDirectoryForSourceSet(sourceSet, scalaSourceSet.getScala(), project, scalaCompile, scalaCompile.map(new Transformer<CompileOptions, ScalaCompile>() {
@@ -246,6 +273,12 @@ public class ScalaBasePlugin implements Plugin<Project> {
                     @Override
                     public Configuration call() throws Exception {
                         return project.getConfigurations().getAt(ZINC_CONFIGURATION_NAME);
+                    }
+                });
+                compile.getConventionMapping().map("scalaCompilerPlugins", new Callable<FileCollection>() {
+                    @Override
+                    public FileCollection call() throws Exception {
+                        return project.getConfigurations().getAt(SCALA_COMPILER_PLUGINS_CONFIGURATION_NAME);
                     }
                 });
             }

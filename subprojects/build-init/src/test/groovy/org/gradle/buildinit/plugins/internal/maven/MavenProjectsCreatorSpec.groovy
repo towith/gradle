@@ -16,16 +16,19 @@
 
 package org.gradle.buildinit.plugins.internal.maven
 
+import org.gradle.api.file.Directory
+import org.gradle.api.file.RegularFile
 import org.gradle.api.internal.artifacts.mvnsettings.DefaultMavenSettingsProvider
 import org.gradle.api.internal.artifacts.mvnsettings.MavenFileLocations
 import org.gradle.buildinit.plugins.internal.BuildScriptBuilderFactory
+import org.gradle.buildinit.plugins.internal.modifiers.BuildInitDsl
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
 import spock.lang.Specification
 
 class MavenProjectsCreatorSpec extends Specification {
 
-    @Rule TestNameTestDirectoryProvider temp
+    @Rule TestNameTestDirectoryProvider temp = new TestNameTestDirectoryProvider(getClass())
     private settings = new DefaultMavenSettingsProvider({} as MavenFileLocations)
     private creator = new MavenProjectsCreator()
 
@@ -117,6 +120,15 @@ class MavenProjectsCreatorSpec extends Specification {
 
     def "creates multi module project with same artifactId"() {
         given:
+        Directory target = Mock() {
+            _ * getAsFile() >> temp.testDirectory
+            _ * file(_) >> { String path ->
+                Mock(RegularFile) {
+                    _ * getAsFile() >> temp.file(path)
+                }
+            }
+        }
+
         def parentPom = temp.file("pom.xml")
         parentPom.text = """\
 <project>
@@ -161,11 +173,11 @@ class MavenProjectsCreatorSpec extends Specification {
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.gradle.commons</groupId>
   <artifactId>commons</artifactId>
-  
+
 </project>
 """
         def mavenProjects = creator.create(settings.buildSettings(), parentPom)
-        def converter = new Maven2Gradle(mavenProjects, temp.testDirectory, Stub(BuildScriptBuilderFactory))
+        def converter = new Maven2Gradle(mavenProjects, target, BuildInitDsl.GROOVY, Stub(BuildScriptBuilderFactory))
 
         expect:
         converter.convert()

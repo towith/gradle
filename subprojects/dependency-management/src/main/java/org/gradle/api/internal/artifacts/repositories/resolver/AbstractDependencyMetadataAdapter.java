@@ -33,7 +33,7 @@ import org.gradle.internal.component.model.ForcingDependencyMetadata;
 
 import java.util.List;
 
-public abstract class AbstractDependencyMetadataAdapter<T extends DependencyMetadata> implements DependencyMetadata<T> {
+public abstract class AbstractDependencyMetadataAdapter<T extends DependencyMetadata<T>> implements DependencyMetadata<T> {
     private final List<ModuleDependencyMetadata> container;
     private final int originalIndex;
     private final ImmutableAttributesFactory attributesFactory;
@@ -119,4 +119,5 @@ public abstract class AbstractDependencyMetadataAdapter<T extends DependencyMeta
             updateMetadata((ModuleDependencyMetadata) ((ForcingDependencyMetadata) originalMetadata).forced());
         }
     }
+
 }

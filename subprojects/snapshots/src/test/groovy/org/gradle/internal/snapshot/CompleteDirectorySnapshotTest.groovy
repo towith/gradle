@@ -16,6 +16,7 @@
 
 package org.gradle.internal.snapshot
 
+import org.gradle.internal.file.FileMetadata.AccessType
 import org.gradle.internal.file.FileType
 import org.gradle.internal.hash.HashCode
 import spock.lang.Unroll
@@ -26,7 +27,7 @@ import static org.gradle.internal.snapshot.CaseSensitivity.CASE_SENSITIVE
 class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<FileSystemNode, CompleteFileSystemLocationSnapshot> {
     @Override
     protected FileSystemNode createInitialRootNode(String pathToParent, List<CompleteFileSystemLocationSnapshot> children) {
-        return new CompleteDirectorySnapshot("/root/${pathToParent}", PathUtil.getFileName(pathToParent), children, HashCode.fromInt(1234)).asFileSystemNode(pathToParent)
+        return new CompleteDirectorySnapshot("/root/${pathToParent}", PathUtil.getFileName(pathToParent), children, HashCode.fromInt(1234), AccessType.DIRECT).asFileSystemNode(pathToParent)
     }
 
     @Override
@@ -38,11 +39,13 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         setupTest(vfsSpec)
 
         when:
-        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE).get()
+        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE, diffListener).get()
         then:
         resultRoot instanceof PartialDirectorySnapshot
         resultRoot.children == children
         resultRoot.pathToParent == initialRoot.pathToParent
+        removedNodes == [initialRoot.getSnapshot().get()]
+        addedNodes == children
         interaction { noMoreInteractions() }
 
         where:
@@ -53,27 +56,31 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         setupTest(vfsSpec)
 
         when:
-        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE).get()
+        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE, diffListener).get()
         then:
         resultRoot instanceof PartialDirectorySnapshot
         resultRoot.children == childrenWithSelectedChildRemoved()
         resultRoot.pathToParent == initialRoot.pathToParent
+        removedNodes == [initialRoot.getSnapshot().get()]
+        addedNodes == childrenWithSelectedChildRemoved()
         interaction { noMoreInteractions() }
 
         where:
         vfsSpec << onlyDirectChildren(SAME_PATH)
     }
 
-    def "invalidate descendant #vfsSpec.absolutePath of child #vfsSpec.selectedChildPath creates a partial directory snapshot with the invalidated child (#vfsSpec)"() {
+    def "invalidate descendant #vfsSpec.searchedPath of child #vfsSpec.selectedChildPath creates a partial directory snapshot with the invalidated child (#vfsSpec)"() {
         setupTest(vfsSpec)
         def invalidatedChild = mockChild(selectedChild.pathToParent)
 
         when:
-        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE).get()
+        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE, diffListener).get()
         then:
         resultRoot instanceof PartialDirectorySnapshot
         resultRoot.children == childrenWithSelectedChildReplacedBy(invalidatedChild)
         resultRoot.pathToParent == initialRoot.pathToParent
+        removedNodes == [initialRoot.getSnapshot().get()]
+        addedNodes == childrenWithSelectedChildRemoved()
 
         interaction {
             invalidateDescendantOfSelectedChild(invalidatedChild)
@@ -84,15 +91,17 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         vfsSpec << onlyDirectChildren(CHILD_IS_PREFIX)
     }
 
-    def "completely invalidating descendant #vfsSpec.absolutePath of child #vfsSpec.selectedChildPath creates a partial directory snapshot without the child (#vfsSpec)"() {
+    def "completely invalidating descendant #vfsSpec.searchedPath of child #vfsSpec.selectedChildPath creates a partial directory snapshot without the child (#vfsSpec)"() {
         setupTest(vfsSpec)
 
         when:
-        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE).get()
+        def resultRoot = initialRoot.invalidate(searchedPath, CASE_SENSITIVE, diffListener).get()
         then:
         resultRoot instanceof PartialDirectorySnapshot
         resultRoot.children == childrenWithSelectedChildRemoved()
         resultRoot.pathToParent == initialRoot.pathToParent
+        removedNodes == [initialRoot.getSnapshot().get()]
+        addedNodes == childrenWithSelectedChildRemoved()
 
         interaction {
             invalidateDescendantOfSelectedChild(null)
@@ -103,17 +112,19 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         vfsSpec << onlyDirectChildren(CHILD_IS_PREFIX)
     }
 
-    def "storing for path #vfsSpec.absolutePath adds no information (#vfsSpec)"() {
+    def "storing for path #vfsSpec.searchedPath adds no information (#vfsSpec)"() {
         setupTest(vfsSpec)
 
         expect:
-        initialRoot.store(searchedPath, CASE_SENSITIVE, Mock(MetadataSnapshot)) is initialRoot
+        initialRoot.store(searchedPath, CASE_SENSITIVE, Mock(MetadataSnapshot), diffListener) is initialRoot
+        addedNodes.empty
+        removedNodes.empty
 
         where:
         vfsSpec << onlyDirectChildren(NO_COMMON_PREFIX + SAME_PATH + CHILD_IS_PREFIX)
     }
 
-    def "querying the snapshot for non-existent child #vfsSpec.absolutePath yields a missing file (#vfsSpec)"() {
+    def "querying the snapshot for non-existent child #vfsSpec.searchedPath yields a missing file (#vfsSpec)"() {
         setupTest(vfsSpec)
 
         when:
@@ -126,7 +137,20 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         vfsSpec << onlyDirectChildren(NO_COMMON_PREFIX)
     }
 
-    def "querying the snapshot for child #vfsSpec.absolutePath yields the child (#vfsSpec)"() {
+    def "querying the node for non-existent child #vfsSpec.searchedPath yields a missing file (#vfsSpec)"() {
+        setupTest(vfsSpec)
+
+        when:
+        CompleteFileSystemLocationSnapshot foundSnapshot = initialRoot.getNode(searchedPath, CASE_SENSITIVE) as CompleteFileSystemLocationSnapshot
+        then:
+        foundSnapshot.type == FileType.Missing
+        foundSnapshot.absolutePath == searchedPath.absolutePath
+
+        where:
+        vfsSpec << onlyDirectChildren(NO_COMMON_PREFIX)
+    }
+
+    def "querying the snapshot for child #vfsSpec.searchedPath yields the child (#vfsSpec)"() {
         setupTest(vfsSpec)
 
         when:
@@ -140,7 +164,20 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         vfsSpec << onlyDirectChildren(SAME_PATH)
     }
 
-    def "querying a snapshot in child #vfsSpec.absolutePath yields the found snapshot (#vfsSpec)"() {
+    def "querying the node for child #vfsSpec.searchedPath yields the child (#vfsSpec)"() {
+        setupTest(vfsSpec)
+
+        when:
+        CompleteFileSystemLocationSnapshot foundSnapshot = initialRoot.getNode(searchedPath, CASE_SENSITIVE) as CompleteFileSystemLocationSnapshot
+        then:
+        foundSnapshot == selectedChild
+        interaction { noMoreInteractions() }
+
+        where:
+        vfsSpec << onlyDirectChildren(SAME_PATH)
+    }
+
+    def "querying a snapshot in child #vfsSpec.searchedPath yields the found snapshot (#vfsSpec)"() {
         setupTest(vfsSpec)
         def grandChild = Mock(CompleteFileSystemLocationSnapshot)
 
@@ -157,7 +194,24 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         vfsSpec << onlyDirectChildren(CHILD_IS_PREFIX)
     }
 
-    def "querying a non-existent snapshot in child #vfsSpec.absolutePath yields a missing snapshot (#vfsSpec)"() {
+    def "querying a node in child #vfsSpec.searchedPath yields the found node (#vfsSpec)"() {
+        setupTest(vfsSpec)
+        def grandChild = Mock(CompleteFileSystemLocationSnapshot)
+
+        when:
+        CompleteFileSystemLocationSnapshot foundSnapshot = initialRoot.getNode(searchedPath, CASE_SENSITIVE) as CompleteFileSystemLocationSnapshot
+        then:
+        foundSnapshot == grandChild
+        interaction {
+            getDescendantNodeOfSelectedChild(grandChild)
+            noMoreInteractions()
+        }
+
+        where:
+        vfsSpec << onlyDirectChildren(CHILD_IS_PREFIX)
+    }
+
+    def "querying a non-existent snapshot in child #vfsSpec.searchedPath yields a missing snapshot (#vfsSpec)"() {
         setupTest(vfsSpec)
 
         when:
@@ -167,6 +221,23 @@ class CompleteDirectorySnapshotTest extends AbstractSnapshotWithChildrenTest<Fil
         foundSnapshot.absolutePath == searchedPath.absolutePath
         interaction {
             getDescendantSnapshotOfSelectedChild(null)
+            noMoreInteractions()
+        }
+
+        where:
+        vfsSpec << onlyDirectChildren(CHILD_IS_PREFIX)
+    }
+
+    def "querying a non-existent node in child #vfsSpec.searchedPath yields a missing snapshot (#vfsSpec)"() {
+        setupTest(vfsSpec)
+
+        when:
+        CompleteFileSystemLocationSnapshot foundSnapshot = initialRoot.getNode(searchedPath, CASE_SENSITIVE) as CompleteFileSystemLocationSnapshot
+        then:
+        foundSnapshot.type == FileType.Missing
+        foundSnapshot.absolutePath == searchedPath.absolutePath
+        interaction {
+            getDescendantNodeOfSelectedChild(ReadOnlyFileSystemNode.EMPTY)
             noMoreInteractions()
         }
 

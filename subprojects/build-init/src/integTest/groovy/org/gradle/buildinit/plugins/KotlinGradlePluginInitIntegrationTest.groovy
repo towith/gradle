@@ -17,14 +17,20 @@
 package org.gradle.buildinit.plugins
 
 import org.gradle.buildinit.plugins.fixtures.ScriptDslFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
 import org.gradle.test.fixtures.file.LeaksFileHandles
+import spock.lang.IgnoreIf
 import spock.lang.Unroll
 
 import static org.gradle.buildinit.plugins.internal.modifiers.BuildInitDsl.KOTLIN
 
 @LeaksFileHandles
 class KotlinGradlePluginInitIntegrationTest extends AbstractInitIntegrationSpec {
+
+    @Override
+    String subprojectName() { 'plugin' }
+
     def "defaults to kotlin build scripts"() {
         when:
         run ('init', '--type', 'kotlin-gradle-plugin')
@@ -34,21 +40,21 @@ class KotlinGradlePluginInitIntegrationTest extends AbstractInitIntegrationSpec 
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
+    @IgnoreIf({ GradleContextualExecuter.embedded }) // This test runs a build that itself runs a build in a test worker with 'gradleApi()' dependency, which needs to pick up Gradle modules from a real distribution
     def "creates sample source if no source present with #scriptDsl build scripts"() {
         when:
         run('init', '--type', 'kotlin-gradle-plugin', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/kotlin").assertHasDescendants("some/thing/SomeThingPlugin.kt")
-        targetDir.file("src/test/kotlin").assertHasDescendants("some/thing/SomeThingPluginTest.kt")
-        targetDir.file("src/functionalTest/kotlin").assertHasDescendants("some/thing/SomeThingPluginFunctionalTest.kt")
+        subprojectDir.file("src/main/kotlin").assertHasDescendants("some/thing/SomeThingPlugin.kt")
+        subprojectDir.file("src/test/kotlin").assertHasDescendants("some/thing/SomeThingPluginTest.kt")
+        subprojectDir.file("src/functionalTest/kotlin").assertHasDescendants("some/thing/SomeThingPluginFunctionalTest.kt")
 
         and:
         commonJvmFilesGenerated(scriptDsl)
 
         when:
-        executer.requireGradleDistribution() // TestKit and Kotlin DSL both require a distribution
         run("build")
 
         then:

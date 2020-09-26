@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -35,6 +36,8 @@ public class Download implements IDownload {
 
     private static final int BUFFER_SIZE = 10 * 1024;
     private static final int PROGRESS_CHUNK = 1024 * 1024;
+    private static final int CONNECTION_TIMEOUT_MILLISECONDS = 10 * 1000;
+    private static final int READ_TIMEOUT_MILLISECONDS = 10 * 1000;
     private final Logger logger;
     private final String appName;
     private final String appVersion;
@@ -53,7 +56,8 @@ public class Download implements IDownload {
     }
 
     private void configureProxyAuthentication() {
-        if (System.getProperty("http.proxyUser") != null) {
+        if (System.getProperty("http.proxyUser") != null || System.getProperty("https.proxyUser") != null) {
+            // Only an authenticator for proxies needs to be set. Basic authentication is supported by directly setting the request header field.
             Authenticator.setDefault(new ProxyAuthenticator());
         }
     }
@@ -64,17 +68,22 @@ public class Download implements IDownload {
     }
 
     private void downloadInternal(URI address, File destination)
-            throws Exception {
+        throws Exception {
         OutputStream out = null;
         URLConnection conn;
         InputStream in = null;
+        URL safeUrl = safeUri(address).toURL();
         try {
-            URL url = safeUri(address).toURL();
             out = new BufferedOutputStream(new FileOutputStream(destination));
-            conn = url.openConnection();
+
+            // No proxy is passed here as proxies are set globally using the HTTP(S) proxy system properties. The respective protocol handler implementation then makes use of these properties.
+            conn = safeUrl.openConnection();
+
             addBasicAuthentication(address, conn);
             final String userAgentValue = calculateUserAgent();
             conn.setRequestProperty("User-Agent", userAgentValue);
+            conn.setConnectTimeout(CONNECTION_TIMEOUT_MILLISECONDS);
+            conn.setReadTimeout(READ_TIMEOUT_MILLISECONDS);
             in = conn.getInputStream();
             byte[] buffer = new byte[BUFFER_SIZE];
             int numRead;
@@ -97,6 +106,8 @@ public class Download implements IDownload {
 
                 out.write(buffer, 0, numRead);
             }
+        } catch (SocketTimeoutException e) {
+            throw new IOException("Downloading from " + safeUrl + " failed: timeout", e);
         } finally {
             logger.log("");
             if (in != null) {
@@ -183,9 +194,17 @@ public class Download implements IDownload {
     private static class ProxyAuthenticator extends Authenticator {
         @Override
         protected PasswordAuthentication getPasswordAuthentication() {
-            return new PasswordAuthentication(
-                    System.getProperty("http.proxyUser"), System.getProperty(
-                    "http.proxyPassword", "").toCharArray());
+            if (getRequestorType() == RequestorType.PROXY) {
+                // Note: Do not use getRequestingProtocol() here, which is "http" even for HTTPS proxies.
+                String protocol = getRequestingURL().getProtocol();
+                String proxyUser = System.getProperty(protocol + ".proxyUser");
+                if (proxyUser != null) {
+                    String proxyPassword = System.getProperty(protocol + ".proxyPassword", "");
+                    return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
+                }
+            }
+
+            return super.getPasswordAuthentication();
         }
     }
 

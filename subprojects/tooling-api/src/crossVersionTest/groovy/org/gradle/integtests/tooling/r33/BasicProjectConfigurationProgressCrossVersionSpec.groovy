@@ -23,7 +23,7 @@ import org.gradle.tooling.BuildException
 import org.gradle.tooling.ProjectConnection
 import org.gradle.tooling.events.OperationType
 
-@TargetGradleVersion(">=3.3 <5.1")
+@TargetGradleVersion(">=3.3")
 class BasicProjectConfigurationProgressCrossVersionSpec extends ToolingApiSpecification {
 
     def "generates project configuration events for single project build"() {
@@ -195,15 +195,15 @@ class BasicProjectConfigurationProgressCrossVersionSpec extends ToolingApiSpecif
 
     def javaProjectWithTests() {
         buildFile << """
-            allprojects { 
+            allprojects {
                 apply plugin: 'java'
                 ${mavenCentralRepository()}
-                dependencies { testCompile 'junit:junit:4.12' }
+                dependencies { testCompile 'junit:junit:4.13' }
             }
 """
         file("src/main/java/Thing.java") << """class Thing { }"""
         file("src/test/java/ThingTest.java") << """
-            public class ThingTest { 
+            public class ThingTest {
                 @org.junit.Test
                 public void ok() { }
             }
@@ -213,10 +213,10 @@ class BasicProjectConfigurationProgressCrossVersionSpec extends ToolingApiSpecif
     def buildSrc() {
         file("buildSrc/settings.gradle") << "include 'a', 'b'"
         file("buildSrc/build.gradle") << """
-            allprojects {   
+            allprojects {
                 apply plugin: 'java'
                 ${mavenCentralRepository()}
-                dependencies { testCompile 'junit:junit:4.12' }
+                dependencies { testCompile 'junit:junit:4.13' }
             }
             dependencies {
                 compile project(':a')

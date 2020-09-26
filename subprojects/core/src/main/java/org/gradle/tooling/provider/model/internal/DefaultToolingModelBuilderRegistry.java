@@ -18,6 +18,7 @@ package org.gradle.tooling.provider.model.internal;
 
 import org.gradle.api.Project;
 import org.gradle.api.internal.project.ProjectStateRegistry;
+import org.gradle.internal.Cast;
 import org.gradle.internal.Factory;
 import org.gradle.internal.operations.BuildOperationContext;
 import org.gradle.internal.operations.BuildOperationDescriptor;
@@ -32,8 +33,8 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRegistry {
-    private final ToolingModelBuilderRegistry parent;
+public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRegistry, ToolingModelBuilderLookup {
+    private final ToolingModelBuilderLookup parent;
 
     private final List<ToolingModelBuilder> builders = new ArrayList<ToolingModelBuilder>();
     private final BuildOperationExecutor buildOperationExecutor;
@@ -44,7 +45,7 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
         register(new VoidToolingModelBuilder());
     }
 
-    public DefaultToolingModelBuilderRegistry(BuildOperationExecutor buildOperationExecutor, ProjectStateRegistry projectStateRegistry, ToolingModelBuilderRegistry parent) {
+    public DefaultToolingModelBuilderRegistry(BuildOperationExecutor buildOperationExecutor, ProjectStateRegistry projectStateRegistry, ToolingModelBuilderLookup parent) {
         this.buildOperationExecutor = buildOperationExecutor;
         this.projectStateRegistry = projectStateRegistry;
         this.parent = parent;
@@ -57,6 +58,22 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
 
     @Override
     public ToolingModelBuilder getBuilder(String modelName) throws UnsupportedOperationException {
+        ToolingModelBuilder builder = get(modelName);
+        return new LenientToolingModelBuilder(builder);
+    }
+
+    @Override
+    public ToolingModelBuilder locateForClientOperation(String modelName) throws UnknownModelException {
+        ToolingModelBuilder builder = get(modelName);
+        if (builder instanceof ParameterizedToolingModelBuilder) {
+            return new ParameterizedBuildOperationWrappingToolingModelBuilder<>(Cast.uncheckedNonnullCast(builder));
+        } else {
+            return new BuildOperationWrappingToolingModelBuilder(builder);
+        }
+    }
+
+    @Nullable
+    public ToolingModelBuilder find(String modelName) {
         ToolingModelBuilder match = null;
         for (ToolingModelBuilder builder : builders) {
             if (builder.canBuild(modelName)) {
@@ -67,17 +84,44 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
             }
         }
         if (match != null) {
-            if (match instanceof ParameterizedToolingModelBuilder) {
-                return new ParameterizedBuildOperationWrappingToolingModelBuilder((ParameterizedToolingModelBuilder) match);
-            } else {
-                return new BuildOperationWrappingToolingModelBuilder(match);
-            }
+            return match;
         }
         if (parent != null) {
-            return parent.getBuilder(modelName);
+            return parent.find(modelName);
+        }
+        return null;
+    }
+
+    private ToolingModelBuilder get(String modelName) {
+        ToolingModelBuilder builder = find(modelName);
+        if (builder != null) {
+            return builder;
         }
 
         throw new UnknownModelException(String.format("No builders are available to build a model of type '%s'.", modelName));
+    }
+
+    private class LenientToolingModelBuilder implements ToolingModelBuilder {
+        private final ToolingModelBuilder delegate;
+
+        public LenientToolingModelBuilder(ToolingModelBuilder delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean canBuild(String modelName) {
+            return delegate.canBuild(modelName);
+        }
+
+        @Override
+        public Object buildAll(String modelName, Project project) {
+            return projectStateRegistry.allowUncontrolledAccessToAnyProject(new Factory<Object>() {
+                @Override
+                public Object create() {
+                    return delegate.buildAll(modelName, project);
+                }
+            });
+        }
     }
 
     private class BuildOperationWrappingToolingModelBuilder implements ToolingModelBuilder {
@@ -97,7 +141,7 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
             return buildOperationExecutor.call(new CallableBuildOperation<Object>() {
                 @Override
                 public Object call(BuildOperationContext context) {
-                    return projectStateRegistry.withLenientState(new Factory<Object>() {
+                    return projectStateRegistry.withMutableStateOfAllProjects(new Factory<Object>() {
                         @Nullable
                         @Override
                         public Object create() {
@@ -118,7 +162,7 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
     private class ParameterizedBuildOperationWrappingToolingModelBuilder<T> extends BuildOperationWrappingToolingModelBuilder implements ParameterizedToolingModelBuilder<T> {
         private final ParameterizedToolingModelBuilder<T> delegate;
 
-        private ParameterizedBuildOperationWrappingToolingModelBuilder(ParameterizedToolingModelBuilder delegate) {
+        private ParameterizedBuildOperationWrappingToolingModelBuilder(ParameterizedToolingModelBuilder<T> delegate) {
             super(delegate);
             this.delegate = delegate;
         }
@@ -133,7 +177,7 @@ public class DefaultToolingModelBuilderRegistry implements ToolingModelBuilderRe
             return buildOperationExecutor.call(new CallableBuildOperation<Object>() {
                 @Override
                 public Object call(BuildOperationContext context) {
-                    return projectStateRegistry.withLenientState(new Factory<Object>() {
+                    return projectStateRegistry.withMutableStateOfAllProjects(new Factory<Object>() {
                         @Nullable
                         @Override
                         public Object create() {

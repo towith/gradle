@@ -20,16 +20,19 @@ import org.gradle.performance.ResultSpecification
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.gradle.util.SetSystemProperties
 import org.junit.Rule
+import spock.lang.Ignore
 
 import static org.gradle.performance.measure.Duration.minutes
 
+@Ignore
 class CrossBuildResultsStoreTest extends ResultSpecification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
     @Rule
     SetSystemProperties properties = new SetSystemProperties("org.gradle.performance.db.url": "jdbc:h2:" + tmpDir.testDirectory)
 
     final dbName = "cross-build-results"
+    def experiment1 = new PerformanceExperiment("testProject1", new PerformanceScenario("org.gradle.performance.MyPerformanceTest", "test1"))
 
     def "persists results"() {
         given:
@@ -66,13 +69,13 @@ class CrossBuildResultsStoreTest extends ResultSpecification {
 
         when:
         def readStore = new BaseCrossBuildResultsStore(dbName)
-        def tests = readStore.testNames
+        def experiments = readStore.performanceExperiments
 
         then:
-        tests == ["test1", "test2"]
+        experiments*.scenario == ["test1", "test2"]
 
         when:
-        def history = readStore.getTestResults("test1", channel)
+        def history = readStore.getTestResults(experiment1, channel)
 
         then:
         history.id == "test1"
@@ -149,7 +152,7 @@ class CrossBuildResultsStoreTest extends ResultSpecification {
 
         when:
         def readStore = new BaseCrossBuildResultsStore(dbName)
-        def history = readStore.getTestResults("test1", channel)
+        def history = readStore.getTestResults(experiment1, channel)
 
         then:
         history.id == "test1"
@@ -257,7 +260,7 @@ class CrossBuildResultsStoreTest extends ResultSpecification {
 
         when:
         def readStore = new BaseCrossBuildResultsStore(dbName)
-        def history = readStore.getTestResults("test1", channel)
+        def history = readStore.getTestResults(experiment1, channel)
 
         then:
         history.id == "test1"
@@ -371,7 +374,7 @@ class CrossBuildResultsStoreTest extends ResultSpecification {
 
         when:
         def readStore = new BaseCrossBuildResultsStore(dbName)
-        def history = readStore.getTestResults("test1", channel)
+        def history = readStore.getTestResults(experiment1, channel)
 
         then:
         history.id == "test1"
@@ -428,13 +431,13 @@ class CrossBuildResultsStoreTest extends ResultSpecification {
 
         when:
         def readStore = new BaseCrossBuildResultsStore(dbName)
-        def history = readStore.getTestResults("test1", channel)
+        def history = readStore.getTestResults(experiment1, channel)
 
         then:
         history.results*.startTime == [currentTime - 1000, currentTime - 2000, currentTime - 3000]
 
         when:
-        history = readStore.getTestResults("test1", 2, Integer.MAX_VALUE, channel)
+        history = readStore.getTestResults(experiment1, 2, Integer.MAX_VALUE, channel)
 
         then:
         history.results*.startTime == [currentTime - 1000, currentTime - 2000]

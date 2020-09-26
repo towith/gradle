@@ -17,27 +17,31 @@
 package org.gradle.buildinit.plugins
 
 import org.gradle.buildinit.plugins.fixtures.ScriptDslFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.executer.GradleContextualExecuter
+import spock.lang.IgnoreIf
 import spock.lang.Unroll
 
 
 class JavaGradlePluginInitIntegrationTest extends AbstractInitIntegrationSpec {
+
+    @Override
+    String subprojectName() { 'plugin' }
+
     @Unroll
-    @ToBeFixedForInstantExecution
+    @IgnoreIf({ GradleContextualExecuter.embedded }) // This test runs a build that itself runs a build in a test worker with 'gradleApi()' dependency, which needs to pick up Gradle modules from a real distribution
     def "creates sample source if no source present with #scriptDsl build scripts"() {
         when:
         run('init', '--type', 'java-gradle-plugin', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/java").assertHasDescendants("some/thing/SomeThingPlugin.java")
-        targetDir.file("src/test/java").assertHasDescendants("some/thing/SomeThingPluginTest.java")
-        targetDir.file("src/functionalTest/java").assertHasDescendants("some/thing/SomeThingPluginFunctionalTest.java")
+        subprojectDir.file("src/main/java").assertHasDescendants("some/thing/SomeThingPlugin.java")
+        subprojectDir.file("src/test/java").assertHasDescendants("some/thing/SomeThingPluginTest.java")
+        subprojectDir.file("src/functionalTest/java").assertHasDescendants("some/thing/SomeThingPluginFunctionalTest.java")
 
         and:
         commonJvmFilesGenerated(scriptDsl)
 
         when:
-        executer.requireGradleDistribution() // TestKit and Kotlin DSL both require a distribution
         run("build")
 
         then:

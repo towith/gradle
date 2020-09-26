@@ -24,10 +24,11 @@ import org.junit.Rule
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 
+@IgnoreIf({ GradleContextualExecuter.embedded }) // needs to run a distribution from scratch to not have native services on the classpath already
 class NativeServicesIntegrationTest extends AbstractIntegrationSpec {
 
     @Rule
-    final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     def nativeDir = new File(executer.gradleUserHomeDir, 'native')
     def library
@@ -37,7 +38,7 @@ class NativeServicesIntegrationTest extends AbstractIntegrationSpec {
         def jansiStorage = jansiLibraryLocator.locate(nativeDir)
         library = jansiStorage.targetLibFile
 
-        executer.requireGradleDistribution().withNoExplicitTmpDir()
+        executer.withNoExplicitTmpDir()
     }
 
     def "native services libs are unpacked to gradle user home dir"() {
@@ -52,7 +53,6 @@ class NativeServicesIntegrationTest extends AbstractIntegrationSpec {
     }
 
     @Issue("GRADLE-3573")
-    @IgnoreIf({ GradleContextualExecuter.embedded })
     def "jansi library is unpacked to gradle user home dir and isn't overwritten if existing"() {
         String tmpDirJvmOpt = "-Djava.io.tmpdir=$tmpDir.testDirectory.absolutePath"
         executer.withBuildJvmOpts(tmpDirJvmOpt)

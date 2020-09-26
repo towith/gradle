@@ -16,8 +16,8 @@
 package org.gradle.api.internal.artifacts.ivyservice.modulecache.artifacts;
 
 import org.gradle.api.internal.artifacts.ivyservice.ArtifactCacheLockingManager;
+import org.gradle.internal.file.FileAccessTracker;
 import org.gradle.internal.hash.HashCode;
-import org.gradle.internal.resource.local.FileAccessTracker;
 import org.gradle.util.BuildCommencedTimeProvider;
 
 import java.io.File;
@@ -46,7 +46,8 @@ public class ReadOnlyModuleArtifactCache extends DefaultModuleArtifactCache {
 
     @Override
     public void clear(ArtifactAtRepositoryKey key) {
-        operationShouldNotHaveBeenCalled();
+        // clear is actually called from org.gradle.internal.resource.cached.AbstractCachedIndex.lookup which
+        // is a read operation, in case of missing entry, so we can't fail here, but should be a no-op only
     }
 
     private static void operationShouldNotHaveBeenCalled() {

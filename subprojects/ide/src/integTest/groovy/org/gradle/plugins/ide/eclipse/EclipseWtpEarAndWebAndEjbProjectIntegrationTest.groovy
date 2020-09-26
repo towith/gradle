@@ -15,10 +15,10 @@
  */
 package org.gradle.plugins.ide.eclipse
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class EclipseWtpEarAndWebAndEjbProjectIntegrationTest extends AbstractEclipseIntegrationSpec {
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "generates configuration files for an ear project and ejb and web projects it bundles"() {
         settingsFile << "include 'ear', 'web', 'java'"
 
@@ -45,7 +45,7 @@ project(':web') {
 
     dependencies {
         providedCompile 'javax.servlet:javax.servlet-api:3.1.0'
-        testImplementation "junit:junit:4.12"
+        testImplementation "junit:junit:4.13"
     }
 }
 project(':java') {
@@ -55,7 +55,7 @@ project(':java') {
         implementation 'com.google.guava:guava:18.0'
         implementation files('foo')
         implementation 'javax.servlet:javax.servlet-api:3.1.0'
-        testImplementation "junit:junit:4.12"
+        testImplementation "junit:junit:4.13"
     }
 }
 """

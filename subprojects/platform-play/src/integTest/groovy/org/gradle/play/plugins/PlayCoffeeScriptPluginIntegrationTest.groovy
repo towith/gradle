@@ -17,6 +17,7 @@
 package org.gradle.play.plugins
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.TestResources
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.util.TextUtil
 import org.junit.Rule
 
@@ -44,6 +45,7 @@ class PlayCoffeeScriptPluginIntegrationTest extends AbstractIntegrationSpec {
         """
     }
 
+    @ToBeFixedForConfigurationCache(because = ":components")
     def "coffeescript source set appears in component listing"() {
         when:
         succeeds "components"

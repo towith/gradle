@@ -21,6 +21,9 @@ import org.gradle.integtests.fixtures.executer.GradleDistribution
 import org.gradle.integtests.fixtures.versions.ReleasedVersionDistributions
 import org.gradle.util.GradleVersion
 
+/**
+ * See {@link org.gradle.integtests.fixtures.AbstractContextualMultiVersionSpecRunner} for information on running these tests.
+ */
 class ToolingApiCompatibilitySuiteRunner extends AbstractCompatibilityTestRunner {
     private static final GradleVersion MINIMAL_VERSION = GradleVersion.version("2.6")
 
@@ -48,7 +51,7 @@ class ToolingApiCompatibilitySuiteRunner extends AbstractCompatibilityTestRunner
     @Override
     protected void createExecutionsForContext(CoverageContext coverageContext) {
         // current vs. current
-        add(new ToolingApiExecution(getResolver().resolve(current.version.version), current))
+        add(new ToolingApiExecution(getResolver().resolve(current.version.baseVersion.version), current))
         super.createExecutionsForContext(coverageContext)
     }
 
@@ -61,7 +64,7 @@ class ToolingApiCompatibilitySuiteRunner extends AbstractCompatibilityTestRunner
             // current vs. target
             def currentVersion = current.version
             if (currentVersion >= MINIMAL_VERSION) {
-                executions.add(new ToolingApiExecution(getResolver().resolve(currentVersion.version), distribution))
+                executions.add(new ToolingApiExecution(getResolver().resolve(currentVersion.baseVersion.version), distribution))
             }
             // target vs. current
             def distribVersion = distribution.version

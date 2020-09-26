@@ -43,7 +43,10 @@ public class MinimalJavaCompileOptions implements Serializable {
     private boolean verbose;
     private boolean warnings;
     private File annotationProcessorGeneratedSourcesDirectory;
-    private final File headerOutputDirectory;
+    private File headerOutputDirectory;
+    private String javaModuleVersion;
+    private String javaModuleMainClass;
+    private File incrementalCompilationMappingFile;
 
     public MinimalJavaCompileOptions(final CompileOptions compileOptions) {
         FileCollection sourcepath = compileOptions.getSourcepath();
@@ -60,8 +63,10 @@ public class MinimalJavaCompileOptions implements Serializable {
         this.listFiles = compileOptions.isListFiles();
         this.verbose = compileOptions.isVerbose();
         this.warnings = compileOptions.isWarnings();
-        this.annotationProcessorGeneratedSourcesDirectory = compileOptions.getAnnotationProcessorGeneratedSourcesDirectory();
+        this.annotationProcessorGeneratedSourcesDirectory = compileOptions.getGeneratedSourceOutputDirectory().getAsFile().getOrNull();
         this.headerOutputDirectory = compileOptions.getHeaderOutputDirectory().getAsFile().getOrNull();
+        this.javaModuleVersion = compileOptions.getJavaModuleVersion().getOrNull();
+        this.javaModuleMainClass = compileOptions.getJavaModuleMainClass().getOrNull();
     }
 
     @Nullable
@@ -85,11 +90,12 @@ public class MinimalJavaCompileOptions implements Serializable {
         this.compilerArgs = compilerArgs;
     }
 
+    @Nullable
     public String getEncoding() {
         return encoding;
     }
 
-    public void setEncoding(String encoding) {
+    public void setEncoding(@Nullable String encoding) {
         this.encoding = encoding;
     }
 
@@ -181,7 +187,39 @@ public class MinimalJavaCompileOptions implements Serializable {
         this.annotationProcessorGeneratedSourcesDirectory = annotationProcessorGeneratedSourcesDirectory;
     }
 
+    @Nullable
     public File getHeaderOutputDirectory() {
         return headerOutputDirectory;
+    }
+
+    public void setHeaderOutputDirectory(@Nullable File headerOutputDirectory) {
+        this.headerOutputDirectory = headerOutputDirectory;
+    }
+
+    @Nullable
+    public String getJavaModuleVersion() {
+        return javaModuleVersion;
+    }
+
+    public void setJavaModuleVersion(@Nullable String javaModuleVersion) {
+        this.javaModuleVersion = javaModuleVersion;
+    }
+
+    @Nullable
+    public String getJavaModuleMainClass() {
+        return javaModuleMainClass;
+    }
+
+    public void setJavaModuleMainClass(@Nullable String javaModuleMainClass) {
+        this.javaModuleMainClass = javaModuleMainClass;
+    }
+
+    @Nullable
+    public File getIncrementalCompilationMappingFile() {
+        return incrementalCompilationMappingFile;
+    }
+
+    public void setIncrementalCompilationMappingFile(@Nullable File incrementalCompilationMappingFile) {
+        this.incrementalCompilationMappingFile = incrementalCompilationMappingFile;
     }
 }

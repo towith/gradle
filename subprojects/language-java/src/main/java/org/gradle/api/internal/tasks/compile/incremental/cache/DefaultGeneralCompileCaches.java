@@ -31,14 +31,14 @@ import org.gradle.api.internal.tasks.compile.incremental.recomp.PreviousCompilat
 import org.gradle.api.invocation.Gradle;
 import org.gradle.cache.CacheRepository;
 import org.gradle.cache.FileLockManager;
+import org.gradle.cache.GlobalCacheLocations;
 import org.gradle.cache.PersistentCache;
 import org.gradle.cache.PersistentIndexedCache;
 import org.gradle.cache.PersistentIndexedCacheParameters;
 import org.gradle.cache.internal.InMemoryCacheDecoratorFactory;
 import org.gradle.internal.hash.HashCode;
 import org.gradle.internal.serialize.HashCodeSerializer;
-import org.gradle.internal.vfs.AdditiveCacheLocations;
-import org.gradle.internal.vfs.VirtualFileSystem;
+import org.gradle.internal.vfs.FileSystemAccess;
 
 import java.io.Closeable;
 
@@ -51,13 +51,13 @@ public class DefaultGeneralCompileCaches implements GeneralCompileCaches, Closea
     private final PersistentIndexedCache<String, PreviousCompilationData> previousCompilationCache;
 
     public DefaultGeneralCompileCaches(
-        AdditiveCacheLocations additiveCacheLocations,
+        GlobalCacheLocations globalCacheLocations,
         CacheRepository cacheRepository,
         Gradle gradle,
         InMemoryCacheDecoratorFactory inMemoryCacheDecoratorFactory,
         StringInterner interner,
         UserHomeScopedCompileCaches userHomeScopedCompileCaches,
-        VirtualFileSystem virtualFileSystem
+        FileSystemAccess fileSystemAccess
     ) {
         cache = cacheRepository
             .cache(gradle, "javaCompile")
@@ -70,7 +70,7 @@ public class DefaultGeneralCompileCaches implements GeneralCompileCaches, Closea
 
         PersistentIndexedCacheParameters<HashCode, ClasspathEntrySnapshotData> jarCacheParameters = PersistentIndexedCacheParameters.of("jarAnalysis", new HashCodeSerializer(), new ClasspathEntrySnapshotDataSerializer(interner))
             .withCacheDecorator(inMemoryCacheDecoratorFactory.decorator(20000, true));
-        this.classpathEntrySnapshotCache = new SplitClasspathEntrySnapshotCache(additiveCacheLocations, userHomeScopedCompileCaches.getClasspathEntrySnapshotCache(), new DefaultClasspathEntrySnapshotCache(virtualFileSystem, cache.createCache(jarCacheParameters)));
+        this.classpathEntrySnapshotCache = new SplitClasspathEntrySnapshotCache(globalCacheLocations, userHomeScopedCompileCaches.getClasspathEntrySnapshotCache(), new DefaultClasspathEntrySnapshotCache(fileSystemAccess, cache.createCache(jarCacheParameters)));
 
         PersistentIndexedCacheParameters<String, PreviousCompilationData> previousCompilationCacheParameters = PersistentIndexedCacheParameters.of("taskHistory", String.class, new PreviousCompilationData.Serializer(interner))
             .withCacheDecorator(inMemoryCacheDecoratorFactory.decorator(2000, false));

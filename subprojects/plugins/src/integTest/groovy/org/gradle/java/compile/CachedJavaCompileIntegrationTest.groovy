@@ -17,7 +17,6 @@
 package org.gradle.java.compile
 
 import org.gradle.api.tasks.compile.AbstractCachedCompileIntegrationTest
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.test.fixtures.file.TestFile
 
 class CachedJavaCompileIntegrationTest extends AbstractCachedCompileIntegrationTest implements IncrementalCompileMultiProjectTestFixture {
@@ -33,7 +32,9 @@ class CachedJavaCompileIntegrationTest extends AbstractCachedCompileIntegrationT
                 id 'application'
             }
 
-            mainClassName = "Hello"
+            application {
+                mainClass = "Hello"
+            }
 
             ${mavenCentralRepository()}
 
@@ -52,7 +53,6 @@ class CachedJavaCompileIntegrationTest extends AbstractCachedCompileIntegrationT
         }
     }
 
-    @ToBeFixedForInstantExecution
     def "up-to-date incremental compilation is cached if nothing to recompile"() {
         given:
         buildFile.text = ""

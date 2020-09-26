@@ -18,7 +18,6 @@ package org.gradle.api.tasks.compile
 
 import org.gradle.integtests.fixtures.AbstractPluginIntegrationTest
 import org.gradle.integtests.fixtures.AvailableJavaHomes
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import org.gradle.util.Requires
 import org.gradle.util.Resources
 import org.gradle.util.TestPrecondition
@@ -47,7 +46,6 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
         javaClassFile("Foo.class").exists()
     }
 
-    @ToBeFixedForInstantExecution
     def "don't implicitly compile source files from classpath"() {
         settingsFile << "include 'a', 'b'"
         buildFile << """
@@ -82,7 +80,6 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
     }
 
     @Issue("https://issues.gradle.org/browse/GRADLE-3508")
-    @ToBeFixedForInstantExecution
     def "detects change in classpath order"() {
         jarWithClasses(file("lib1.jar"), Thing: "class Thing {}")
         jarWithClasses(file("lib2.jar"), Thing2: "class Thing2 {}")
@@ -153,7 +150,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
             ${mavenCentralRepository()}
 
             dependencies {
-                testCompile "junit:junit:4.12"
+                testCompile "junit:junit:4.13"
             }
         """
 
@@ -263,7 +260,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
 
             dependencies {
                 implementation 'org.apache.commons:commons-lang3:3.4'
-                testImplementation 'junit:junit:4.12'
+                testImplementation 'junit:junit:4.13'
             }
         """
         file('src/main/java/Text.java') << '''import org.apache.commons.lang3.StringUtils;
@@ -299,7 +296,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
 
             dependencies {
                 implementation 'org.apache.commons:commons-lang3:3.4'
-                testImplementation 'junit:junit:4.12'
+                testImplementation 'junit:junit:4.13'
             }
         """
         file('src/main/java/Text.java') << '''import org.apache.commons.lang3.StringUtils;
@@ -335,7 +332,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
 
             dependencies {
                 implementation 'org.apache.commons:commons-lang3:3.4'
-                testImplementation 'junit:junit:4.12'
+                testImplementation 'junit:junit:4.13'
             }
         """
         file('src/main/java/Text.java') << '''import org.apache.commons.lang3.StringUtils;
@@ -441,7 +438,6 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
     }
 
     @Issue("gradle/gradle#1347")
-    @ToBeFixedForInstantExecution
     def "compile classpath snapshotting ignores non-relevant elements"() {
         def buildFileWithDependencies = { String... dependencies ->
             buildFile.text = """
@@ -577,7 +573,6 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
             }
 
             compileJava.dependsOn(fooJar)
-
 
         '''
         file('foo.class') << 'this is clearly not a well formed class file'
@@ -840,8 +835,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
         failureHasCause("Cannot specify -J flags via `CompileOptions.compilerArgs`. Use the `CompileOptions.forkOptions.jvmArgs` property instead.")
     }
 
-    @Requires(adhoc = { AvailableJavaHomes.getJdk7() && AvailableJavaHomes.getJdk8() && TestPrecondition.NOT_JDK_IBM.fulfilled && TestPrecondition.FIX_TO_WORK_ON_JAVA9.fulfilled })
-    @ToBeFixedForInstantExecution
+    @Requires(adhoc = { AvailableJavaHomes.getJdk7() && AvailableJavaHomes.getJdk8() && TestPrecondition.JDK8_OR_EARLIER.fulfilled }) // bootclasspath has been removed in Java 9+
     def "bootclasspath can be set"() {
         def jdk7 = AvailableJavaHomes.getJdk7()
         def jdk7bootClasspath = TextUtil.escapeString(jdk7.jre.homeDir.absolutePath) + "/lib/rt.jar"
@@ -851,9 +845,9 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
             apply plugin: 'java'
 
             compileJava {
-                if (project.hasProperty("java7")) {
+                if (providers.gradleProperty("java7").forUseAtConfigurationTime().isPresent()) {
                     options.bootstrapClasspath = files("$jdk7bootClasspath")
-                } else if (project.hasProperty("java8")) {
+                } else if (providers.gradleProperty("java8").forUseAtConfigurationTime().isPresent()) {
                     options.bootstrapClasspath = files("$jdk8bootClasspath")
                 }
                 options.fork = true
@@ -905,7 +899,6 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
         ! file("build/classes/java/main/com/foo").exists()
     }
 
-    @Requires(TestPrecondition.JDK8_OR_LATER)
     def "can configure custom header output"() {
         given:
         buildFile << """
@@ -924,13 +917,33 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
         file("build/headers/java/main/Foo.h").exists()
     }
 
-    @Requires(TestPrecondition.JDK8_OR_LATER)
-    @ToBeFixedForInstantExecution
+    def "can connect generated headers to input of another task"() {
+        given:
+        buildFile << """
+            apply plugin: 'java'
+
+            task copy(type: Copy) {
+                from tasks.compileJava.options.headerOutputDirectory
+                into 'headers'
+            }
+        """
+        file('src/main/java/Foo.java') << """
+            public class Foo {
+                public native void foo();
+            }
+        """
+        when:
+        succeeds "copy"
+        executed ":compileJava"
+
+        then:
+        file('headers').assertHasDescendants("Foo.h")
+    }
+
     def "deletes stale header files"() {
         given:
         buildFile << """
             apply plugin: 'java'
-            compileJava.options.headerOutputDirectory = file("build/headers/java/main")
         """
         def header = file('src/main/java/my/org/Foo.java') << """
             package my.org;
@@ -939,7 +952,7 @@ class JavaCompileIntegrationTest extends AbstractPluginIntegrationTest {
                 public native void foo();
             }
         """
-        def generatedHeader = file("build/headers/java/main/my_org_Foo.h")
+        def generatedHeader = file("build/generated/sources/headers/java/main/my_org_Foo.h")
 
         when:
         succeeds "compileJava"

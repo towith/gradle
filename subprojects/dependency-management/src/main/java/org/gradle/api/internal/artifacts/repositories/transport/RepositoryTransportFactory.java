@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.credentials.Credentials;
+import org.gradle.api.internal.artifacts.ivyservice.ArtifactCacheLockingManager;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.StartParameterResolutionOverride;
 import org.gradle.api.internal.artifacts.ivyservice.resolutionstrategy.DefaultExternalResourceCachePolicy;
 import org.gradle.api.internal.artifacts.ivyservice.resolutionstrategy.ExternalResourceCachePolicy;
@@ -33,6 +34,7 @@ import org.gradle.internal.resource.ExternalResourceName;
 import org.gradle.internal.resource.cached.CachedExternalResourceIndex;
 import org.gradle.internal.resource.connector.ResourceConnectorFactory;
 import org.gradle.internal.resource.connector.ResourceConnectorSpecification;
+import org.gradle.internal.resource.local.FileResourceListener;
 import org.gradle.internal.resource.local.FileResourceRepository;
 import org.gradle.internal.resource.transfer.ExternalResourceConnector;
 import org.gradle.internal.resource.transport.ResourceConnectorRepositoryTransport;
@@ -52,39 +54,39 @@ public class RepositoryTransportFactory {
     private final CachedExternalResourceIndex<String> cachedExternalResourceIndex;
     private final ProgressLoggerFactory progressLoggerFactory;
     private final BuildCommencedTimeProvider timeProvider;
+    private final ArtifactCacheLockingManager artifactCacheLockingManager;
     private final BuildOperationExecutor buildOperationExecutor;
     private final StartParameterResolutionOverride startParameterResolutionOverride;
     private final ProducerGuard<ExternalResourceName> producerGuard;
     private final FileResourceRepository fileRepository;
     private final ChecksumService checksumService;
+    private final FileResourceListener listener;
 
     public RepositoryTransportFactory(Collection<ResourceConnectorFactory> resourceConnectorFactory,
                                       ProgressLoggerFactory progressLoggerFactory,
                                       TemporaryFileProvider temporaryFileProvider,
                                       CachedExternalResourceIndex<String> cachedExternalResourceIndex,
                                       BuildCommencedTimeProvider timeProvider,
+                                      ArtifactCacheLockingManager artifactCacheLockingManager,
                                       BuildOperationExecutor buildOperationExecutor,
                                       StartParameterResolutionOverride startParameterResolutionOverride,
                                       ProducerGuard<ExternalResourceName> producerGuard,
                                       FileResourceRepository fileRepository,
-                                      ChecksumService checksumService) {
+                                      ChecksumService checksumService,
+                                      FileResourceListener listener) {
         this.progressLoggerFactory = progressLoggerFactory;
         this.temporaryFileProvider = temporaryFileProvider;
         this.cachedExternalResourceIndex = cachedExternalResourceIndex;
         this.timeProvider = timeProvider;
+        this.artifactCacheLockingManager = artifactCacheLockingManager;
         this.buildOperationExecutor = buildOperationExecutor;
         this.startParameterResolutionOverride = startParameterResolutionOverride;
         this.producerGuard = producerGuard;
         this.fileRepository = fileRepository;
         this.checksumService = checksumService;
+        this.listener = listener;
 
-        for (ResourceConnectorFactory connectorFactory : resourceConnectorFactory) {
-            register(connectorFactory);
-        }
-    }
-
-    public void register(ResourceConnectorFactory resourceConnectorFactory) {
-        registeredProtocols.add(resourceConnectorFactory);
+        registeredProtocols.addAll(resourceConnectorFactory);
     }
 
     public Set<String> getRegisteredProtocols() {
@@ -96,7 +98,7 @@ public class RepositoryTransportFactory {
     }
 
     public RepositoryTransport createFileTransport(String name) {
-        return new FileTransport(name, fileRepository, cachedExternalResourceIndex, temporaryFileProvider, timeProvider, producerGuard, checksumService);
+        return new FileTransport(name, fileRepository, cachedExternalResourceIndex, temporaryFileProvider, timeProvider, artifactCacheLockingManager, producerGuard, checksumService, listener);
     }
 
     public RepositoryTransport createTransport(String scheme, String name, Collection<Authentication> authentications, HttpRedirectVerifier redirectVerifier) {
@@ -126,7 +128,7 @@ public class RepositoryTransportFactory {
         ExternalResourceCachePolicy cachePolicy = new DefaultExternalResourceCachePolicy();
         cachePolicy = startParameterResolutionOverride.overrideExternalResourceCachePolicy(cachePolicy);
 
-        return new ResourceConnectorRepositoryTransport(name, progressLoggerFactory, temporaryFileProvider, cachedExternalResourceIndex, timeProvider, resourceConnector, buildOperationExecutor, cachePolicy, producerGuard, fileRepository, checksumService);
+        return new ResourceConnectorRepositoryTransport(name, progressLoggerFactory, temporaryFileProvider, cachedExternalResourceIndex, timeProvider, artifactCacheLockingManager, resourceConnector, buildOperationExecutor, cachePolicy, producerGuard, fileRepository, checksumService);
     }
 
     private void validateSchemes(Set<String> schemes) {
@@ -200,9 +202,9 @@ public class RepositoryTransportFactory {
                 return null;
             }
 
-            Credentials credentials = ((AuthenticationInternal)authentications.iterator().next()).getCredentials();
+            Credentials credentials = ((AuthenticationInternal) authentications.iterator().next()).getCredentials();
 
-            if(credentials == null) {
+            if (credentials == null) {
                 return null;
             }
             if (type.isAssignableFrom(credentials.getClass())) {

@@ -38,6 +38,7 @@ import org.gradle.internal.component.model.IvyArtifactName;
 import org.gradle.internal.serialize.Decoder;
 import org.gradle.internal.serialize.Encoder;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -102,6 +103,7 @@ public abstract class AbstractRealisedModuleResolveMetadataSerializationHelper {
         encoder.writeString(configuration.getName());
         attributeContainerSerializer.write(encoder, configuration.getAttributes());
         writeCapabilities(encoder, configuration.getCapabilities().getCapabilities());
+        encoder.writeBoolean(configuration.isExternalVariant());
     }
 
     protected Map<String, List<GradleDependencyMetadata>> readVariantDependencies(Decoder decoder) throws IOException {
@@ -139,7 +141,7 @@ public abstract class AbstractRealisedModuleResolveMetadataSerializationHelper {
             String extension = decoder.readNullableString();
             String classifier = decoder.readNullableString();
             String timestamp = decoder.readNullableString();
-            String version = null;
+            String version;
             ModuleComponentIdentifier cid = componentIdentifier;
             if (timestamp != null) {
                 version = decoder.readString();
@@ -249,6 +251,7 @@ public abstract class AbstractRealisedModuleResolveMetadataSerializationHelper {
         }
     }
 
+    @Nullable
     protected IvyArtifactName readNullableArtifact(Decoder decoder) throws IOException {
         boolean hasArtifact = decoder.readBoolean();
         IvyArtifactName artifactName = null;
@@ -262,7 +265,7 @@ public abstract class AbstractRealisedModuleResolveMetadataSerializationHelper {
         return artifactName;
     }
 
-    protected void writeNullableArtifact(Encoder encoder, IvyArtifactName artifact) throws IOException {
+    protected void writeNullableArtifact(Encoder encoder, @Nullable IvyArtifactName artifact) throws IOException {
         if (artifact == null) {
             encoder.writeBoolean(false);
         } else {
@@ -285,7 +288,7 @@ public abstract class AbstractRealisedModuleResolveMetadataSerializationHelper {
 
     protected Set<String> readStringSet(Decoder decoder) throws IOException {
         int size = decoder.readSmallInt();
-        Set<String> set = new LinkedHashSet<String>(3 * size / 2, 0.9f);
+        Set<String> set = new LinkedHashSet<>(3 * size / 2, 0.9f);
         for (int i = 0; i < size; i++) {
             set.add(decoder.readString());
         }

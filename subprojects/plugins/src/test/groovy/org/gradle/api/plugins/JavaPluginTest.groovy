@@ -321,7 +321,9 @@ class JavaPluginTest extends AbstractProjectBuilderSpec {
         task dependsOn()
         task.classpath.is(project.sourceSets.main.compileClasspath)
         task.options.annotationProcessorPath.is(project.sourceSets.main.annotationProcessorPath)
-        task.options.annotationProcessorGeneratedSourcesDirectory == new File(project.buildDir, 'generated/sources/annotationProcessor/java/main')
+        task.options.generatedSourceOutputDirectory.asFile.orNull == new File(project.buildDir, 'generated/sources/annotationProcessor/java/main')
+        task.options.annotationProcessorGeneratedSourcesDirectory == task.options.generatedSourceOutputDirectory.asFile.orNull
+        task.options.headerOutputDirectory.asFile.orNull == new File(project.buildDir, 'generated/sources/headers/java/main')
         task.destinationDir == project.sourceSets.main.java.destinationDirectory.get().asFile
         task.source.files == project.sourceSets.main.java.files
 
@@ -349,7 +351,9 @@ class JavaPluginTest extends AbstractProjectBuilderSpec {
         task dependsOn(JavaPlugin.CLASSES_TASK_NAME)
         task.classpath.is(project.sourceSets.test.compileClasspath)
         task.options.annotationProcessorPath.is(project.sourceSets.test.annotationProcessorPath)
-        task.options.annotationProcessorGeneratedSourcesDirectory == new File(project.buildDir, 'generated/sources/annotationProcessor/java/test')
+        task.options.generatedSourceOutputDirectory.asFile.orNull == new File(project.buildDir, 'generated/sources/annotationProcessor/java/test')
+        task.options.annotationProcessorGeneratedSourcesDirectory == task.options.generatedSourceOutputDirectory.asFile.orNull
+        task.options.headerOutputDirectory.asFile.orNull == new File(project.buildDir, 'generated/sources/headers/java/test')
         task.destinationDir == project.sourceSets.test.java.destinationDirectory.get().asFile
         task.source.files == project.sourceSets.test.java.files
 
@@ -436,7 +440,7 @@ class JavaPluginTest extends AbstractProjectBuilderSpec {
         then:
         task instanceof org.gradle.api.tasks.testing.Test
         task dependsOn(JavaPlugin.TEST_CLASSES_TASK_NAME, JavaPlugin.CLASSES_TASK_NAME)
-        task.classpath == project.sourceSets.test.runtimeClasspath
+        task.classpath.files == project.sourceSets.test.runtimeClasspath.files
         task.testClassesDirs.contains(project.sourceSets.test.java.destinationDirectory.get().asFile)
         task.workingDir == project.projectDir
     }
@@ -449,7 +453,7 @@ class JavaPluginTest extends AbstractProjectBuilderSpec {
         def task = project.task('customTest', type: org.gradle.api.tasks.testing.Test.class)
 
         then:
-        task.classpath == project.sourceSets.test.runtimeClasspath
+        task.classpath.files == project.sourceSets.test.runtimeClasspath.files
         task.testClassesDirs.contains(project.sourceSets.test.java.destinationDirectory.get().asFile)
         task.workingDir == project.projectDir
         task.reports.junitXml.destination == new File(project.testResultsDir, 'customTest')
@@ -553,5 +557,22 @@ class JavaPluginTest extends AbstractProjectBuilderSpec {
 
         then:
         task.taskDependencies.getDependencies(task)*.path as Set == [':middle:build', ':app:buildDependents'] as Set
+    }
+
+    void "source and target compatibility of compile tasks default to release if set"() {
+        given:
+        project.pluginManager.apply(JavaPlugin)
+        def compileJava = project.tasks.named("compileJava", JavaCompile).get()
+        def testCompileJava = project.tasks.named("compileTestJava", JavaCompile).get()
+
+        when:
+        compileJava.options.release.set(8)
+        testCompileJava.options.release.set(9)
+
+        then:
+        compileJava.targetCompatibility == "1.8"
+        compileJava.sourceCompatibility == "1.8"
+        testCompileJava.targetCompatibility == "1.9"
+        testCompileJava.sourceCompatibility == "1.9"
     }
 }

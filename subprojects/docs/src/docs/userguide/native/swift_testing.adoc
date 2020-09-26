@@ -68,7 +68,7 @@ Note that, by default, both task type always executes every test that it detects
 `testLogging` - default: not set::
 This property represents a set of options that control which test events are logged and at what level.
 You can also configure other logging behavior via this property.
-Set https://docs.gradle.org/current/javadoc/org/gradle/api/tasks/testing/logging/TestLoggingContainer.html[TestLoggingContainer] for more detail.
+Set link:{javadocPath}/org/gradle/api/tasks/testing/logging/TestLoggingContainer.html[TestLoggingContainer] for more detail.
 
 See link:{groovyDslPath}/org.gradle.nativeplatform.test.xctest.tasks.XCTest.html[XCTest] for details on all the available configuration options.
 
@@ -86,8 +86,8 @@ Here’s an example of some filters that are applied every time the build runs:
 
 .Filter tests on every build
 ====
-include::sample[dir="snippets/userguide/swift/testFiltering/groovy",files="build.gradle[tags=test-filtering]"]
-include::sample[dir="snippets/userguide/swift/testFiltering/kotlin",files="build.gradle.kts[tags=test-filtering]"]
+include::sample[dir="snippets/swift/testFiltering/groovy",files="build.gradle[tags=test-filtering]"]
+include::sample[dir="snippets/swift/testFiltering/kotlin",files="build.gradle.kts[tags=test-filtering]"]
 ====
 
 For more details and examples of declaring filters in the build script, please see the TestFilter reference.
@@ -119,7 +119,7 @@ gradle xcTest --tests TestBundle.SomeTestClass.someSpecificMethod
 # or `gradle xcTest --tests TestBundle.SomeTestClass.someSpecificMethod` on macOS
 ```
 
-You can also combine filters defined at the command line with https://docs.gradle.org/current/userguide/command_line_interface.html#sec:continuous_build[continuous build] to re-execute a subset of tests immediately after every change to a production or test source file.
+You can also combine filters defined at the command line with <<command_line_interface.adoc#sec:continuous_build,continuous build>> to re-execute a subset of tests immediately after every change to a production or test source file.
 The following executes all tests in the ‘SomeTestClass’ test class whenever a change triggers the tests to run:
 
 ```
@@ -142,9 +142,15 @@ Here is a sample which generates a combined report for the unit tests from all s
 
 .Combine test reports from all subprojects
 ====
-include::sample[dir="snippets/userguide/swift/testReport/groovy",files="build.gradle[tags=test-report]"]
-include::sample[dir="snippets/userguide/swift/testReport/kotlin",files="build.gradle.kts[tags=test-report]"]
+include::sample[dir="snippets/swift/testReport/groovy",files="buildSrc/src/main/groovy/myproject.xctest-conventions.gradle[tags=test-report];build.gradle[tags=test-report]"]
+include::sample[dir="snippets/swift/testReport/kotlin",files="buildSrc/src/main/kotlin/myproject.xctest-conventions.gradle.kts[tags=test-report];build.gradle.kts[tags=test-report]"]
 ====
+
+In this example, we use a convention plugin `myproject.xctest-conventions` to expose the test results from a project to Gradle's <<variant_model.adoc#,variant aware dependency management engine>>.
+
+The plugin declares a consumable `binaryTestResultsElements` configuration that represents the binary test results of the `test` task.
+In the aggregation project's build file, we declare the `testReportData` configuration and depend on all of the projects that we want to aggregate the results from. Gradle will automatically select the binary test result variant from each of the subprojects instead of the project's jar file.
+Lastly, we add a `testReport` task that aggregates the test results from the `testResultsDirs` property, which contains all of the binary test results resolved from the `testReportData` configuration.
 
 You should note that the link:{groovyDslPath}/org.gradle.api.tasks.testing.TestReport.html[TestReport] type combines the results from multiple test tasks and needs to aggregate the results of individual test classes.
 This means that it a given test class is executed by multiple test tasks, then the test report will include executions of that class, but it can be hard to distinguish individual executions of that class and their output.

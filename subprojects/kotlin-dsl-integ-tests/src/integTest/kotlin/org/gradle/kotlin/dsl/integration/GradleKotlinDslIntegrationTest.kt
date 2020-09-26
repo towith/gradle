@@ -19,7 +19,7 @@ package org.gradle.kotlin.dsl.integration
 import okhttp3.HttpUrl
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.fixtures.RepoScriptBlockUtil.jcenterRepository
 import org.gradle.kotlin.dsl.embeddedKotlinVersion
 import org.gradle.kotlin.dsl.fixtures.DeepThought
@@ -126,9 +126,8 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
     fun `given a Kotlin project in buildSrc, it will be added to the compilation classpath`() {
-
-        requireGradleDistributionOnEmbeddedExecuter()
 
         withKotlinBuildSrc()
 
@@ -178,10 +177,10 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     fun `can compile against a different (but compatible) version of the Kotlin compiler`() {
 
-        requireGradleDistributionOnEmbeddedExecuter()
+        assumeNonEmbeddedGradleExecuter() // Class path isolation, tested here, is not correct in embedded mode
 
         val differentKotlinVersion = "1.3.30"
         val expectedKotlinCompilerVersionString = "1.3.30"
@@ -222,7 +221,7 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     fun `can apply base plugin via plugins block`() {
 
         withBuildScript("""
@@ -243,6 +242,7 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
+    @ToBeFixedForConfigurationCache(because = ":buildEnvironment")
     fun `can use Closure only APIs`() {
 
         withBuildScript("""
@@ -417,7 +417,6 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
-    @ToBeFixedForInstantExecution
     fun `script plugin can be applied to either Project or Settings`() {
 
         withFile("common.gradle.kts", """
@@ -742,9 +741,8 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
 
     @Test
     @LeaksFileHandles("Kotlin Compiler Daemon working directory")
+    @ToBeFixedForConfigurationCache(because = "Kotlin Gradle Plugin")
     fun `given generic extension types they can be accessed and configured`() {
-
-        requireGradleDistributionOnEmbeddedExecuter()
 
         withDefaultSettingsIn("buildSrc")
 
@@ -810,6 +808,7 @@ class GradleKotlinDslIntegrationTest : AbstractPluginIntegrationTest() {
     }
 
     @Test
+    @ToBeFixedForConfigurationCache(because = "Task.getProject() during execution")
     fun `can use kotlin java8 inline-only methods`() {
 
         withBuildScript("""

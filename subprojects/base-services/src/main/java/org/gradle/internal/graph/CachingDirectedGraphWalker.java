@@ -60,7 +60,7 @@ public class CachingDirectedGraphWalker<N, T> {
     /**
      * Adds some start nodes.
      */
-    public CachingDirectedGraphWalker add(Iterable<? extends N> values) {
+    public CachingDirectedGraphWalker<?, ?> add(Iterable<? extends N> values) {
         GUtil.addToCollection(startNodes, values);
         return this;
     }

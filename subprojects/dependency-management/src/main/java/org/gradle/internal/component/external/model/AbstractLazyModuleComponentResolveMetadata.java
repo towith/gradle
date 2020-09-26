@@ -26,6 +26,7 @@ import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.internal.component.external.descriptor.Configuration;
 import org.gradle.internal.component.model.ConfigurationMetadata;
+import org.gradle.internal.component.model.ExcludeMetadata;
 import org.gradle.internal.component.model.ModuleConfigurationMetadata;
 import org.gradle.internal.component.model.ModuleSources;
 
@@ -60,8 +61,8 @@ public abstract class AbstractLazyModuleComponentResolveMetadata extends Abstrac
     /**
      * Creates a copy of the given metadata
      */
-    protected AbstractLazyModuleComponentResolveMetadata(AbstractLazyModuleComponentResolveMetadata metadata, ModuleSources sources) {
-        super(metadata, sources);
+    protected AbstractLazyModuleComponentResolveMetadata(AbstractLazyModuleComponentResolveMetadata metadata, ModuleSources sources, VariantDerivationStrategy variantDerivationStrategy) {
+        super(metadata, sources, variantDerivationStrategy);
         this.configurationDefinitions = metadata.configurationDefinitions;
         variantMetadataRules = metadata.variantMetadataRules;
     }
@@ -70,10 +71,12 @@ public abstract class AbstractLazyModuleComponentResolveMetadata extends Abstrac
      * Clear any cached state, for the case where the inputs are invalidated.
      * This only happens when constructing a copy
      */
-    protected void copyCachedState(AbstractLazyModuleComponentResolveMetadata metadata) {
+    protected void copyCachedState(AbstractLazyModuleComponentResolveMetadata metadata, boolean copyGraphVariants) {
         // Copy built-on-demand state
         metadata.copyCachedConfigurations(this.configurations);
-        this.graphVariants = metadata.graphVariants;
+        if (copyGraphVariants) {
+            this.graphVariants = metadata.graphVariants;
+        }
     }
 
     private synchronized void copyCachedConfigurations(Map<String, ConfigurationMetadata> target) {
@@ -128,7 +131,7 @@ public abstract class AbstractLazyModuleComponentResolveMetadata extends Abstrac
                 }
             }
             if (baseName == null || base instanceof ModuleConfigurationMetadata) {
-                ConfigurationMetadata configurationMetadata = new LazyRuleAwareWithBaseConfigurationMetadata(additionalVariant.getName(), (ModuleConfigurationMetadata) base, getId(), getAttributes(), variantMetadataRules);
+                ConfigurationMetadata configurationMetadata = new LazyRuleAwareWithBaseConfigurationMetadata(additionalVariant.getName(), (ModuleConfigurationMetadata) base, getId(), getAttributes(), variantMetadataRules, constructVariantExcludes(base), false);
                 builder.add(configurationMetadata);
             }
         }
@@ -175,7 +178,7 @@ public abstract class AbstractLazyModuleComponentResolveMetadata extends Abstrac
         if (descriptorConfiguration.getExtendsFrom().isEmpty()) {
             return ImmutableSet.of(descriptorConfiguration.getName());
         }
-        ImmutableSet.Builder<String> accumulator = new ImmutableSet.Builder<String>();
+        ImmutableSet.Builder<String> accumulator = new ImmutableSet.Builder<>();
         populateHierarchy(descriptorConfiguration, accumulator);
         return accumulator.build();
     }
@@ -186,6 +189,13 @@ public abstract class AbstractLazyModuleComponentResolveMetadata extends Abstrac
             Configuration parent = configurationDefinitions.get(parentName);
             populateHierarchy(parent, accumulator);
         }
+    }
+
+    private ImmutableList<ExcludeMetadata> constructVariantExcludes(ConfigurationMetadata base) {
+        if(base == null) {
+            return ImmutableList.of();
+        }
+        return base.getExcludes();
     }
 
     /**

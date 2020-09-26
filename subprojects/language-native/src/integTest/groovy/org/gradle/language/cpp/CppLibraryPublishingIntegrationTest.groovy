@@ -16,7 +16,7 @@
 
 package org.gradle.language.cpp
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.language.VariantContext
 import org.gradle.nativeplatform.fixtures.RequiresInstalledToolChain
 import org.gradle.nativeplatform.fixtures.ToolChainRequirement
@@ -39,7 +39,7 @@ import static org.gradle.nativeplatform.OperatingSystemFamily.WINDOWS
 
 class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrationTest implements CppTaskNames {
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can publish the binaries and headers of a library to a Maven repository"() {
         def lib = new CppLib()
         assert !lib.publicHeaders.files.empty
@@ -49,7 +49,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         buildFile << """
             apply plugin: 'cpp-library'
             apply plugin: 'maven-publish'
-            
+
             group = 'some.group'
             version = '1.2'
             library {
@@ -149,7 +149,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         releaseRuntime.files[0].url == withSharedLibrarySuffix("test_release-1.2")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can publish a library and its dependencies to a Maven repository"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
 
@@ -160,14 +160,14 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
                     repositories { maven { url '${repoDir.toURI()}' } }
                 }
             }
-            project(':deck') { 
+            project(':deck') {
                 dependencies {
                     api project(':card')
                     implementation project(':shuffle')
@@ -269,7 +269,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         installation(consumer.file("build/install/main/debug")).exec().out == app.expectedOutput
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can publish a library with external dependencies to a Maven repository"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
 
@@ -281,7 +281,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
@@ -300,13 +300,13 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
             apply plugin: 'maven-publish'
 
             repositories { maven { url '${repoDir.toURI()}' } }
-            
+
             group = 'some.group'
             version = '1.2'
             publishing {
                 repositories { maven { url '${repoDir.toURI()}' } }
             }
-            
+
             dependencies {
                 api 'some.group:card:1.2'
                 implementation 'some.group:shuffle:1.2'
@@ -383,7 +383,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         installation(consumer.file("build/install/main/debug")).exec().out == app.expectedOutput
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "uses base name of library to calculate coordinates"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
 
@@ -394,7 +394,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
 
@@ -402,7 +402,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
                     repositories { maven { url '${repoDir.toURI()}' } }
                 }
             }
-            project(':deck') { 
+            project(':deck') {
                 library.baseName = 'card_deck'
                 dependencies {
                     api project(':card')
@@ -496,7 +496,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         installation(consumer.file("build/install/main/debug")).exec().out == app.expectedOutput
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can adjust main publication coordinates"() {
         def lib = new CppLib()
 
@@ -504,7 +504,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         buildFile << """
             apply plugin: 'cpp-library'
             apply plugin: 'maven-publish'
-            
+
             group = 'some.group'
             version = '1.2'
             library {
@@ -529,7 +529,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         main.assertArtifactsPublished("test-adjusted-1.2-cpp-api-headers.zip", "test-adjusted-1.2.pom", "test-adjusted-1.2.module")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "private headers are not visible to consumer"() {
         def lib = new CppLib()
         def repoDir = file("repo")
@@ -539,7 +539,7 @@ class CppLibraryPublishingIntegrationTest extends AbstractCppPublishingIntegrati
         buildFile << """
             apply plugin: 'cpp-library'
             apply plugin: 'maven-publish'
-            
+
             group = 'some.group'
             version = '1.2'
             publishing {
@@ -580,7 +580,7 @@ library.publicHeaders.from 'src/main/public', 'src/main/headers'
         succeeds("compileDebugCpp")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "implementation dependencies are not visible to consumer"() {
         def app = new CppAppWithLibraries()
         def repoDir = file("repo")
@@ -591,7 +591,7 @@ library.publicHeaders.from 'src/main/public', 'src/main/headers'
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
@@ -634,7 +634,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
         succeeds("compileDebugCpp")
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "correct variant of published library is selected when resolving"() {
         def app = new CppAppWithLibraryAndOptionalFeature()
 
@@ -644,17 +644,17 @@ dependencies { implementation 'some.group:greeter:1.2' }
         producer.file("build.gradle") << """
             apply plugin: 'cpp-library'
             apply plugin: 'maven-publish'
-            
+
             group = 'some.group'
             version = '1.2'
             publishing {
                 repositories { maven { url '${repoDir.toURI()}' } }
             }
-            
+
             library.binaries.get { it.optimized }.configure {
                 compileTask.get().macros(WITH_FEATURE: "true")
             }
-            
+
         """
         app.greeterLib.writeToProject(file(producer))
 
@@ -698,7 +698,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
     }
 
     @Issue("https://github.com/gradle/gradle/issues/6766")
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     void "configuration exclusions are published in generated POM and Gradle metadata"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
 
@@ -708,7 +708,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
@@ -749,7 +749,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
         }
     }
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can publish a library and its dependencies to a Maven repository when multiple target operating systems are specified"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
         def targetMachines = [machine(WINDOWS, currentArchitecture), machine(LINUX, currentArchitecture), machine(MACOS, currentArchitecture)]
@@ -760,18 +760,18 @@ dependencies { implementation 'some.group:greeter:1.2' }
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
                     repositories { maven { url '${mavenRepo.uri}' } }
                 }
-                
+
                 components.withType(CppComponent) {
                     targetMachines = [machines.windows.architecture('${currentArchitecture}'), machines.linux.architecture('${currentArchitecture}'), machines.macOS.architecture('${currentArchitecture}')]
                 }
             }
-            project(':deck') { 
+            project(':deck') {
                 dependencies {
                     api project(':card')
                     implementation project(':shuffle')
@@ -819,7 +819,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
     }
 
     @RequiresInstalledToolChain(ToolChainRequirement.SUPPORTS_32_AND_64)
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "can publish a library and its dependencies to a Maven repository when multiple target architectures are specified"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
         def targetMachines = [machine(currentOsFamilyName, X86), machine(currentOsFamilyName, X86_64)]
@@ -830,18 +830,18 @@ dependencies { implementation 'some.group:greeter:1.2' }
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
                     repositories { maven { url '${mavenRepo.uri}' } }
                 }
-                
+
                 components.withType(CppComponent) {
                     targetMachines = [machines.host().x86, machines.host().x86_64]
                 }
             }
-            project(':deck') { 
+            project(':deck') {
                 dependencies {
                     api project(':card')
                     implementation project(':shuffle')
@@ -889,7 +889,7 @@ dependencies { implementation 'some.group:greeter:1.2' }
     }
 
     @RequiresInstalledToolChain(ToolChainRequirement.SUPPORTS_32_AND_64)
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     def "fails when a dependency is published without a matching target architecture"() {
         def app = new CppAppWithLibrariesWithApiDependencies()
 
@@ -899,18 +899,18 @@ dependencies { implementation 'some.group:greeter:1.2' }
             subprojects {
                 apply plugin: 'cpp-library'
                 apply plugin: 'maven-publish'
-                
+
                 group = 'some.group'
                 version = '1.2'
                 publishing {
                     repositories { maven { url '${mavenRepo.uri}' } }
                 }
-                
+
                 components.withType(CppComponent) {
                     targetMachines = [machines.host().x86_64]
                 }
             }
-            project(':deck') { 
+            project(':deck') {
                 dependencies {
                     api project(':card')
                     implementation project(':shuffle')
@@ -942,8 +942,8 @@ dependencies { implementation 'some.group:greeter:1.2' }
         fails("assemble")
 
         then:
-        failure.assertHasCause("Unable to find a matching variant of some.group:deck:1.2")
-        failure.assertHasErrorOutput("Required org.gradle.native.architecture 'x86' and found incompatible value 'x86-64'.")
+        failure.assertHasCause("No matching variant of some.group:deck:1.2 was found. The consumer was configured to find attribute 'org.gradle.usage' with value 'native-link', attribute 'org.gradle.native.debuggable' with value 'true', attribute 'org.gradle.native.optimized' with value 'false', attribute 'org.gradle.native.operatingSystem' with value '${currentOsFamilyName.toLowerCase()}', attribute 'org.gradle.native.architecture' with value 'x86' but:")
+        failure.assertHasErrorOutput("Incompatible because this component declares attribute 'org.gradle.native.architecture' with value 'x86-64' and the consumer needed attribute 'org.gradle.native.architecture' with value 'x86'")
     }
 
     @Override

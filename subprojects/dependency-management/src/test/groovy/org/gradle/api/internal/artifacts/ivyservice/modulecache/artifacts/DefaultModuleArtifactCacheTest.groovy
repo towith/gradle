@@ -20,8 +20,8 @@ import org.gradle.api.internal.artifacts.ivyservice.ArtifactCacheLockingManager
 import org.gradle.cache.PersistentIndexedCache
 import org.gradle.internal.Factory
 import org.gradle.internal.component.external.model.ModuleComponentArtifactIdentifier
+import org.gradle.internal.file.FileAccessTracker
 import org.gradle.internal.hash.HashCode
-import org.gradle.internal.resource.local.FileAccessTracker
 import org.gradle.internal.serialize.Decoder
 import org.gradle.internal.serialize.Encoder
 import org.gradle.internal.serialize.Serializer
@@ -35,7 +35,7 @@ import java.nio.file.Path
 
 class DefaultModuleArtifactCacheTest extends Specification {
 
-    @Rule TestNameTestDirectoryProvider folder = new TestNameTestDirectoryProvider()
+    @Rule TestNameTestDirectoryProvider folder = new TestNameTestDirectoryProvider(getClass())
 
     ArtifactCacheLockingManager cacheLockingManager = Mock(ArtifactCacheLockingManager)
     BuildCommencedTimeProvider timeProvider = Mock(BuildCommencedTimeProvider)

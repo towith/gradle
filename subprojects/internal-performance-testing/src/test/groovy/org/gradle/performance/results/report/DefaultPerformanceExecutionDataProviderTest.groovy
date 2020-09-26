@@ -26,7 +26,7 @@ import spock.lang.Subject
 
 class DefaultPerformanceExecutionDataProviderTest extends ResultSpecification {
     @Rule
-    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
+    TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider(getClass())
 
     @Subject
     DefaultPerformanceExecutionDataProvider provider
@@ -36,7 +36,7 @@ class DefaultPerformanceExecutionDataProviderTest extends ResultSpecification {
 
     def setup() {
         resultsJson << '[]'
-        provider = new DefaultPerformanceExecutionDataProvider(mockStore, resultsJson)
+        provider = new DefaultPerformanceExecutionDataProvider(mockStore, [resultsJson])
     }
 
     def 'can sort scenarios correctly'() {

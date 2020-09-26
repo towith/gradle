@@ -15,11 +15,11 @@
  */
 package org.gradle.api.publish.ivy
 
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 
 class IvyPublishWarIntegTest extends AbstractIvyPublishIntegTest {
 
-    @ToBeFixedForInstantExecution
+    @ToBeFixedForConfigurationCache
     void "can publish WAR only for mixed java and WAR project"() {
         given:
         file("settings.gradle") << "rootProject.name = 'publishTest' "
@@ -40,7 +40,7 @@ class IvyPublishWarIntegTest extends AbstractIvyPublishIntegTest {
                 runtimeOnly "commons-io:commons-io:1.4"
                 providedCompile "commons-lang:commons-lang:2.6"
                 providedRuntime "commons-cli:commons-cli:1.2"
-                testImplementation "junit:junit:4.12"
+                testImplementation "junit:junit:4.13"
             }
 
             publishing {

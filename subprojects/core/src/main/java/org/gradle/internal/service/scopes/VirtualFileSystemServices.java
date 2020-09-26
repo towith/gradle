@@ -17,25 +17,29 @@
 package org.gradle.internal.service.scopes;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
+import net.rubygrapefruit.platform.NativeIntegrationUnavailableException;
 import org.apache.tools.ant.DirectoryScanner;
+import org.gradle.BuildAdapter;
 import org.gradle.StartParameter;
+import org.gradle.api.initialization.Settings;
+import org.gradle.api.internal.DocumentationRegistry;
 import org.gradle.api.internal.GradleInternal;
 import org.gradle.api.internal.cache.StringInterner;
-import org.gradle.api.internal.changedetection.state.BuildScopeFileTimeStampInspector;
+import org.gradle.api.internal.changedetection.state.BuildSessionScopeFileTimeStampInspector;
 import org.gradle.api.internal.changedetection.state.CachingFileHasher;
 import org.gradle.api.internal.changedetection.state.CrossBuildFileHashCache;
 import org.gradle.api.internal.changedetection.state.DefaultResourceSnapshotterCacheService;
-import org.gradle.api.internal.changedetection.state.GlobalScopeFileTimeStampInspector;
+import org.gradle.api.internal.changedetection.state.GradleUserHomeScopeFileTimeStampInspector;
+import org.gradle.api.internal.changedetection.state.ResourceEntryFilter;
 import org.gradle.api.internal.changedetection.state.ResourceFilter;
 import org.gradle.api.internal.changedetection.state.ResourceSnapshotterCacheService;
 import org.gradle.api.internal.changedetection.state.SplitFileHasher;
 import org.gradle.api.internal.changedetection.state.SplitResourceSnapshotterCacheService;
-import org.gradle.api.internal.file.BaseDirFileResolver;
 import org.gradle.api.internal.file.FileCollectionFactory;
-import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.internal.initialization.loadercache.DefaultClasspathHasher;
+import org.gradle.api.tasks.util.internal.PatternSpecFactory;
 import org.gradle.cache.CacheRepository;
+import org.gradle.cache.GlobalCacheLocations;
 import org.gradle.cache.PersistentIndexedCache;
 import org.gradle.cache.PersistentIndexedCacheParameters;
 import org.gradle.cache.internal.CacheScopeMapping;
@@ -43,10 +47,13 @@ import org.gradle.cache.internal.InMemoryCacheDecoratorFactory;
 import org.gradle.cache.internal.VersionStrategy;
 import org.gradle.initialization.RootBuildLifecycleListener;
 import org.gradle.initialization.layout.ProjectCacheDir;
+import org.gradle.internal.build.BuildAddedListener;
 import org.gradle.internal.classloader.ClasspathHasher;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.event.ListenerManager;
+import org.gradle.internal.execution.DefaultOutputSnapshotter;
 import org.gradle.internal.execution.OutputChangeListener;
-import org.gradle.internal.file.PathToFileResolver;
+import org.gradle.internal.execution.OutputSnapshotter;
 import org.gradle.internal.file.Stat;
 import org.gradle.internal.fingerprint.FileCollectionFingerprinter;
 import org.gradle.internal.fingerprint.FileCollectionFingerprinterRegistry;
@@ -68,86 +75,91 @@ import org.gradle.internal.hash.DefaultFileHasher;
 import org.gradle.internal.hash.FileHasher;
 import org.gradle.internal.hash.HashCode;
 import org.gradle.internal.hash.StreamHasher;
+import org.gradle.internal.nativeintegration.NativeCapabilities;
 import org.gradle.internal.nativeintegration.filesystem.FileSystem;
 import org.gradle.internal.os.OperatingSystem;
 import org.gradle.internal.serialize.HashCodeSerializer;
 import org.gradle.internal.service.ServiceRegistration;
-import org.gradle.internal.vfs.AdditiveCacheLocations;
-import org.gradle.internal.vfs.DarwinFileWatcherRegistry;
-import org.gradle.internal.vfs.RoutingVirtualFileSystem;
+import org.gradle.internal.snapshot.CaseSensitivity;
+import org.gradle.internal.vfs.FileSystemAccess;
 import org.gradle.internal.vfs.VirtualFileSystem;
-import org.gradle.internal.vfs.WatchingVirtualFileSystem;
-import org.gradle.internal.vfs.WindowsFileWatcherRegistry;
-import org.gradle.internal.vfs.impl.DefaultVirtualFileSystem;
-import org.gradle.internal.vfs.impl.DefaultWatchingVirtualFileSystem;
-import org.gradle.internal.vfs.watch.FileWatcherRegistryFactory;
-import org.gradle.internal.vfs.watch.impl.JdkFileWatcherRegistry;
-import org.gradle.internal.vfs.watch.impl.NoopFileWatcherRegistry;
-import org.gradle.util.IncubationLogger;
+import org.gradle.internal.vfs.impl.DefaultFileSystemAccess;
+import org.gradle.internal.vfs.impl.DefaultSnapshotHierarchy;
+import org.gradle.internal.vfs.impl.VfsRootReference;
+import org.gradle.internal.watch.registry.FileWatcherRegistryFactory;
+import org.gradle.internal.watch.registry.impl.DarwinFileWatcherRegistryFactory;
+import org.gradle.internal.watch.registry.impl.LinuxFileWatcherRegistryFactory;
+import org.gradle.internal.watch.registry.impl.WindowsFileWatcherRegistryFactory;
+import org.gradle.internal.watch.vfs.BuildLifecycleAwareVirtualFileSystem;
+import org.gradle.internal.watch.vfs.impl.LocationsWrittenByCurrentBuild;
+import org.gradle.internal.watch.vfs.impl.WatchingNotSupportedVirtualFileSystem;
+import org.gradle.internal.watch.vfs.impl.WatchingVirtualFileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 import static org.gradle.internal.snapshot.CaseSensitivity.CASE_INSENSITIVE;
 import static org.gradle.internal.snapshot.CaseSensitivity.CASE_SENSITIVE;
 
 public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(VirtualFileSystemServices.class);
 
     /**
-     * Boolean system property to enable partial invalidation.
+     * Deprecated system property used to enable watching the file system.
+     *
+     * Using this property causes Gradle to emit a deprecation warning.
      */
-    public static final String VFS_PARTIAL_INVALIDATION_ENABLED_PROPERTY = "org.gradle.unsafe.vfs.partial-invalidation";
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
+    public static final String DEPRECATED_VFS_RETENTION_ENABLED_PROPERTY = "org.gradle.unsafe.vfs.retention";
 
     /**
-     * Boolean system property to enable retaining VFS state between builds.
+     * When file system watching is enabled, this system property can be used to invalidate the entire VFS.
      *
-     * Also enables partial VFS invalidation.
-     *
-     * @see #VFS_PARTIAL_INVALIDATION_ENABLED_PROPERTY
+     * @see org.gradle.initialization.StartParameterBuildOptions.WatchFileSystemOption
      */
-    public static final String VFS_RETENTION_ENABLED_PROPERTY = "org.gradle.unsafe.vfs.retention";
+    public static final String VFS_DROP_PROPERTY = "org.gradle.vfs.drop";
 
     /**
-     * When retention is enabled, this system property can be used to pass a comma-separated
-     * list of file paths that have changed since the last build.
-     *
-     * @see #VFS_RETENTION_ENABLED_PROPERTY
+     * Previous name for {@link #VFS_DROP_PROPERTY}.
      */
-    public static final String VFS_CHANGES_SINCE_LAST_BUILD_PROPERTY = "org.gradle.unsafe.vfs.changes";
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
+    @VisibleForTesting
+    public static final String DEPRECATED_VFS_DROP_PROPERTY = "org.gradle.unsafe.vfs.drop";
 
-    /**
-     * When retention is enabled, this system property can be used to invalidate the entire VFS.
-     *
-     * @see #VFS_RETENTION_ENABLED_PROPERTY
-     */
-    public static final String VFS_DROP_PROPERTY = "org.gradle.unsafe.vfs.drop";
+    private static final int DEFAULT_MAX_HIERARCHIES_TO_WATCH = 50;
+    public static final String MAX_HIERARCHIES_TO_WATCH_PROPERTY = "org.gradle.vfs.watch.hierarchies.max";
 
-    public static boolean isPartialInvalidationEnabled(Map<String, String> systemPropertiesArgs) {
-        return isSystemPropertyEnabled(VFS_PARTIAL_INVALIDATION_ENABLED_PROPERTY, systemPropertiesArgs)
-            || isRetentionEnabled(systemPropertiesArgs);
-    }
-
-    public static boolean isRetentionEnabled(Map<String, String> systemPropertiesArgs) {
-        return isSystemPropertyEnabled(VFS_RETENTION_ENABLED_PROPERTY, systemPropertiesArgs);
-    }
-
-    public static List<File> getChangedPathsSinceLastBuild(PathToFileResolver resolver, Map<String, String> systemPropertiesArgs) {
-        String changeList = getSystemProperty(VFS_CHANGES_SINCE_LAST_BUILD_PROPERTY, systemPropertiesArgs);
-        if (changeList == null) {
-            return ImmutableList.of();
+    public static boolean isDropVfs(StartParameter startParameter) {
+        if (getSystemProperty(DEPRECATED_VFS_DROP_PROPERTY, startParameter.getSystemPropertiesArgs()) != null) {
+            DeprecationLogger
+                .deprecateSystemProperty(DEPRECATED_VFS_DROP_PROPERTY)
+                .replaceWith(VFS_DROP_PROPERTY)
+                .willBeRemovedInGradle7()
+                .undocumented()
+                .nagUser();
+            return isSystemPropertyEnabled(DEPRECATED_VFS_DROP_PROPERTY, startParameter.getSystemPropertiesArgs());
         }
-        return Stream.of(changeList.split(","))
-            .filter(path -> !path.isEmpty())
-            .map(resolver::resolve)
-            .collect(Collectors.toList());
+        return isSystemPropertyEnabled(VFS_DROP_PROPERTY, startParameter.getSystemPropertiesArgs());
+    }
+
+    public static int getMaximumNumberOfWatchedHierarchies(StartParameter startParameter) {
+        String fromProperty = getSystemProperty(MAX_HIERARCHIES_TO_WATCH_PROPERTY, startParameter.getSystemPropertiesArgs());
+        return fromProperty != null && !fromProperty.isEmpty()
+            ? Integer.parseInt(fromProperty, 10)
+            : DEFAULT_MAX_HIERARCHIES_TO_WATCH;
+    }
+
+    public static boolean isDeprecatedVfsRetentionPropertyPresent(StartParameter startParameter) {
+        return getSystemProperty(DEPRECATED_VFS_RETENTION_ENABLED_PROPERTY, startParameter.getSystemPropertiesArgs()) != null;
     }
 
     private static boolean isSystemPropertyEnabled(String systemProperty, Map<String, String> systemPropertiesArgs) {
@@ -177,95 +189,122 @@ public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
             return new CrossBuildFileHashCache(null, cacheRepository, inMemoryCacheDecoratorFactory, CrossBuildFileHashCache.Kind.FILE_HASHES);
         }
 
-        FileHasher createCachingFileHasher(StringInterner stringInterner, CrossBuildFileHashCache fileStore, FileSystem fileSystem, GlobalScopeFileTimeStampInspector fileTimeStampInspector, StreamHasher streamHasher) {
+        FileHasher createCachingFileHasher(StringInterner stringInterner, CrossBuildFileHashCache fileStore, FileSystem fileSystem, GradleUserHomeScopeFileTimeStampInspector fileTimeStampInspector, StreamHasher streamHasher) {
             CachingFileHasher fileHasher = new CachingFileHasher(new DefaultFileHasher(streamHasher), fileStore, stringInterner, fileTimeStampInspector, "fileHashes", fileSystem);
             fileTimeStampInspector.attach(fileHasher);
             return fileHasher;
         }
 
-        FileWatcherRegistryFactory createFileWatcherRegistryFactory() {
-            OperatingSystem operatingSystem = OperatingSystem.current();
-            if (operatingSystem.isMacOsX()) {
-                return new DarwinFileWatcherRegistry.Factory();
-            } else if (operatingSystem.isWindows()) {
-                return new WindowsFileWatcherRegistry.Factory();
-            } else if (operatingSystem.isLinux()) {
-                // The Linux watcher in the JDK works quite well
-                return new JdkFileWatcherRegistry.Factory();
-            } else {
-                return new NoopFileWatcherRegistry.Factory();
-            }
-        }
-
-        VirtualFileSystem createVirtualFileSystem(
-            AdditiveCacheLocations additiveCacheLocations,
-            FileHasher hasher,
-            FileSystem fileSystem,
-            FileWatcherRegistryFactory watcherRegistryFactory,
-            ListenerManager listenerManager,
-            Stat stat,
-            StringInterner stringInterner
-        ) {
-            WatchingVirtualFileSystem virtualFileSystem = new DefaultWatchingVirtualFileSystem(
-                watcherRegistryFactory,
-                new DefaultVirtualFileSystem(
-                    hasher,
-                    stringInterner,
-                    stat,
-                    fileSystem.isCaseSensitive() ? CASE_SENSITIVE : CASE_INSENSITIVE,
-                    DirectoryScanner.getDefaultExcludes()
-                ),
-                path -> !additiveCacheLocations.isInsideAdditiveCache(path.toString())
-            );
+        LocationsWrittenByCurrentBuild createLocationsUpdatedByCurrentBuild(ListenerManager listenerManager) {
+            LocationsWrittenByCurrentBuild locationsWrittenByCurrentBuild = new LocationsWrittenByCurrentBuild();
             listenerManager.addListener(new RootBuildLifecycleListener() {
                 @Override
                 public void afterStart(GradleInternal gradle) {
-                    StartParameter startParameter = gradle.getStartParameter();
-                    Map<String, String> systemPropertiesArgs = startParameter.getSystemPropertiesArgs();
-                    if (isRetentionEnabled(systemPropertiesArgs)) {
-                        IncubationLogger.incubatingFeatureUsed("Virtual file system retention");
-                        FileResolver fileResolver = new BaseDirFileResolver(startParameter.getCurrentDir(), () -> {
-                            throw new UnsupportedOperationException();
-                        });
-                        if (isSystemPropertyEnabled(VFS_DROP_PROPERTY, systemPropertiesArgs)) {
-                            virtualFileSystem.invalidateAll();
-                        } else {
-                            List<File> changedPathsSinceLastBuild = getChangedPathsSinceLastBuild(fileResolver, systemPropertiesArgs);
-                            for (File changedPathSinceLastBuild : changedPathsSinceLastBuild) {
-                                LOGGER.warn("Marking as changed since last build: {}", changedPathSinceLastBuild);
-                            }
-                            virtualFileSystem.update(
-                                changedPathsSinceLastBuild
-                                    .stream()
-                                    .map(File::getAbsolutePath)
-                                    .collect(Collectors.toList()),
-                                () -> {}
-                            );
-                        }
-                    } else {
-                        virtualFileSystem.invalidateAll();
-                    }
-                    virtualFileSystem.stopWatching();
+                    locationsWrittenByCurrentBuild.buildStarted();
                 }
 
                 @Override
                 public void beforeComplete(GradleInternal gradle) {
-                    if (isRetentionEnabled(gradle.getStartParameter().getSystemPropertiesArgs())) {
-                        virtualFileSystem.startWatching(Collections.singleton(gradle.getRootProject().getProjectDir()));
-                    } else {
-                        virtualFileSystem.invalidateAll();
-                    }
+                    locationsWrittenByCurrentBuild.buildFinished();
                 }
             });
+            return locationsWrittenByCurrentBuild;
+        }
+
+        BuildLifecycleAwareVirtualFileSystem createVirtualFileSystem(
+            LocationsWrittenByCurrentBuild locationsWrittenByCurrentBuild,
+            DocumentationRegistry documentationRegistry,
+            NativeCapabilities nativeCapabilities,
+            ListenerManager listenerManager,
+            FileSystem fileSystem,
+            GlobalCacheLocations globalCacheLocations
+        ) {
+            CaseSensitivity caseSensitivity = fileSystem.isCaseSensitive() ? CASE_SENSITIVE : CASE_INSENSITIVE;
+            VfsRootReference rootReference = new VfsRootReference(DefaultSnapshotHierarchy.empty(caseSensitivity));
+            // All the changes in global caches should be done by Gradle itself, so in order
+            // to minimize the number of watches we don't watch anything within the global caches.
+            Predicate<String> watchFilter = path -> !globalCacheLocations.isInsideGlobalCache(path);
+
+            BuildLifecycleAwareVirtualFileSystem virtualFileSystem = determineWatcherRegistryFactory(OperatingSystem.current(), nativeCapabilities, watchFilter)
+                .<BuildLifecycleAwareVirtualFileSystem>map(watcherRegistryFactory -> new WatchingVirtualFileSystem(
+                    watcherRegistryFactory,
+                    rootReference,
+                    sectionId -> documentationRegistry.getDocumentationFor("gradle_daemon", sectionId),
+                    locationsWrittenByCurrentBuild
+                ))
+                .orElse(new WatchingNotSupportedVirtualFileSystem(rootReference));
+            listenerManager.addListener((BuildAddedListener) buildState ->
+                virtualFileSystem.registerWatchableHierarchy(buildState.getBuildRootDir())
+            );
             return virtualFileSystem;
+        }
+
+        FileSystemAccess createFileSystemAccess(
+            FileHasher hasher,
+            VirtualFileSystem virtualFileSystem,
+            Stat stat,
+            StringInterner stringInterner,
+            ListenerManager listenerManager,
+            PatternSpecFactory patternSpecFactory,
+            FileSystemAccess.WriteListener writeListener
+        ) {
+            DefaultFileSystemAccess fileSystemAccess = new DefaultFileSystemAccess(
+                hasher,
+                stringInterner,
+                stat,
+                virtualFileSystem,
+                writeListener,
+                DirectoryScanner.getDefaultExcludes()
+            );
+            listenerManager.addListener(new DefaultExcludesBuildListener(fileSystemAccess) {
+                @Override
+                public void settingsEvaluated(Settings settings) {
+                    super.settingsEvaluated(settings);
+                    String[] defaultExcludes = DirectoryScanner.getDefaultExcludes();
+                    patternSpecFactory.setDefaultExcludesFromSettings(defaultExcludes);
+                    PatternSpecFactory.INSTANCE.setDefaultExcludesFromSettings(defaultExcludes);
+                }
+            });
+            listenerManager.addListener(new RootBuildLifecycleListener() {
+                @Override
+                public void afterStart(GradleInternal gradle) {
+                    // Reset default excludes for each build
+                    DirectoryScanner.resetDefaultExcludes();
+                    String[] defaultExcludes = DirectoryScanner.getDefaultExcludes();
+                    patternSpecFactory.setDefaultExcludesFromSettings(defaultExcludes);
+                    PatternSpecFactory.INSTANCE.setDefaultExcludesFromSettings(defaultExcludes);
+                }
+
+                @Override
+                public void beforeComplete(GradleInternal gradle) {
+                }
+            });
+            return fileSystemAccess;
+        }
+
+        private Optional<FileWatcherRegistryFactory> determineWatcherRegistryFactory(OperatingSystem operatingSystem, NativeCapabilities nativeCapabilities, Predicate<String> watchFilter) {
+            if (nativeCapabilities.useFileSystemWatching()) {
+                try {
+                    if (operatingSystem.isMacOsX()) {
+                        return Optional.of(new DarwinFileWatcherRegistryFactory(watchFilter));
+                    } else if (operatingSystem.isWindows()) {
+                        return Optional.of(new WindowsFileWatcherRegistryFactory(watchFilter));
+                    } else if (operatingSystem.isLinux()) {
+                        return Optional.of(new LinuxFileWatcherRegistryFactory(watchFilter));
+                    }
+                } catch (NativeIntegrationUnavailableException e) {
+                    LOGGER.info("Native file system watching is not available for this operating system.", e);
+                }
+            }
+            return Optional.empty();
         }
 
         GenericFileTreeSnapshotter createGenericFileTreeSnapshotter(FileHasher hasher, StringInterner stringInterner) {
             return new DefaultGenericFileTreeSnapshotter(hasher, stringInterner);
         }
 
-        FileCollectionSnapshotter createFileCollectionSnapshotter(VirtualFileSystem virtualFileSystem, GenericFileTreeSnapshotter genericFileTreeSnapshotter, Stat stat) {
-            return new DefaultFileCollectionSnapshotter(virtualFileSystem, genericFileTreeSnapshotter, stat);
+        FileCollectionSnapshotter createFileCollectionSnapshotter(FileSystemAccess fileSystemAccess, GenericFileTreeSnapshotter genericFileTreeSnapshotter, Stat stat) {
+            return new DefaultFileCollectionSnapshotter(fileSystemAccess, genericFileTreeSnapshotter, stat);
         }
 
         ResourceSnapshotterCacheService createResourceSnapshotterCacheService(CrossBuildFileHashCache store) {
@@ -277,7 +316,7 @@ public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
         }
 
         ClasspathFingerprinter createClasspathFingerprinter(ResourceSnapshotterCacheService resourceSnapshotterCacheService, FileCollectionSnapshotter fileCollectionSnapshotter, StringInterner stringInterner) {
-            return new DefaultClasspathFingerprinter(resourceSnapshotterCacheService, fileCollectionSnapshotter, ResourceFilter.FILTER_NOTHING, stringInterner);
+            return new DefaultClasspathFingerprinter(resourceSnapshotterCacheService, fileCollectionSnapshotter, ResourceFilter.FILTER_NOTHING, ResourceEntryFilter.FILTER_NOTHING, ResourceEntryFilter.FILTER_NOTHING, stringInterner);
         }
 
         ClasspathHasher createClasspathHasher(ClasspathFingerprinter fingerprinter, FileCollectionFactory fileCollectionFactory) {
@@ -293,8 +332,8 @@ public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
         }
 
         FileHasher createFileHasher(
-            AdditiveCacheLocations additiveCacheLocations,
-            BuildScopeFileTimeStampInspector fileTimeStampInspector,
+            GlobalCacheLocations globalCacheLocations,
+            BuildSessionScopeFileTimeStampInspector fileTimeStampInspector,
             CrossBuildFileHashCache cacheAccess,
             FileHasher globalHasher,
             FileSystem fileSystem,
@@ -302,65 +341,42 @@ public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
             StringInterner stringInterner
         ) {
             CachingFileHasher localHasher = new CachingFileHasher(new DefaultFileHasher(streamHasher), cacheAccess, stringInterner, fileTimeStampInspector, "fileHashes", fileSystem);
-            return new SplitFileHasher(globalHasher, localHasher, additiveCacheLocations);
+            return new SplitFileHasher(globalHasher, localHasher, globalCacheLocations);
         }
 
-        VirtualFileSystem createVirtualFileSystem(
-            AdditiveCacheLocations additiveCacheLocations,
+        FileSystemAccess createFileSystemAccess(
             FileHasher hasher,
-            FileSystem fileSystem,
             ListenerManager listenerManager,
-            StartParameter startParameter,
             Stat stat,
             StringInterner stringInterner,
-            VirtualFileSystem gradleUserHomeVirtualFileSystem
+            VirtualFileSystem root,
+            FileSystemAccess.WriteListener writeListener
         ) {
-            VirtualFileSystem buildSessionsScopedVirtualFileSystem = new DefaultVirtualFileSystem(
+            DefaultFileSystemAccess buildSessionsScopedVirtualFileSystem = new DefaultFileSystemAccess(
                 hasher,
                 stringInterner,
                 stat,
-                fileSystem.isCaseSensitive() ? CASE_SENSITIVE : CASE_INSENSITIVE,
+                root,
+                writeListener,
                 DirectoryScanner.getDefaultExcludes()
             );
-            RoutingVirtualFileSystem routingVirtualFileSystem = new RoutingVirtualFileSystem(
-                additiveCacheLocations,
-                gradleUserHomeVirtualFileSystem,
-                buildSessionsScopedVirtualFileSystem,
-                () -> isRetentionEnabled(startParameter.getSystemPropertiesArgs())
-            );
 
-            listenerManager.addListener(new RootBuildLifecycleListener() {
-                @Override
-                public void afterStart(GradleInternal gradle) {
-                    // Note: this never fires as we are registering it too late
-                }
+            listenerManager.addListener(new DefaultExcludesBuildListener(buildSessionsScopedVirtualFileSystem));
+            listenerManager.addListener((OutputChangeListener) affectedOutputPaths -> buildSessionsScopedVirtualFileSystem.write(affectedOutputPaths, () -> {}));
 
-                @Override
-                public void beforeComplete(GradleInternal gradle) {
-                    buildSessionsScopedVirtualFileSystem.invalidateAll();
-                }
-            });
-            listenerManager.addListener(new OutputChangeListener() {
-                @Override
-                public void beforeOutputChange() {
-                    routingVirtualFileSystem.invalidateAll();
-                }
-
-                @Override
-                public void beforeOutputChange(Iterable<String> affectedOutputPaths) {
-                    routingVirtualFileSystem.update(affectedOutputPaths, () -> {});
-                }
-            });
-
-            return routingVirtualFileSystem;
+            return buildSessionsScopedVirtualFileSystem;
         }
 
         GenericFileTreeSnapshotter createGenericFileTreeSnapshotter(FileHasher hasher, StringInterner stringInterner) {
             return new DefaultGenericFileTreeSnapshotter(hasher, stringInterner);
         }
 
-        FileCollectionSnapshotter createFileCollectionSnapshotter(VirtualFileSystem virtualFileSystem, GenericFileTreeSnapshotter genericFileTreeSnapshotter, Stat stat) {
-            return new DefaultFileCollectionSnapshotter(virtualFileSystem, genericFileTreeSnapshotter, stat);
+        FileCollectionSnapshotter createFileCollectionSnapshotter(FileSystemAccess fileSystemAccess, GenericFileTreeSnapshotter genericFileTreeSnapshotter, Stat stat) {
+            return new DefaultFileCollectionSnapshotter(fileSystemAccess, genericFileTreeSnapshotter, stat);
+        }
+
+        OutputSnapshotter createOutputSnapshotter(FileCollectionSnapshotter fileCollectionSnapshotter) {
+            return new DefaultOutputSnapshotter(fileCollectionSnapshotter);
         }
 
         AbsolutePathFileCollectionFingerprinter createAbsolutePathFileCollectionFingerprinter(FileCollectionSnapshotter fileCollectionSnapshotter) {
@@ -388,18 +404,32 @@ public class VirtualFileSystemServices extends AbstractPluginServiceRegistry {
         }
 
         ResourceSnapshotterCacheService createResourceSnapshotterCacheService(
-            AdditiveCacheLocations additiveCacheLocations,
+            GlobalCacheLocations globalCacheLocations,
             CrossBuildFileHashCache store,
             ResourceSnapshotterCacheService globalCache
         ) {
             PersistentIndexedCache<HashCode, HashCode> resourceHashesCache = store.createCache(PersistentIndexedCacheParameters.of("resourceHashesCache", HashCode.class, new HashCodeSerializer()), 800000, true);
             DefaultResourceSnapshotterCacheService localCache = new DefaultResourceSnapshotterCacheService(resourceHashesCache);
-            return new SplitResourceSnapshotterCacheService(globalCache, localCache, additiveCacheLocations);
+            return new SplitResourceSnapshotterCacheService(globalCache, localCache, globalCacheLocations);
         }
 
         CompileClasspathFingerprinter createCompileClasspathFingerprinter(ResourceSnapshotterCacheService resourceSnapshotterCacheService, FileCollectionSnapshotter fileCollectionSnapshotter, StringInterner stringInterner) {
             return new DefaultCompileClasspathFingerprinter(resourceSnapshotterCacheService, fileCollectionSnapshotter, stringInterner);
         }
-
     }
+
+    private static class DefaultExcludesBuildListener extends BuildAdapter {
+        private final DefaultFileSystemAccess fileSystemAccess;
+
+        public DefaultExcludesBuildListener(DefaultFileSystemAccess fileSystemAccess) {
+            this.fileSystemAccess = fileSystemAccess;
+        }
+
+        @Override
+        public void settingsEvaluated(Settings settings) {
+            fileSystemAccess.updateDefaultExcludes(DirectoryScanner.getDefaultExcludes());
+        }
+    }
+
+    interface WatchFilter extends Predicate<String> {}
 }

@@ -18,10 +18,10 @@ package org.gradle.internal.deprecation
 
 import org.gradle.api.logging.configuration.WarningMode
 import org.gradle.internal.Factory
-import org.gradle.internal.featurelifecycle.DeprecatedUsageBuildOperationProgressBroadcaster
 import org.gradle.internal.featurelifecycle.UsageLocationReporter
 import org.gradle.internal.logging.CollectingTestOutputEventListener
 import org.gradle.internal.logging.ConfigureLogging
+import org.gradle.internal.operations.BuildOperationProgressEventEmitter
 import org.gradle.test.fixtures.concurrent.ConcurrentSpec
 import org.gradle.util.GradleVersion
 import org.junit.Rule
@@ -34,7 +34,7 @@ class DeprecationLoggerTest extends ConcurrentSpec {
     final ConfigureLogging logging = new ConfigureLogging(outputEventListener)
 
     def setup() {
-        DeprecationLogger.init(Mock(UsageLocationReporter), WarningMode.All, Mock(DeprecatedUsageBuildOperationProgressBroadcaster))
+        DeprecationLogger.init(Mock(UsageLocationReporter), WarningMode.All, Mock(BuildOperationProgressEventEmitter))
     }
 
     def cleanup() {
@@ -43,8 +43,8 @@ class DeprecationLoggerTest extends ConcurrentSpec {
 
     def "logs deprecation warning once until reset"() {
         when:
-        DeprecationLogger.deprecate("nag").undocumented().nagUser()
-        DeprecationLogger.deprecate("nag").undocumented().nagUser()
+        DeprecationLogger.deprecate("nag").willBeRemovedInGradle7().undocumented().nagUser()
+        DeprecationLogger.deprecate("nag").willBeRemovedInGradle7().undocumented().nagUser()
 
         then:
         def events = outputEventListener.events
@@ -53,7 +53,7 @@ class DeprecationLoggerTest extends ConcurrentSpec {
 
         when:
         DeprecationLogger.reset()
-        DeprecationLogger.deprecate("nag").undocumented().nagUser()
+        DeprecationLogger.deprecate("nag").willBeRemovedInGradle7().undocumented().nagUser()
 
         then:
         events.size() == 2
@@ -73,7 +73,7 @@ class DeprecationLoggerTest extends ConcurrentSpec {
 
         and:
         1 * factory.create() >> {
-            DeprecationLogger.deprecate("nag").undocumented().nagUser()
+            DeprecationLogger.deprecate("nag").willBeRemovedInGradle7().undocumented().nagUser()
             return "result"
         }
         0 * _
@@ -102,13 +102,13 @@ class DeprecationLoggerTest extends ConcurrentSpec {
         async {
             start {
                 thread.blockUntil.disabled
-                DeprecationLogger.deprecate("nag").undocumented().nagUser()
+                DeprecationLogger.deprecate("nag").willBeRemovedInGradle7().undocumented().nagUser()
                 instant.logged
             }
             start {
                 DeprecationLogger.whileDisabled {
                     instant.disabled
-                    DeprecationLogger.deprecate("ignored").undocumented().nagUser()
+                    DeprecationLogger.deprecate("ignored").willBeRemovedInGradle7().undocumented().nagUser()
                     thread.blockUntil.logged
                 }
             }
@@ -127,6 +127,7 @@ class DeprecationLoggerTest extends ConcurrentSpec {
         when:
         DeprecationLogger.deprecate("foo")
             .withAdvice("bar.")
+            .willBeRemovedInGradle7()
             .undocumented()
             .nagUser();
 

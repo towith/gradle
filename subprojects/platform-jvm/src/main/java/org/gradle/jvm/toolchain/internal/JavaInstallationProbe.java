@@ -40,6 +40,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.EnumMap;
 
 public class JavaInstallationProbe {
@@ -93,9 +95,9 @@ public class JavaInstallationProbe {
             this.error = error;
         }
 
-        public File getJavaHome() {
+        public Path getJavaHome() {
             assertOk();
-            return new File(metadata.get(SysProp.JAVA_HOME));
+            return Paths.get(metadata.get(SysProp.JAVA_HOME));
         }
 
         public String getImplementationJavaVersion() {
@@ -121,6 +123,7 @@ public class JavaInstallationProbe {
             return error;
         }
 
+        @Deprecated
         public void configure(LocalJavaInstallation install) {
             assertOk();
             install.setJavaVersion(getJavaVersion());
@@ -154,6 +157,7 @@ public class JavaInstallationProbe {
         if (!jdkPath.exists()) {
             return ProbeResult.failure(InstallType.NO_SUCH_DIRECTORY, "No such directory: " + jdkPath);
         }
+        jdkPath = resolveSymlink(jdkPath);
         EnumMap<SysProp, String> metadata = cache.getUnchecked(jdkPath);
         String version = metadata.get(SysProp.VERSION);
         if (UNKNOWN.equals(version)) {
@@ -169,6 +173,14 @@ public class JavaInstallationProbe {
             return ProbeResult.success(InstallType.IS_JDK, metadata);
         }
         return ProbeResult.success(InstallType.IS_JRE, metadata);
+    }
+
+    private File resolveSymlink(File jdkPath) {
+        try {
+            return jdkPath.getCanonicalFile();
+        } catch (IOException e) {
+            return jdkPath;
+        }
     }
 
     private EnumMap<SysProp, String> getCurrentJvmMetadata() {

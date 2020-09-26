@@ -17,7 +17,6 @@
 package org.gradle.buildinit.plugins
 
 import org.gradle.buildinit.plugins.fixtures.ScriptDslFixture
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
 import spock.lang.Unroll
 
 class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
@@ -25,15 +24,17 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
     public static final String SAMPLE_APP_CLASS = "some/thing/App.groovy"
     public static final String SAMPLE_APP_TEST_CLASS = "some/thing/AppTest.groovy"
 
+    @Override
+    String subprojectName() { 'app' }
+
     @Unroll
-    @ToBeFixedForInstantExecution
     def "creates sample source if no source present with #scriptDsl build scripts"() {
         when:
         run('init', '--type', 'groovy-application', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/groovy").assertHasDescendants(SAMPLE_APP_CLASS)
-        targetDir.file("src/test/groovy").assertHasDescendants(SAMPLE_APP_TEST_CLASS)
+        subprojectDir.file("src/main/groovy").assertHasDescendants(SAMPLE_APP_CLASS)
+        subprojectDir.file("src/test/groovy").assertHasDescendants(SAMPLE_APP_TEST_CLASS)
 
         and:
         commonJvmFilesGenerated(scriptDsl)
@@ -48,7 +49,7 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
         run("run")
 
         then:
-        outputContains("Hello world")
+        outputContains("Hello World!")
 
         where:
         scriptDsl << ScriptDslFixture.SCRIPT_DSLS
@@ -60,8 +61,8 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
         run('init', '--type', 'groovy-application', '--test-framework', 'spock', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/groovy").assertHasDescendants(SAMPLE_APP_CLASS)
-        targetDir.file("src/test/groovy").assertHasDescendants(SAMPLE_APP_TEST_CLASS)
+        subprojectDir.file("src/main/groovy").assertHasDescendants(SAMPLE_APP_CLASS)
+        subprojectDir.file("src/test/groovy").assertHasDescendants(SAMPLE_APP_TEST_CLASS)
 
         and:
         commonJvmFilesGenerated(scriptDsl)
@@ -90,14 +91,13 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
     }
 
     @Unroll
-    @ToBeFixedForInstantExecution
     def "creates sample source with package and #scriptDsl build scripts"() {
         when:
         run('init', '--type', 'groovy-application', '--package', 'my.app', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/groovy").assertHasDescendants("my/app/App.groovy")
-        targetDir.file("src/test/groovy").assertHasDescendants("my/app/AppTest.groovy")
+        subprojectDir.file("src/main/groovy").assertHasDescendants("my/app/App.groovy")
+        subprojectDir.file("src/test/groovy").assertHasDescendants("my/app/AppTest.groovy")
 
         and:
         commonJvmFilesGenerated(scriptDsl)
@@ -112,7 +112,7 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
         run("run")
 
         then:
-        outputContains("Hello world")
+        outputContains("Hello World!")
 
         where:
         scriptDsl << ScriptDslFixture.SCRIPT_DSLS
@@ -121,13 +121,13 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
     @Unroll
     def "source generation is skipped when groovy sources detected with #scriptDsl build scripts"() {
         setup:
-        targetDir.file("src/main/groovy/org/acme/SampleMain.groovy") << """
+        subprojectDir.file("src/main/groovy/org/acme/SampleMain.groovy") << """
         package org.acme;
 
         public class SampleMain {
         }
 """
-        targetDir.file("src/test/groovy/org/acme/SampleMainTest.groovy") << """
+        subprojectDir.file("src/test/groovy/org/acme/SampleMainTest.groovy") << """
                 package org.acme;
 
                 class SampleMainTest {
@@ -137,15 +137,15 @@ class GroovyApplicationInitIntegrationTest extends AbstractInitIntegrationSpec {
         run('init', '--type', 'groovy-application', '--dsl', scriptDsl.id)
 
         then:
-        targetDir.file("src/main/groovy").assertHasDescendants("org/acme/SampleMain.groovy")
-        targetDir.file("src/test/groovy").assertHasDescendants("org/acme/SampleMainTest.groovy")
+        subprojectDir.file("src/main/groovy").assertHasDescendants("org/acme/SampleMain.groovy")
+        subprojectDir.file("src/test/groovy").assertHasDescendants("org/acme/SampleMainTest.groovy")
         dslFixtureFor(scriptDsl).assertGradleFilesGenerated()
 
         when:
         run("build")
 
         then:
-        executed(":test")
+        executed(":app:test")
 
         where:
         scriptDsl << ScriptDslFixture.SCRIPT_DSLS

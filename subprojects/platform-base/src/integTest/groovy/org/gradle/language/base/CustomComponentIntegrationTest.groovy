@@ -18,7 +18,7 @@ package org.gradle.language.base
 
 import groovy.transform.NotYetImplemented
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import org.gradle.integtests.fixtures.ToBeFixedForInstantExecution
+import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
 import org.gradle.platform.base.ApplicationSpec
 import org.gradle.platform.base.ComponentSpec
 import org.gradle.platform.base.GeneralComponentSpec
@@ -26,6 +26,7 @@ import org.gradle.platform.base.LibrarySpec
 import org.gradle.platform.base.SourceComponentSpec
 import spock.lang.Unroll
 
+@UnsupportedWithConfigurationCache(because = "software model")
 class CustomComponentIntegrationTest extends AbstractIntegrationSpec {
     @Unroll
     def "can declare custom managed #componentSpecType"() {
@@ -113,7 +114,6 @@ class CustomComponentIntegrationTest extends AbstractIntegrationSpec {
         succeeds "model"
     }
 
-    @ToBeFixedForInstantExecution
     def "can view a component as a ModelElement"() {
         buildFile << """
             @Managed
@@ -650,7 +650,7 @@ class CustomComponentIntegrationTest extends AbstractIntegrationSpec {
 
         expect:
         fails "help"
-        failure.assertHasCause("Failed to apply plugin [class 'Broken']")
+        failure.assertHasCause("Failed to apply plugin class 'Broken'")
         failure.assertHasCause("""Type Broken is not a valid rule source:
 - Method broken(org.gradle.platform.base.TypeBuilder<?>) is not a valid rule method: A rule method cannot be private
 - Method broken(org.gradle.platform.base.TypeBuilder<?>) is not a valid rule method: Type '?' cannot be a wildcard type (i.e. cannot use ? super, ? extends etc.).""")

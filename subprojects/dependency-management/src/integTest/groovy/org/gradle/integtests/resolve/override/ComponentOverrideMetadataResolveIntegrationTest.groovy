@@ -18,17 +18,15 @@ package org.gradle.integtests.resolve.override
 
 import org.gradle.integtests.fixtures.GradleMetadataResolveRunner
 import org.gradle.integtests.fixtures.RequiredFeature
-import org.gradle.integtests.fixtures.RequiredFeatures
+import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
 import org.gradle.integtests.resolve.AbstractModuleDependencyResolveTest
 import spock.lang.Unroll
 
 /**
  * There is more test coverage for 'dependency artifacts' in ArtifactDependenciesIntegrationTest (old test setup).
  */
-@RequiredFeatures(
-    // This test bypasses all metadata using 'artifact()' metadata sources. It is sufficient to test with one metadata setup.
-    @RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
-)
+// This test bypasses all metadata using 'artifact()' metadata sources. It is sufficient to test with one metadata setup.
+@RequiredFeature(feature = GradleMetadataResolveRunner.GRADLE_METADATA, value = "true")
 class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDependencyResolveTest {
 
     def "can combine artifact notation and constraints"() {
@@ -49,7 +47,7 @@ class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDepe
             }
             dependencies {
                 conf('org:foo@distribution-tgz')
-              
+
                 constraints {
                    conf('org:foo:1.0')
                 }
@@ -151,10 +149,10 @@ class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDepe
         buildFile << """
             dependencies {
                 conf 'org:foo:$otherVersion'
-                conf module('org:foo:1.0') { 
+                conf module('org:foo:1.0') {
                     // no dependencies
                 }
-            } 
+            }
 
         """
 
@@ -196,13 +194,13 @@ class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDepe
         buildFile << """
             dependencies {
                 conf 'org:foo:1.1'
-                conf module('org:foo:[1.0,1.1]') { 
+                conf module('org:foo:[1.0,1.1]') {
                     // no dependencies
                 }
-                conf module('org:foo:1.0') { 
+                conf module('org:foo:1.0') {
                     // no dependencies
                 }
-            } 
+            }
         """
 
         when:
@@ -228,6 +226,7 @@ class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDepe
         }
     }
 
+    @ToBeFixedForConfigurationCache
     def "clashing client modules fail the build"() {
         given:
         buildFile << """
@@ -235,12 +234,12 @@ class ComponentOverrideMetadataResolveIntegrationTest extends AbstractModuleDepe
                 conf
             }
             dependencies {
-                conf module('org:foo:1.0') { 
+                conf module('org:foo:1.0') {
                 }
                 conf module('org:foo:1.0') {
                     dependency("org:baz:1.0")
                 }
-            } 
+            }
         """
 
         when:
