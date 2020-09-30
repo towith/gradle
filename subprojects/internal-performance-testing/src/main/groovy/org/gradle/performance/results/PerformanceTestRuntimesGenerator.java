@@ -17,7 +17,6 @@
 package org.gradle.performance.results;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,25 +33,36 @@ public class PerformanceTestRuntimesGenerator {
 
     public void generate(File runtimesFile) throws IOException {
         AllResultsStore resultsStore = new AllResultsStore();
-        Map<PerformanceExperiment, Long> estimatedExperimentTimes = resultsStore.getEstimatedExperimentTimes(OperatingSystem.LINUX);
-        Map<PerformanceScenario, List<Map.Entry<PerformanceExperiment, Long>>> performanceScenarioMap =
+        Map<PerformanceExperimentOnOs, Long> estimatedExperimentTimes = resultsStore.getEstimatedExperimentTimesInMillis();
+        Map<PerformanceScenario, List<Map.Entry<PerformanceExperimentOnOs, Long>>> performanceScenarioMap =
             estimatedExperimentTimes.entrySet().stream()
                 .collect(Collectors.groupingBy(
-                    it -> it.getKey().getScenario(),
+                    it -> it.getKey().getPerformanceExperiment().getScenario(),
                     LinkedHashMap::new,
                     Collectors.toList())
                 );
-        List<Map<String, Object>> json = performanceScenarioMap.entrySet().stream()
+        List<PerformanceScenarioRuntimes> json = performanceScenarioMap.entrySet().stream()
             .map(entry -> {
                 PerformanceScenario scenario = entry.getKey();
-                List<Map.Entry<PerformanceExperiment, Long>> times = entry.getValue();
-                return ImmutableMap.of(
-                    "scenario", scenario.getClassName() + "." + scenario.getTestName(),
-                    "runtimes", times.stream()
-                        .map(experimentEntry -> ImmutableMap.of(
-                            "testProject", experimentEntry.getKey().getTestProject(),
-                            "linux", experimentEntry.getValue()
-                        ))
+                Map<String, Map<OperatingSystem, Long>> perTestProject = entry.getValue().stream()
+                    .collect(Collectors.groupingBy(
+                        it -> it.getKey().getPerformanceExperiment().getTestProject(),
+                        LinkedHashMap::new,
+                        Collectors.toMap(it -> it.getKey().getOperatingSystem(), Map.Entry::getValue)
+                    ));
+                return new PerformanceScenarioRuntimes(
+                    scenario.getClassName() + "." + scenario.getTestName(),
+                    perTestProject.entrySet().stream()
+                        .map(experimentEntry -> {
+                                Map<OperatingSystem, Long> perOs = experimentEntry.getValue();
+                                return new TestProjectRuntime(
+                                    experimentEntry.getKey(),
+                                    perOs.get(OperatingSystem.LINUX),
+                                    perOs.get(OperatingSystem.WINDOWS),
+                                    perOs.get(OperatingSystem.MAC_OS)
+                                );
+                            }
+                        )
                         .collect(Collectors.toList())
                 );
             })
