@@ -29,6 +29,7 @@ import org.gradle.integtests.fixtures.executer.IntegrationTestBuildContext
 import org.gradle.integtests.fixtures.versions.AndroidGradlePluginVersions
 import org.gradle.internal.featurelifecycle.LoggingDeprecatedFeatureHandler
 import org.gradle.internal.operations.trace.BuildOperationTrace
+import org.gradle.test.fixtures.dsl.GradleDsl
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.testkit.runner.BuildResult
 import org.gradle.testkit.runner.GradleRunner
@@ -39,6 +40,7 @@ import spock.lang.Specification
 
 import static org.gradle.integtests.fixtures.RepoScriptBlockUtil.createMirrorInitScript
 import static org.gradle.integtests.fixtures.RepoScriptBlockUtil.gradlePluginRepositoryMirrorUrl
+import static org.gradle.test.fixtures.dsl.GradleDsl.GROOVY
 import static org.gradle.test.fixtures.server.http.MavenHttpPluginRepository.PLUGIN_PORTAL_OVERRIDE_URL_PROPERTY
 
 abstract class AbstractSmokeTest extends Specification {
@@ -71,7 +73,7 @@ abstract class AbstractSmokeTest extends Specification {
         static nebulaResolutionRules = "7.7.6"
 
         // https://plugins.gradle.org/plugin/com.github.johnrengelman.shadow
-        static shadow = Versions.of("4.0.4", "5.2.0", "6.0.0")
+        static shadow = Versions.of("4.0.4", "5.2.0", "6.0.0", "6.1.0")
 
         // https://github.com/asciidoctor/asciidoctor-gradle-plugin/releases
         static asciidoctor = Versions.of("2.3.0", "3.0.0", "3.2.0")
@@ -115,7 +117,7 @@ abstract class AbstractSmokeTest extends Specification {
         static gradleVersions = "0.29.0"
 
         // https://plugins.gradle.org/plugin/org.gradle.playframework
-        static playframework = "0.9"
+        static playframework = "0.10"
 
         // https://plugins.gradle.org/plugin/net.ltgt.errorprone
         static errorProne = "1.2.1"
@@ -289,16 +291,16 @@ abstract class AbstractSmokeTest extends Specification {
         file.text = text
     }
 
-    protected static String jcenterRepository() {
-        RepoScriptBlockUtil.jcenterRepository()
+    protected static String jcenterRepository(GradleDsl dsl = GROOVY) {
+        RepoScriptBlockUtil.jcenterRepository(dsl)
     }
 
-    protected static String mavenCentralRepository() {
-        RepoScriptBlockUtil.mavenCentralRepository()
+    protected static String mavenCentralRepository(GradleDsl dsl = GROOVY) {
+        RepoScriptBlockUtil.mavenCentralRepository(dsl)
     }
 
-    protected static String googleRepository() {
-        RepoScriptBlockUtil.googleRepository()
+    protected static String googleRepository(GradleDsl dsl = GROOVY) {
+        RepoScriptBlockUtil.googleRepository(dsl)
     }
 
     protected static void expectNoDeprecationWarnings(BuildResult result) {

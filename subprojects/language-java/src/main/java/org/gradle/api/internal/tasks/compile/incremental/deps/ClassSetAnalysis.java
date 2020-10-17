@@ -27,6 +27,7 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -69,9 +70,9 @@ public class ClassSetAnalysis {
     }
 
     public DependentsSet getRelevantDependents(Iterable<String> classes, IntSet constants) {
-        final Set<String> accessibleResultClasses = Sets.newLinkedHashSet();
-        final Set<String> privateResultClasses = Sets.newLinkedHashSet();
-        final Set<GeneratedResource> resultResources = Sets.newLinkedHashSet();
+        final Set<String> accessibleResultClasses = new LinkedHashSet<>();
+        final Set<String> privateResultClasses = new LinkedHashSet<>();
+        final Set<GeneratedResource> resultResources = new LinkedHashSet<>();
         for (String cls : classes) {
             DependentsSet d = getRelevantDependents(cls, constants);
             if (d.isDependencyToAll()) {
@@ -103,17 +104,17 @@ public class ClassSetAnalysis {
         if (!constants.isEmpty()) {
             return DependentsSet.dependencyToAll();
         }
-        Set<String> classesDependingOnAllOthers = annotationProcessingData.getGeneratedTypesDependingOnAllOthers();
-        Set<GeneratedResource> resourcesDependingOnAllOthers = annotationProcessingData.getGeneratedResourcesDependingOnAllOthers();
+        Set<String> classesDependingOnAllOthers = annotationProcessingData.participatesInClassGeneration(className) ? annotationProcessingData.getGeneratedTypesDependingOnAllOthers() : Collections.emptySet();
+        Set<GeneratedResource> resourcesDependingOnAllOthers = annotationProcessingData.participatesInResourceGeneration(className) ? annotationProcessingData.getGeneratedResourcesDependingOnAllOthers() : Collections.emptySet();
         if (!deps.hasDependentClasses() && classesDependingOnAllOthers.isEmpty() && resourcesDependingOnAllOthers.isEmpty()) {
             return deps;
         }
 
-        Set<String> privateResultClasses = new HashSet<String>();
-        Set<String> accessibleResultClasses = new HashSet<String>();
-        Set<GeneratedResource> resultResources = new HashSet<GeneratedResource>(resourcesDependingOnAllOthers);
-        processDependentClasses(new HashSet<String>(), privateResultClasses, accessibleResultClasses, resultResources, deps.getPrivateDependentClasses(), deps.getAccessibleDependentClasses());
-        processDependentClasses(new HashSet<String>(), privateResultClasses, accessibleResultClasses, resultResources, Collections.emptySet(), classesDependingOnAllOthers);
+        Set<String> privateResultClasses = new HashSet<>();
+        Set<String> accessibleResultClasses = new HashSet<>();
+        Set<GeneratedResource> resultResources = new HashSet<>(resourcesDependingOnAllOthers);
+        processDependentClasses(new HashSet<>(), privateResultClasses, accessibleResultClasses, resultResources, deps.getPrivateDependentClasses(), deps.getAccessibleDependentClasses());
+        processDependentClasses(new HashSet<>(), privateResultClasses, accessibleResultClasses, resultResources, Collections.emptySet(), classesDependingOnAllOthers);
         accessibleResultClasses.remove(className);
         privateResultClasses.remove(className);
 

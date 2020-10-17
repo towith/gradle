@@ -19,12 +19,12 @@ package org.gradle.performance.fixture;
 import com.google.common.collect.ImmutableList;
 import groovy.transform.CompileStatic;
 import org.gradle.integtests.fixtures.executer.GradleDistribution;
+import org.gradle.integtests.fixtures.executer.IntegrationTestBuildContext;
 import org.gradle.internal.UncheckedException;
 import org.gradle.internal.jvm.Jvm;
 import org.gradle.performance.results.GradleProfilerReporter;
 import org.gradle.performance.results.MeasuredOperationList;
 import org.gradle.profiler.BuildAction;
-import org.gradle.profiler.BuildMutatorFactory;
 import org.gradle.profiler.DaemonControl;
 import org.gradle.profiler.GradleBuildConfiguration;
 import org.gradle.profiler.GradleBuildInvocationResult;
@@ -36,8 +36,11 @@ import org.gradle.profiler.Logging;
 import org.gradle.profiler.RunTasksAction;
 import org.gradle.profiler.instrument.PidInstrumentation;
 import org.gradle.profiler.report.CsvGenerator;
-import org.gradle.profiler.result.Sample;
+import org.gradle.tooling.GradleConnector;
+import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.internal.consumer.ConnectorServices;
+import org.gradle.tooling.model.build.BuildEnvironment;
+import org.gradle.util.GradleVersion;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,7 +60,8 @@ import static java.util.Collections.emptyMap;
 @CompileStatic
 public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
     private static final String GRADLE_USER_HOME_NAME = "gradleUserHome";
-    private PidInstrumentation pidInstrumentation;
+    private final PidInstrumentation pidInstrumentation;
+    private final IntegrationTestBuildContext context = new IntegrationTestBuildContext();
 
     public GradleBuildExperimentRunner(GradleProfilerReporter gradleProfilerReporter) {
         super(gradleProfilerReporter);
@@ -66,14 +70,6 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public PidInstrumentation getPidInstrumentation() {
-        return pidInstrumentation;
-    }
-
-    public void setPidInstrumentation(PidInstrumentation pidInstrumentation) {
-        this.pidInstrumentation = pidInstrumentation;
     }
 
     @Override
@@ -95,21 +91,18 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
         GradleBuildExperimentSpec gradleExperiment = (GradleBuildExperimentSpec) experiment;
         InvocationSettings invocationSettings = createInvocationSettings(buildSpec, gradleExperiment);
         GradleScenarioDefinition scenarioDefinition = createScenarioDefinition(gradleExperiment, invocationSettings, invocation);
-        List<Sample<GradleBuildInvocationResult>> buildOperationSamples = scenarioDefinition.getMeasuredBuildOperations().stream()
-            .map(GradleBuildInvocationResult::sampleBuildOperation)
-            .collect(Collectors.toList());
-        Consumer<GradleBuildInvocationResult> scenarioReporter = getResultCollector(scenarioDefinition.getName()).scenario(
-            scenarioDefinition,
-            ImmutableList.<Sample<? super GradleBuildInvocationResult>>builder()
-                .add(GradleBuildInvocationResult.EXECUTION_TIME)
-                .addAll(buildOperationSamples)
-                .build()
-        );
 
         try {
-            GradleScenarioInvoker scenarioInvoker = createScenarioInvoker(new File(buildSpec.getWorkingDirectory(), GRADLE_USER_HOME_NAME));
+            GradleScenarioInvoker scenarioInvoker = createScenarioInvoker(invocationSettings.getGradleUserHome());
+            Consumer<GradleBuildInvocationResult> scenarioReporter = getResultCollector().scenario(
+                scenarioDefinition,
+                scenarioInvoker.samplesFor(invocationSettings, scenarioDefinition)
+            );
             AtomicInteger iterationCount = new AtomicInteger(0);
             Logging.setupLogging(workingDirectory);
+            if (gradleExperiment.getInvocation().isUseToolingApi()) {
+                initializeNativeServicesForTapiClient(buildSpec, scenarioDefinition);
+            }
             scenarioInvoker.doRun(scenarioDefinition,
                 invocationSettings,
                 consumerFor(scenarioDefinition, iterationCount, results, scenarioReporter));
@@ -126,6 +119,22 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
         }
     }
 
+    private void initializeNativeServicesForTapiClient(GradleInvocationSpec buildSpec, GradleScenarioDefinition scenarioDefinition) {
+        GradleConnector connector = GradleConnector.newConnector();
+        try {
+            connector.forProjectDirectory(buildSpec.getWorkingDirectory());
+            connector.useInstallation(scenarioDefinition.getBuildConfiguration().getGradleHome());
+            // First initialize the Gradle instance using the default user home dir
+            // This sets some static state that uses files from the user home dir, such as DLLs
+            connector.useGradleUserHomeDir(context.getGradleUserHomeDir());
+            try (ProjectConnection connection = connector.connect()) {
+                connection.getModel(BuildEnvironment.class);
+            }
+        } finally {
+            connector.disconnect();
+        }
+    }
+
     private GradleScenarioInvoker createScenarioInvoker(File gradleUserHome) {
         DaemonControl daemonControl = new DaemonControl(gradleUserHome);
         return new GradleScenarioInvoker(daemonControl, pidInstrumentation);
@@ -139,6 +148,9 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
             : (daemonInvoker == GradleBuildInvoker.ToolingApi
             ? daemonInvoker.withColdDaemon()
             : GradleBuildInvoker.CliNoDaemon);
+        boolean measureGarbageCollection = experiment.isMeasureGarbageCollection()
+            // Measuring GC needs build services which have been introduced in Gradle 6.1
+            && experiment.getInvocation().getGradleDistribution().getVersion().getBaseVersion().compareTo(GradleVersion.version("6.1")) >= 0;
         return new InvocationSettings.InvocationSettingsBuilder()
             .setProjectDir(invocationSpec.getWorkingDirectory())
             .setProfiler(getProfiler())
@@ -150,14 +162,21 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
             .setVersions(ImmutableList.of(invocationSpec.getGradleDistribution().getVersion().getVersion()))
             .setTargets(invocationSpec.getTasksToRun())
             .setSysProperties(emptyMap())
-            .setGradleUserHome(new File(invocationSpec.getWorkingDirectory(), GRADLE_USER_HOME_NAME))
+            .setGradleUserHome(determineGradleUserHome(invocationSpec))
             .setWarmupCount(warmupsForExperiment(experiment))
             .setIterations(invocationsForExperiment(experiment))
             .setMeasureConfigTime(false)
             .setMeasuredBuildOperations(experiment.getMeasuredBuildOperations())
+            .setMeasureGarbageCollection(measureGarbageCollection)
             .setCsvFormat(CsvGenerator.Format.LONG)
             .setBuildLog(invocationSpec.getBuildLog())
             .build();
+    }
+
+    private File determineGradleUserHome(GradleInvocationSpec invocationSpec) {
+        File projectDirectory = invocationSpec.getWorkingDirectory();
+        // do not add the Gradle user home in the project directory, so it is not watched
+        return new File(projectDirectory.getParent(), projectDirectory.getName() + "-" + GRADLE_USER_HOME_NAME);
     }
 
     private GradleScenarioDefinition createScenarioDefinition(GradleBuildExperimentSpec experimentSpec, InvocationSettings invocationSettings, GradleInvocationSpec invocationSpec) {
@@ -174,10 +193,9 @@ public class GradleBuildExperimentRunner extends AbstractBuildExperimentRunner {
                 : new RunTasksAction(cleanTasks),
             invocationSpec.getArgs(),
             invocationSettings.getSystemProperties(),
-            new BuildMutatorFactory(experimentSpec.getBuildMutators().stream()
-                .map(mutatorFunction -> toMutatorSupplierForSettings(invocationSettings, mutatorFunction))
-                .collect(Collectors.toList())
-            ),
+            experimentSpec.getBuildMutators().stream()
+                .map(mutatorFunction -> mutatorFunction.apply(invocationSettings))
+                .collect(Collectors.toList()),
             invocationSettings.getWarmUpCount(),
             invocationSettings.getBuildCount(),
             invocationSettings.getOutputDir(),

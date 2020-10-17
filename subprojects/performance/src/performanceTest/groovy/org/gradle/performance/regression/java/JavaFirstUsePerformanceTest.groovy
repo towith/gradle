@@ -23,13 +23,13 @@ import org.gradle.profiler.mutations.ClearGradleUserHomeMutator
 import org.gradle.profiler.mutations.ClearProjectCacheMutator
 import org.junit.experimental.categories.Category
 
-import static org.gradle.performance.generator.JavaTestProject.LARGE_JAVA_MULTI_PROJECT_KOTLIN_DSL
+import static org.gradle.performance.generator.JavaTestProjectGenerator.LARGE_JAVA_MULTI_PROJECT_KOTLIN_DSL
 
 @Category(SlowPerformanceRegressionTest)
 class JavaFirstUsePerformanceTest extends AbstractCrossVersionPerformanceTest {
 
     def setup() {
-        runner.targetVersions = ["6.8-20200927220040+0000"]
+        runner.targetVersions = ["6.8-20201011220037+0000"]
     }
 
     def "first use"() {

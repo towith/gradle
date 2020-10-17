@@ -15,11 +15,14 @@
  */
 package org.gradle.performance.regression.inception
 
+import org.gradle.api.JavaVersion
 import org.gradle.performance.AbstractCrossVersionPerformanceTest
 import org.gradle.performance.categories.SlowPerformanceRegressionTest
-import org.gradle.profiler.BuildContext
+import org.gradle.performance.fixture.CrossVersionPerformanceTestRunner
+import org.gradle.performance.mutator.ApplyAbiChangeToGroovySourceFileMutator
+import org.gradle.performance.mutator.ApplyNonAbiChangeToGroovySourceFileMutator
 import org.gradle.profiler.BuildMutator
-import org.gradle.util.GradleVersion
+import org.gradle.profiler.InvocationSettings
 import org.junit.experimental.categories.Category
 
 @Category(SlowPerformanceRegressionTest)
@@ -28,7 +31,10 @@ class BuildSrcApiChangePerformanceTest extends AbstractCrossVersionPerformanceTe
     def setup() {
         def targetVersion = "6.8-20200927220040+0000"
         runner.targetVersions = [targetVersion]
-        runner.minimumBaseVersion = GradleVersion.version(targetVersion).baseVersion.version
+        runner.minimumBaseVersion = "6.8"
+        runner.warmUpRuns = 3
+        runner.gradleOpts = runner.projectMemoryOptions
+        useG1GarbageCollectorOnJava8(runner)
     }
 
     def "buildSrc abi change"() {
@@ -38,25 +44,28 @@ class BuildSrcApiChangePerformanceTest extends AbstractCrossVersionPerformanceTe
 
         and:
         def changingClassFilePath = "buildSrc/src/main/groovy/ChangingClass.groovy"
-        runner.addBuildMutator { invocationSettings ->
-            new BuildMutator() {
-                @Override
-                void beforeBuild(BuildContext context) {
-                    new File(invocationSettings.projectDir, changingClassFilePath).tap {
-                        parentFile.mkdirs()
-                        text = """
-                        class ChangingClass {
-                            void changingMethod${context.phase}${context.iteration}() {}
-                        }
-                    """.stripIndent()
-                    }
-                }
-            }
-        }
+        runner.addBuildMutator { new CreateChangingClassMutator(it, changingClassFilePath) }
+        runner.addBuildMutator { new ApplyAbiChangeToGroovySourceFileMutator(new File(it.projectDir, changingClassFilePath)) }
 
         when:
         def result = runner.run()
 
+        then:
+        result.assertCurrentVersionHasNotRegressed()
+    }
+
+    def "buildSrc non-abi change"() {
+        given:
+        runner.tasksToRun = ['help']
+        runner.runs = determineNumberOfRuns(runner.testProject)
+
+        and:
+        def changingClassFilePath = "buildSrc/src/main/groovy/ChangingClass.groovy"
+        runner.addBuildMutator { new CreateChangingClassMutator(it, changingClassFilePath) }
+        runner.addBuildMutator { new ApplyNonAbiChangeToGroovySourceFileMutator(new File(it.projectDir, changingClassFilePath)) }
+
+        when:
+        def result = runner.run()
         then:
         result.assertCurrentVersionHasNotRegressed()
     }
@@ -71,6 +80,31 @@ class BuildSrcApiChangePerformanceTest extends AbstractCrossVersionPerformanceTe
                 return 10
             default:
                 20
+        }
+    }
+
+    private static void useG1GarbageCollectorOnJava8(CrossVersionPerformanceTestRunner runner) {
+        if (!JavaVersion.current().isJava9Compatible()) {
+            runner.gradleOpts.addAll(['-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC'])
+        }
+    }
+
+    private static class CreateChangingClassMutator implements BuildMutator {
+
+        CreateChangingClassMutator(InvocationSettings settings, String filePath) {
+            new File(settings.projectDir, filePath).with {
+                parentFile.mkdirs()
+                // We need to create the file in the constructor, since the file change mutators read the text of the file in the constructor as well.
+                // It would be better if the file change mutators would read the original test in `beforeScenario`, so we could create the file here
+                // as well in beforeScenario.
+                text = """
+                    class ChangingClass {
+                        void changingMethod() {
+                            System.out.println("Do the thing");
+                        }
+                    }
+                """
+            }
         }
     }
 }

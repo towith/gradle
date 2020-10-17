@@ -16,6 +16,7 @@
 
 package Gradle_Check.configurations
 
+import Gradle_Check.model.PerformanceTestCoverage
 import common.Os
 import common.applyDefaultSettings
 import configurations.BaseGradleBuildType
@@ -31,10 +32,11 @@ import projects.PerformanceTestProject
 class PerformanceTestsPass(model: CIBuildModel, performanceTestProject: PerformanceTestProject) : BaseGradleBuildType(model, init = {
     uuid = performanceTestProject.uuid + "_Trigger"
     id = AbsoluteId(uuid)
+    val performanceTestCoverage = performanceTestProject.performanceTestCoverage
     name = performanceTestProject.name + " (Trigger)"
 
     val os = Os.LINUX
-    val type = performanceTestProject.performanceTestCoverage.type
+    val type = performanceTestCoverage.type
 
     applyDefaultSettings(os)
     params {
@@ -42,7 +44,7 @@ class PerformanceTestsPass(model: CIBuildModel, performanceTestProject: Performa
         param("env.JAVA_HOME", os.buildJavaHome())
         param("env.BUILD_BRANCH", "%teamcity.build.branch%")
         param("performance.db.username", "tcagent")
-        param("performance.channel", performanceTestProject.performanceTestCoverage.channel())
+        param("performance.channel", performanceTestCoverage.channel())
     }
 
     features {
@@ -52,14 +54,13 @@ class PerformanceTestsPass(model: CIBuildModel, performanceTestProject: Performa
     val performanceResultsDir = "perf-results"
     val performanceProjectName = "performance"
 
-    val taskName = if (performanceTestProject.performanceTestCoverage.type == PerformanceTestType.flakinessDetection)
+    val taskName = if (performanceTestCoverage.type == PerformanceTestType.flakinessDetection)
         "performanceTestFlakinessReport"
     else
         "performanceTestReport"
 
     artifactRules = """
-$performanceResultsDir => perf-results/
-subprojects/$performanceProjectName/build/$taskName => report/
+subprojects/$performanceProjectName/build/performance-test-results.zip
 """
 
     gradleRunnerStep(
@@ -99,4 +100,6 @@ subprojects/$performanceProjectName/build/$taskName => report/
             }
         }
     }
-})
+}) {
+    val performanceTestCoverage: PerformanceTestCoverage = performanceTestProject.performanceTestCoverage
+}

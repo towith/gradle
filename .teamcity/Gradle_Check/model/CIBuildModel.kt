@@ -71,7 +71,11 @@ data class CIBuildModel(
             functionalTests = listOf(
                 TestCoverage(5, TestType.quickFeedbackCrossVersion, Os.LINUX, JvmCategory.MIN_VERSION),
                 TestCoverage(6, TestType.quickFeedbackCrossVersion, Os.WINDOWS, JvmCategory.MIN_VERSION),
-                TestCoverage(28, TestType.watchFs, Os.LINUX, JvmCategory.MAX_VERSION))
+                TestCoverage(28, TestType.watchFs, Os.LINUX, JvmCategory.MAX_VERSION)),
+            performanceTests = listOf(
+                PerformanceTestCoverage(6, PerformanceTestType.test, Os.WINDOWS, numberOfBuckets = 5, failsStage = false),
+                PerformanceTestCoverage(7, PerformanceTestType.test, Os.MACOS, numberOfBuckets = 5, failsStage = false)
+            )
         ),
         Stage(StageNames.READY_FOR_RELEASE,
             trigger = Trigger.daily,
@@ -101,7 +105,9 @@ data class CIBuildModel(
             performanceTests = listOf(
                 PerformanceTestCoverage(3, PerformanceTestType.historical, Os.LINUX, numberOfBuckets = 60, oldUuid = "PerformanceTestHistoricalLinux"),
                 PerformanceTestCoverage(4, PerformanceTestType.flakinessDetection, Os.LINUX, numberOfBuckets = 60, oldUuid = "PerformanceTestFlakinessDetectionLinux"),
-                PerformanceTestCoverage(5, PerformanceTestType.experiment, Os.LINUX, numberOfBuckets = 20, oldUuid = "PerformanceTestExperimentLinux")
+                PerformanceTestCoverage(5, PerformanceTestType.experiment, Os.LINUX, numberOfBuckets = 20, oldUuid = "PerformanceTestExperimentLinux"),
+                PerformanceTestCoverage(8, PerformanceTestType.experiment, Os.WINDOWS, numberOfBuckets = 5),
+                PerformanceTestCoverage(9, PerformanceTestType.experiment, Os.MACOS, numberOfBuckets = 5)
             )),
         Stage(StageNames.EXPERIMENTAL,
             trigger = Trigger.never,
@@ -151,8 +157,10 @@ data class CIBuildModel(
             trigger = Trigger.never,
             runsIndependent = true,
             performanceTests = listOf(
-                PerformanceTestCoverage(6, PerformanceTestType.test, Os.WINDOWS, numberOfBuckets = 5, withoutDependencies = true),
-                PerformanceTestCoverage(7, PerformanceTestType.test, Os.MACOS, numberOfBuckets = 5, withoutDependencies = true)
+                PerformanceTestCoverage(10, PerformanceTestType.test, Os.LINUX, numberOfBuckets = 40, withoutDependencies = true),
+                PerformanceTestCoverage(11, PerformanceTestType.test, Os.WINDOWS, numberOfBuckets = 5, withoutDependencies = true),
+                PerformanceTestCoverage(12, PerformanceTestType.test, Os.MACOS, numberOfBuckets = 5, withoutDependencies = true),
+                PerformanceTestCoverage(13, PerformanceTestType.slow, Os.LINUX, numberOfBuckets = 30, withoutDependencies = true)
             )
         )
     ),
@@ -315,6 +323,14 @@ enum class PerformanceTestType(
         timeout = 2280,
         defaultBaselines = "3.5.1,4.10.3,5.6.4,last",
         channel = "historical",
+        extraParameters = "--checks none"
+    ),
+    adHoc(
+        taskId = "HistoricalPerformanceTest",
+        displayName = "AdHoc Performance Test",
+        timeout = 30,
+        defaultBaselines = "defaults",
+        channel = "adhoc",
         extraParameters = "--checks none"
     );
 

@@ -37,6 +37,8 @@ val allVersionsIntegMultiVersionTest = "allVersionsIntegMultiVersionTest"
 
 val soakTest = "soakTest"
 
+val smokeTest = "smokeTest"
+
 
 setupTimeoutMonitorOnCI()
 setupGlobalState()
@@ -51,12 +53,17 @@ tasks.registerEarlyFeedbackRootLifecycleTasks()
 fun setupTimeoutMonitorOnCI() {
     if (BuildEnvironment.isCiServer) {
         val timer = Timer(true).apply {
-            schedule(timerTask {
-                exec {
-                    commandLine("${System.getProperty("java.home")}/bin/java",
-                        rootProject.file("subprojects/internal-integ-testing/src/main/groovy/org/gradle/integtests/fixtures/timeout/JavaProcessStackTracesMonitor.java"))
-                }
-            }, determineTimeoutMillis())
+            schedule(
+                timerTask {
+                    exec {
+                        commandLine(
+                            "${System.getProperty("java.home")}/bin/java",
+                            rootProject.file("subprojects/internal-integ-testing/src/main/groovy/org/gradle/integtests/fixtures/timeout/JavaProcessStackTracesMonitor.java")
+                        )
+                    }
+                },
+                determineTimeoutMillis()
+            )
         }
         gradle.buildFinished {
             timer.cancel()
@@ -64,12 +71,11 @@ fun setupTimeoutMonitorOnCI() {
     }
 }
 
-fun determineTimeoutMillis() =
-    if (isRequestedTask(compileAllBuild) || isRequestedTask(sanityCheck) || isRequestedTask(quickTest)) {
-        Duration.ofMinutes(30).toMillis()
-    } else {
-        Duration.ofHours(2).plusMinutes(45).toMillis()
-    }
+fun determineTimeoutMillis() = when {
+    isRequestedTask(compileAllBuild) || isRequestedTask(sanityCheck) || isRequestedTask(quickTest) -> Duration.ofMinutes(30).toMillis()
+    isRequestedTask(smokeTest) -> Duration.ofHours(1).plusMinutes(30).toMillis()
+    else -> Duration.ofHours(2).plusMinutes(45).toMillis()
+}
 
 fun setupGlobalState() {
     if (needsToUseTestVersionsPartial()) {
@@ -99,7 +105,8 @@ fun TaskContainer.registerEarlyFeedbackRootLifecycleTasks() {
         dependsOn(
             ":docs:checkstyleApi", ":internal-build-reports:allIncubationReportsZip",
             ":architecture-test:checkBinaryCompatibility", ":docs:javadocAll",
-            ":architecture-test:test", ":tooling-api:toolingApiShadedJar")
+            ":architecture-test:test", ":tooling-api:toolingApiShadedJar"
+        )
     }
 }
 
@@ -110,8 +117,10 @@ fun TaskContainer.registerDistributionsPromotionTasks() {
     register("packageBuild") {
         description = "Build production distros and smoke test them"
         group = "build"
-        dependsOn(":distributions-full:verifyIsProductionBuildEnvironment", ":distributions-full:buildDists",
-            ":distributions-integ-tests:forkingIntegTest", ":docs:releaseNotes", ":docs:incubationReport", ":docs:checkDeadInternalLinks")
+        dependsOn(
+            ":distributions-full:verifyIsProductionBuildEnvironment", ":distributions-full:buildDists",
+            ":distributions-integ-tests:forkingIntegTest", ":docs:releaseNotes", ":docs:incubationReport", ":docs:checkDeadInternalLinks"
+        )
     }
 }
 

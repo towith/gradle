@@ -66,7 +66,7 @@ class GradleApiExtensionsTest : TestWithClassPath() {
             ClassAndGroovyNamedArguments::class
         ) {
 
-            assertGeneratedJarHash("b429469f8feb02fe9435b6bf7de2f7a5")
+            assertGeneratedJarHash("b5b74390c5fd73a35a56879a8a667f62")
         }
     }
 
@@ -341,12 +341,14 @@ class GradleApiExtensionsTest : TestWithClassPath() {
         val useDir = file("use").also { it.mkdirs() }
         val usageFiles = extensionsUsages.mapIndexed { idx, usage ->
             useDir.resolve("usage$idx.kt").also {
-                it.writeText("""
-                import org.gradle.kotlin.dsl.fixtures.codegen.*
-                import org.gradle.kotlin.dsl.*
+                it.writeText(
+                    """
+                    import org.gradle.kotlin.dsl.fixtures.codegen.*
+                    import org.gradle.kotlin.dsl.*
 
-                $usage
-                """.trimIndent())
+                    $usage
+                    """.trimIndent()
+                )
             }
         }
 

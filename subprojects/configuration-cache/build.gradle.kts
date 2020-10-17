@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("gradlebuild.distribution.implementation-kotlin")
+    id("gradlebuild.kotlin-dsl-sam-with-receiver")
 }
 
 tasks {
@@ -36,22 +37,22 @@ afterEvaluate {
 dependencies {
     implementation(project(":base-services"))
     implementation(project(":base-services-groovy"))
+    implementation(project(":composite-builds"))
     implementation(project(":core"))
     implementation(project(":core-api"))
     implementation(project(":dependency-management"))
     implementation(project(":execution"))
     implementation(project(":file-collections"))
-    implementation(project(":kotlin-dsl"))
     implementation(project(":logging"))
     implementation(project(":messaging"))
     implementation(project(":model-core"))
     implementation(project(":native"))
     implementation(project(":persistent-cache"))
+    implementation(project(":plugin-use"))
     implementation(project(":plugins"))
     implementation(project(":publish"))
     implementation(project(":resources"))
     implementation(project(":snapshots"))
-    implementation(project(":plugin-use"))
 
     // TODO - move the isolatable serializer to model-core to live with the isolatable infrastructure
     implementation(project(":workers"))

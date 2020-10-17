@@ -73,8 +73,8 @@ public abstract class AbstractBuildExperimentRunner implements BuildExperimentRu
     private Profiler createProfiler(String profilerName) {
         OptionParser optionParser = new OptionParser();
         optionParser.accepts("profiler");
+        ProfilerFactory.configureParser(optionParser);
         ProfilerFactory profilerFactory = ProfilerFactory.of(Collections.singletonList(profilerName));
-        profilerFactory.addOptions(optionParser);
         return profilerFactory.createFromOptions(optionParser.parse());
     }
 
@@ -82,8 +82,8 @@ public abstract class AbstractBuildExperimentRunner implements BuildExperimentRu
         return flameGraphGenerator;
     }
 
-    protected BenchmarkResultCollector getResultCollector(String name) {
-        return gradleProfilerReporter.getResultCollector(name);
+    protected BenchmarkResultCollector getResultCollector() {
+        return gradleProfilerReporter.getResultCollector();
     }
 
     protected Profiler getProfiler() {

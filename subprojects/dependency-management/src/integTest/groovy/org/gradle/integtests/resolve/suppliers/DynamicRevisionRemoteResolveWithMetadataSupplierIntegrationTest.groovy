@@ -1345,8 +1345,6 @@ group:projectB:2.2;release
 
     void addDependenciesTo(TestFile buildFile) {
         buildFile << """
-          import javax.inject.Inject
-
           if (project.hasProperty('refreshDynamicVersions')) {
                 configurations.all {
                     resolutionStrategy.cacheDynamicVersionsFor 0, "seconds"

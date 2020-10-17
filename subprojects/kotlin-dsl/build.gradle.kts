@@ -18,6 +18,7 @@ import gradlebuild.cleanup.WhenNotEmpty
 plugins {
     id("gradlebuild.distribution.api-kotlin")
     id("gradlebuild.kotlin-dsl-dependencies-embedded")
+    id("gradlebuild.kotlin-dsl-sam-with-receiver")
 }
 
 description = "Kotlin DSL Provider"
@@ -48,11 +49,13 @@ dependencies {
     implementation(project(":build-cache"))
     implementation(project(":tooling-api"))
     implementation(project(":execution"))
+    implementation(project(":normalization-java"))
 
     implementation(libs.groovy)
     implementation(libs.slf4jApi)
     implementation(libs.guava)
     implementation(libs.inject)
+    implementation(libs.asm)
 
     implementation(libs.futureKotlin("script-runtime"))
     implementation(libs.futureKotlin("daemon-embeddable"))
@@ -63,7 +66,7 @@ dependencies {
     implementation(libs.futureKotlin("scripting-jvm")) {
         isTransitive = false
     }
-    implementation(libs.futureKotlin("scripting-jvm-host-embeddable")) {
+    implementation(libs.futureKotlin("scripting-jvm-host")) {
         isTransitive = false
     }
     implementation(libs.futureKotlin("scripting-compiler-embeddable")) {
@@ -88,7 +91,6 @@ dependencies {
     testImplementation(project(":plugins"))
     testImplementation(project(":version-control"))
     testImplementation(libs.ant)
-    testImplementation(libs.asm)
     testImplementation(libs.mockitoKotlin)
     testImplementation(libs.jacksonKotlin)
 

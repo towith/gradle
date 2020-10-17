@@ -39,6 +39,7 @@ import org.gradle.configurationcache.serialization.WriteContext
 import org.gradle.configurationcache.serialization.decodePreservingSharedIdentity
 import org.gradle.configurationcache.serialization.encodePreservingSharedIdentityOf
 import org.gradle.configurationcache.serialization.readNonNull
+import org.gradle.internal.Describables
 import org.gradle.internal.Try
 import org.gradle.internal.component.local.model.ComponentFileArtifactIdentifier
 import org.gradle.internal.component.model.DefaultIvyArtifactName
@@ -55,7 +56,7 @@ class TransformedExternalArtifactSetCodec(
             write(value.ownerId)
             write(value.targetVariantAttributes)
             val files = mutableListOf<File>()
-            value.visitArtifacts { files.add(it.file) }
+            value.visitArtifacts { files.add(file) }
             write(files)
             write(value.transformation)
             val unpacked = unpackTransformation(value.transformation, value.dependenciesResolver)
@@ -72,7 +73,7 @@ class TransformedExternalArtifactSetCodec(
             val dependencies = readNonNull<List<TransformDependencies>>()
             val dependenciesPerTransformer = mutableMapOf<Transformer, TransformDependencies>()
             transformation.visitTransformationSteps {
-                dependenciesPerTransformer.put(it.transformer, dependencies[dependenciesPerTransformer.size])
+                dependenciesPerTransformer[transformer] = dependencies[dependenciesPerTransformer.size]
             }
             TransformedExternalArtifactSet(ownerId, FixedFilesArtifactSet(ownerId, files), targetAttributes, transformation, FixedDependenciesResolverFactory(dependenciesPerTransformer), transformationNodeRegistry)
         }
@@ -107,7 +108,16 @@ class FixedFilesArtifactSet(private val ownerId: ComponentIdentifier, private va
     }
 
     override fun startVisit(actions: BuildOperationQueue<RunnableBuildOperation>, listener: ResolvedArtifactSet.AsyncArtifactListener): ResolvedArtifactSet.Completion {
-        throw UnsupportedOperationException("should not be called")
+        val artifacts = artifacts
+        for (artifact in artifacts) {
+            listener.artifactAvailable(artifact)
+        }
+        return ResolvedArtifactSet.Completion { visitor ->
+            val displayName = Describables.of(ownerId)
+            for (artifact in artifacts) {
+                visitor.visitArtifact(displayName, ImmutableAttributes.EMPTY, artifact)
+            }
+        }
     }
 
     override fun visitLocalArtifacts(visitor: ResolvedArtifactSet.LocalArtifactVisitor) {
@@ -115,8 +125,12 @@ class FixedFilesArtifactSet(private val ownerId: ComponentIdentifier, private va
     }
 
     override fun visitExternalArtifacts(visitor: Action<ResolvableArtifact>) {
-        for (file in files) {
-            visitor.execute(PreResolvedResolvableArtifact(null, DefaultIvyArtifactName.forFile(file, null), ComponentFileArtifactIdentifier(ownerId, file.name), file, TaskDependencyContainer.EMPTY))
+        for (artifact in artifacts) {
+            visitor.execute(artifact)
         }
     }
+
+    private
+    val artifacts: List<ResolvableArtifact>
+        get() = files.map { file -> PreResolvedResolvableArtifact(null, DefaultIvyArtifactName.forFile(file, null), ComponentFileArtifactIdentifier(ownerId, file.name), file, TaskDependencyContainer.EMPTY) }
 }

@@ -26,7 +26,7 @@ plugins {
 // --- Enable automatic generation of API extensions -------------------
 val apiExtensionsOutputDir = layout.buildDirectory.dir("generated-sources/kotlin")
 
-val publishedKotlinDslPluginVersion = "1.3.6" // TODO:kotlin-dsl
+val publishedKotlinDslPluginVersion = "1.4.2" // TODO:kotlin-dsl
 
 tasks {
     val generateKotlinDependencyExtensions by registering(GenerateKotlinDependencyExtensions::class) {
@@ -70,11 +70,12 @@ val writeEmbeddedKotlinDependencies by tasks.registering {
     inputs.files(values)
     val skippedModules = setOf(project.name, "distributions-dependencies", "kotlin-compiler-embeddable")
     // https://github.com/gradle/configuration-cache/issues/183
-    val modules = provider { embeddedKotlinBaseDependencies.incoming.resolutionResult.allComponents
-        .asSequence()
-        .mapNotNull { it.moduleVersion }
-        .filter { it.name !in skippedModules }
-        .associate { "${it.group}:${it.name}" to it.version }
+    val modules = provider {
+        embeddedKotlinBaseDependencies.incoming.resolutionResult.allComponents
+            .asSequence()
+            .mapNotNull { it.moduleVersion }
+            .filter { it.name !in skippedModules }
+            .associate { "${it.group}:${it.name}" to it.version }
     }
 
     doLast {
